@@ -2,21 +2,26 @@ name: Backend production smoke
 
 on:
   deployment_status:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: backend-production-smoke-${{ github.event.deployment.id }}
+  group: backend-production-smoke-${{ github.event.deployment.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   smoke:
     name: Production edge smoke
     if: >-
-      github.event.deployment_status.state == 'success' &&
-      github.event.deployment.environment == 'friendly-rating / production' &&
-      github.event.deployment.creator.login == 'railway-app[bot]'
+      (github.event_name == 'workflow_dispatch' &&
+       github.ref == 'refs/heads/main') ||
+      (github.event_name == 'deployment_status' &&
+       github.event.deployment_status.state == 'success' &&
+       (github.event.deployment.environment == 'production' ||
+        github.event.deployment.environment == 'friendly-rating / production') &&
+       github.event.deployment.creator.login == 'railway-app[bot]')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
