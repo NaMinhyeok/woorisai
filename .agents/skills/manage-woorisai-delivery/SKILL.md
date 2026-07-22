@@ -74,17 +74,26 @@ For GitHub delivery:
 For Railway production:
 
 1. Obtain explicit authorization for deploy or configuration mutation.
-2. Scope every operation to the documented project, environment, and API service; read back source,
+2. Confirm the Railway GitHub App can see the current repository identity, not only the same
+   `owner/name`. A repository recreated after a public-history cutover has a new GitHub repository
+   ID. Select that repository in the App installation, save, wait for Railway's cache to refresh,
+   and reconnect the source from a Railway surface that enumerates the repository, without an
+   explicit branch override. If the CLI returns `Unauthorized` after one account reauthentication,
+   verify the repository list and reconnect in the authenticated Railway UI; never substitute a
+   forced branch. Do not call it autodeploy-ready until a watched-path `main` push proves the hook.
+3. Scope every operation to the documented project, environment, and API service; read back source,
    branch, and `Wait for CI` after a change.
-3. Accept only the protected GitHub `main` SHA after its four checks succeed.
-4. Wait for a terminal successful deployment, then verify `/health`, public login options, and an
+4. Accept only the protected GitHub `main` SHA after its four checks succeed.
+5. Wait for a terminal successful deployment, then verify `/health`, public login options, and an
    invalid protected request returning `401` with `Cache-Control: no-store`.
-5. Never use a production PIN, private response, data write, migration, or provider side effect in
+6. Never use a production PIN, private response, data write, migration, or provider side effect in
    the generic smoke.
-6. A source-connect or configuration-driven deployment may not create a GitHub `deployment_status`
+7. A source-connect or configuration-driven deployment may not create a GitHub `deployment_status`
    event. After confirming the exact protected `main` SHA reached terminal success, dispatch
    `Backend production smoke` manually from `main`. Record this as fallback proof; the next normal
-   `main` push must still prove Railway's native post-deploy event path.
+   `main` push that changes a configured Railway watch path must still prove Railway's native
+   post-deploy event path. Use a meaningful pull request rather than an empty or docs-only probe;
+   Railway ignores pushes outside its watch paths.
 
 For iOS delivery:
 
