@@ -1,0 +1,4 @@
+interface:
+  display_name: "Model Spring Domain"
+  short_description: "Spring 도메인 모델과 SOLID 설계 가이드"
+  default_prompt: "Use $model-spring-domain to review this domain model for invariants, responsibilities, and pragmatic SOLID design."

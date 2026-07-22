@@ -1,0 +1,2193 @@
+openapi: 3.1.0
+info:
+  title: Woorisai API
+  version: 2.0.0
+  description: >-
+    Private API for exactly two participants. Protected operations use stateless
+    HTTP Basic credentials: the username is participant slot `1` or `2`, and the
+    password is exactly four ASCII digits. Credentials are verified on every request.
+tags:
+  - name: Operations
+  - name: Identity
+  - name: Media
+  - name: Relationship
+  - name: Diary
+  - name: Notification
+security:
+  - BasicAuth: []
+paths:
+  /health:
+    get:
+      tags:
+        - Operations
+      summary: Read the database-backed readiness state
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: The application and database are ready
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                $ref: "#/components/schemas/HealthUpResponse"
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthUpResponse"
+        "503":
+          description: Readiness is down, including when the database is unavailable
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                $ref: "#/components/schemas/HealthUnavailableResponse"
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthUnavailableResponse"
+
+  /api/v2/auth/login-options:
+    get:
+      tags:
+        - Identity
+      summary: List the two participant choices in slot order
+      operationId: listLoginOptions
+      security: []
+      responses:
+        "200":
+          description: Exactly slot 1 followed by slot 2
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginOptionsResponse"
+        "503":
+          $ref: "#/components/responses/LoginOptionsUnavailable"
+
+  /api/v2/media-uploads:
+    post:
+      tags:
+        - Media
+      summary: Create a pending private media upload
+      operationId: initiateMediaUpload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InitiateMediaUploadRequest"
+      responses:
+        "201":
+          description: A pending upload and short-lived private upload grant
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InitiatedMediaUploadResponse"
+        "400":
+          $ref: "#/components/responses/InvalidMediaUploadRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "503":
+          $ref: "#/components/responses/MediaUploadsOrAuthenticationUnavailable"
+
+  /api/v2/media-uploads/{uploadId}/complete:
+    parameters:
+      - $ref: "#/components/parameters/MediaUploadId"
+    post:
+      tags:
+        - Media
+      summary: Verify a pending object and make the upload ready for attachment
+      operationId: completeMediaUpload
+      responses:
+        "200":
+          description: Ready media metadata; completing an already-ready upload replays this result
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompletedMediaUploadResponse"
+        "400":
+          $ref: "#/components/responses/InvalidMediaUploadRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/MediaUploadForbidden"
+        "404":
+          $ref: "#/components/responses/MediaUploadNotFound"
+        "409":
+          $ref: "#/components/responses/MediaUploadConflict"
+        "503":
+          $ref: "#/components/responses/MediaUploadsOrAuthenticationUnavailable"
+
+  /api/v2/media-uploads/{uploadId}:
+    parameters:
+      - $ref: "#/components/parameters/MediaUploadId"
+    delete:
+      tags:
+        - Media
+      summary: Discard an unattached upload
+      operationId: discardMediaUpload
+      responses:
+        "204":
+          description: The upload was removed, or was already absent
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+        "400":
+          $ref: "#/components/responses/InvalidMediaUploadRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/MediaUploadForbidden"
+        "409":
+          $ref: "#/components/responses/MediaUploadConflict"
+        "503":
+          $ref: "#/components/responses/MediaUploadsOrAuthenticationUnavailable"
+
+  /api/v2/media-attachments/{attachmentId}/download-url:
+    parameters:
+      - $ref: "#/components/parameters/MediaAttachmentId"
+    get:
+      tags:
+        - Media
+      summary: Issue a short-lived private download URL for attached ready media
+      operationId: issueMediaDownloadUrl
+      responses:
+        "200":
+          description: A short-lived private download grant
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaDownloadUrlResponse"
+        "400":
+          $ref: "#/components/responses/InvalidMediaDownloadRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "404":
+          $ref: "#/components/responses/MediaAttachmentNotFound"
+        "503":
+          $ref: "#/components/responses/MediaDownloadOrAuthenticationUnavailable"
+
+  /api/v2/relationship-scores:
+    get:
+      tags:
+        - Relationship
+      summary: Read the authenticated participant's outgoing and incoming scores
+      operationId: getRelationshipScores
+      responses:
+        "200":
+          description: The canonical participant pair and both directional scores
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RelationshipScoresResponse"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/RelationshipForbidden"
+        "503":
+          $ref: "#/components/responses/RelationshipOrAuthenticationUnavailable"
+
+  /api/v2/score-changes:
+    get:
+      tags:
+        - Relationship
+      summary: List score changes from both directions, newest first
+      operationId: listScoreChanges
+      parameters:
+        - $ref: "#/components/parameters/PageNumber"
+      responses:
+        "200":
+          description: One-based page of score changes
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreChangeHistoryResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRelationshipRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/RelationshipForbidden"
+        "404":
+          $ref: "#/components/responses/RelationshipNotFound"
+        "503":
+          $ref: "#/components/responses/RelationshipOrAuthenticationUnavailable"
+    post:
+      tags:
+        - Relationship
+      summary: Change only the authenticated participant's outgoing score
+      operationId: createScoreChange
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeScoreRequest"
+      responses:
+        "201":
+          description: The immutable change and new outgoing score
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreChangeCreatedResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRelationshipRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/RelationshipForbidden"
+        "404":
+          $ref: "#/components/responses/RelationshipNotFound"
+        "409":
+          $ref: "#/components/responses/RelationshipConflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "503":
+          $ref: "#/components/responses/RelationshipOrAuthenticationUnavailable"
+
+  /api/v2/score-changes/{scoreChangeId}:
+    parameters:
+      - $ref: "#/components/parameters/ScoreChangeId"
+    get:
+      tags:
+        - Relationship
+      summary: Read one score change and its flat chronological comment thread
+      operationId: getScoreChange
+      responses:
+        "200":
+          description: The score change and comments in ascending creation order
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreChangeThreadResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRelationshipRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/RelationshipForbidden"
+        "404":
+          $ref: "#/components/responses/RelationshipNotFound"
+        "503":
+          $ref: "#/components/responses/RelationshipOrAuthenticationUnavailable"
+
+  /api/v2/score-changes/{scoreChangeId}/comments:
+    parameters:
+      - $ref: "#/components/parameters/ScoreChangeId"
+    post:
+      tags:
+        - Relationship
+      summary: Add a text, media, or text-and-media comment to a score change
+      operationId: createScoreChangeComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScoreChangeCommentRequest"
+      responses:
+        "201":
+          description: The created comment
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreChangeCommentCreatedResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRelationshipRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/RelationshipForbidden"
+        "404":
+          $ref: "#/components/responses/RelationshipNotFound"
+        "409":
+          $ref: "#/components/responses/RelationshipConflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "503":
+          $ref: "#/components/responses/RelationshipOrAuthenticationUnavailable"
+
+  /api/v2/diary-entries:
+    get:
+      tags:
+        - Diary
+      summary: List shared diary entries, newest first
+      operationId: listDiaryEntries
+      parameters:
+        - $ref: "#/components/parameters/PageNumber"
+      responses:
+        "200":
+          description: One-based page of diary entries
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiaryEntryListResponse"
+        "400":
+          $ref: "#/components/responses/InvalidDiaryRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/DiaryForbidden"
+        "503":
+          $ref: "#/components/responses/DiaryOrAuthenticationUnavailable"
+    post:
+      tags:
+        - Diary
+      summary: Create a diary entry as the authenticated participant
+      operationId: createDiaryEntry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDiaryEntryRequest"
+      responses:
+        "201":
+          description: The created diary entry
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiaryEntryResponse"
+        "400":
+          $ref: "#/components/responses/InvalidDiaryRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/DiaryForbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "503":
+          $ref: "#/components/responses/DiaryOrAuthenticationUnavailable"
+
+  /api/v2/diary-entries/{entryId}:
+    parameters:
+      - $ref: "#/components/parameters/DiaryEntryId"
+    get:
+      tags:
+        - Diary
+      summary: Read one diary entry and its flat chronological comments
+      operationId: getDiaryEntry
+      responses:
+        "200":
+          description: The diary entry and comments in ascending creation order
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiaryEntryDetailResponse"
+        "400":
+          $ref: "#/components/responses/InvalidDiaryRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/DiaryForbidden"
+        "404":
+          $ref: "#/components/responses/DiaryNotFound"
+        "503":
+          $ref: "#/components/responses/DiaryOrAuthenticationUnavailable"
+    patch:
+      tags:
+        - Diary
+      summary: Replace the author's content and/or exact attachment list
+      operationId: updateDiaryEntry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDiaryEntryRequest"
+      responses:
+        "200":
+          description: The updated diary entry
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiaryEntryUpdatedResponse"
+        "400":
+          $ref: "#/components/responses/InvalidDiaryRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/DiaryForbidden"
+        "404":
+          $ref: "#/components/responses/DiaryNotFound"
+        "409":
+          $ref: "#/components/responses/DiaryConflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "503":
+          $ref: "#/components/responses/DiaryOrAuthenticationUnavailable"
+    delete:
+      tags:
+        - Diary
+      summary: Delete a diary entry as its author
+      operationId: deleteDiaryEntry
+      responses:
+        "204":
+          description: The diary entry and its comments were deleted
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+        "400":
+          $ref: "#/components/responses/InvalidDiaryRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/DiaryForbidden"
+        "404":
+          $ref: "#/components/responses/DiaryNotFound"
+        "409":
+          $ref: "#/components/responses/DiaryConflict"
+        "503":
+          $ref: "#/components/responses/DiaryOrAuthenticationUnavailable"
+
+  /api/v2/diary-entries/{entryId}/comments:
+    parameters:
+      - $ref: "#/components/parameters/DiaryEntryId"
+    post:
+      tags:
+        - Diary
+      summary: Add a text comment to a diary entry
+      operationId: createDiaryEntryComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDiaryCommentRequest"
+      responses:
+        "201":
+          description: The created diary comment
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiaryCommentResponse"
+        "400":
+          $ref: "#/components/responses/InvalidDiaryRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/DiaryForbidden"
+        "404":
+          $ref: "#/components/responses/DiaryNotFound"
+        "409":
+          $ref: "#/components/responses/DiaryConflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "503":
+          $ref: "#/components/responses/DiaryOrAuthenticationUnavailable"
+
+  /api/v2/diary-entry-comments/{commentId}:
+    parameters:
+      - $ref: "#/components/parameters/DiaryCommentId"
+    patch:
+      tags:
+        - Diary
+      summary: Update a diary comment as its author
+      operationId: updateDiaryEntryComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDiaryCommentRequest"
+      responses:
+        "200":
+          description: The updated diary comment
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiaryCommentUpdatedResponse"
+        "400":
+          $ref: "#/components/responses/InvalidDiaryRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/DiaryForbidden"
+        "404":
+          $ref: "#/components/responses/DiaryNotFound"
+        "409":
+          $ref: "#/components/responses/DiaryConflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "503":
+          $ref: "#/components/responses/DiaryOrAuthenticationUnavailable"
+    delete:
+      tags:
+        - Diary
+      summary: Delete a diary comment as its author
+      operationId: deleteDiaryEntryComment
+      responses:
+        "204":
+          description: The diary comment was deleted
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+        "400":
+          $ref: "#/components/responses/InvalidDiaryRequest"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "403":
+          $ref: "#/components/responses/DiaryForbidden"
+        "404":
+          $ref: "#/components/responses/DiaryNotFound"
+        "409":
+          $ref: "#/components/responses/DiaryConflict"
+        "503":
+          $ref: "#/components/responses/DiaryOrAuthenticationUnavailable"
+
+  /api/v2/notification-fids:
+    post:
+      tags:
+        - Notification
+      summary: Register or globally reassign a Firebase installation ID
+      operationId: registerNotificationFid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationFidRequest"
+      responses:
+        "204":
+          description: The FID now belongs to the authenticated participant
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+        "400":
+          $ref: "#/components/responses/InvalidNotificationFid"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "503":
+          $ref: "#/components/responses/NotificationFidOrAuthenticationUnavailable"
+    delete:
+      tags:
+        - Notification
+      summary: Unregister a FID only when owned by the authenticated participant
+      operationId: unregisterNotificationFid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationFidRequest"
+      responses:
+        "204":
+          description: The owned FID was removed; missing or foreign FIDs are no-ops
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+        "400":
+          $ref: "#/components/responses/InvalidNotificationFid"
+        "401":
+          $ref: "#/components/responses/AuthenticationRequired"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "503":
+          $ref: "#/components/responses/NotificationFidOrAuthenticationUnavailable"
+
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+      description: >-
+        Send `Authorization: Basic base64("<slot>:<PIN>")`. The username is
+        exactly `1` or `2`; the password matches `^[0-9]{4}$` using ASCII digits.
+
+  headers:
+    NoStore:
+      description: The response Cache-Control value contains the `no-store` directive
+      required: true
+      schema:
+        type: string
+        pattern: '(^|.*,[ ]*)no-store([ ]*,.*|$)'
+    BasicChallenge:
+      description: Requests participant slot and PIN HTTP Basic credentials
+      required: true
+      schema:
+        type: string
+        enum:
+          - 'Basic realm="woorisai"'
+
+  parameters:
+    PageNumber:
+      name: pageNumber
+      in: query
+      required: false
+      description: One-based page number; omitted values default to 1
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 2147483647
+        default: 1
+    MediaUploadId:
+      name: uploadId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/CanonicalUuid"
+    MediaAttachmentId:
+      name: attachmentId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/CanonicalUuid"
+    ScoreChangeId:
+      name: scoreChangeId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/PositiveInt64"
+    DiaryEntryId:
+      name: entryId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/PositiveInt64"
+    DiaryCommentId:
+      name: commentId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/PositiveInt64"
+
+  responses:
+    AuthenticationRequired:
+      description: Basic credentials are missing, malformed, or do not match
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+        WWW-Authenticate:
+          $ref: "#/components/headers/BasicChallenge"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/AuthenticationRequiredProblem"
+    UnsupportedMediaType:
+      description: A JSON request body was sent with a Content-Type other than application/json
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/UnsupportedMediaTypeProblem"
+    LoginOptionsUnavailable:
+      description: The canonical participant pair is unavailable
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/LoginOptionsUnavailableProblem"
+    InvalidMediaUploadRequest:
+      description: The media upload request, identifier, or uploaded content is invalid
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/InvalidMediaUploadRequestProblem"
+    MediaUploadForbidden:
+      description: The upload belongs to the other participant
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/MediaUploadForbiddenProblem"
+    MediaUploadNotFound:
+      description: The upload or an authorized attachment parent was not found
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/MediaUploadNotFoundProblem"
+    MediaUploadConflict:
+      description: The upload cannot be processed in its current state
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/MediaUploadConflictProblem"
+    MediaUploadsOrAuthenticationUnavailable:
+      description: Authentication, persistence, or private object storage is unavailable
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/AuthenticationUnavailableProblem"
+              - $ref: "#/components/schemas/MediaUploadsUnavailableProblem"
+    InvalidMediaDownloadRequest:
+      description: The media attachment identifier is invalid
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/InvalidMediaDownloadRequestProblem"
+    MediaAttachmentNotFound:
+      description: The media attachment is absent, pending, or unattached
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/MediaAttachmentNotFoundProblem"
+    MediaDownloadOrAuthenticationUnavailable:
+      description: Authentication, persistence, or private URL signing is unavailable
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/AuthenticationUnavailableProblem"
+              - $ref: "#/components/schemas/MediaDownloadUnavailableProblem"
+    InvalidRelationshipRequest:
+      description: The relationship request is malformed or violates input limits
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/InvalidRelationshipRequestProblem"
+    RelationshipNotFound:
+      description: The score change or requested media upload was not found
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/RelationshipNotFoundProblem"
+    RelationshipForbidden:
+      description: The relationship resource or media upload is not owned by this participant
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/RelationshipForbiddenProblem"
+    RelationshipConflict:
+      description: The score or attachment request conflicts with current state
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/RelationshipConflictProblem"
+    RelationshipOrAuthenticationUnavailable:
+      description: Authentication, relationship, participant, media, or persistence data is unavailable
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/AuthenticationUnavailableProblem"
+              - $ref: "#/components/schemas/RelationshipUnavailableProblem"
+    InvalidDiaryRequest:
+      description: The diary request is malformed or violates input limits
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/InvalidDiaryRequestProblem"
+    DiaryNotFound:
+      description: The diary entry or comment was not found
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/DiaryNotFoundProblem"
+    DiaryForbidden:
+      description: Only the author can mutate the diary resource
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/DiaryForbiddenProblem"
+    DiaryConflict:
+      description: A concurrent diary mutation changed or removed the resource first
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/DiaryConflictProblem"
+    DiaryOrAuthenticationUnavailable:
+      description: Authentication, diary, participant, media, or persistence data is unavailable
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/AuthenticationUnavailableProblem"
+              - $ref: "#/components/schemas/DiaryUnavailableProblem"
+    InvalidNotificationFid:
+      description: The request does not contain one exact 22-character base64url FID
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/InvalidNotificationFidProblem"
+    NotificationFidOrAuthenticationUnavailable:
+      description: Authentication or notification FID persistence is unavailable
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/NoStore"
+      content:
+        application/problem+json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/AuthenticationUnavailableProblem"
+              - $ref: "#/components/schemas/NotificationFidUnavailableProblem"
+
+  schemas:
+    CanonicalUuid:
+      type: string
+      format: uuid
+      pattern: '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'
+    PositiveInt64:
+      type: integer
+      format: int64
+      minimum: 1
+    NullableDateTime:
+      type:
+        - string
+        - "null"
+      format: date-time
+    HealthUpResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - UP
+    HealthUnavailableResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - DOWN
+            - OUT_OF_SERVICE
+
+    LoginOptionsResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - participants
+      properties:
+        participants:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            $ref: "#/components/schemas/LoginParticipantOption"
+    LoginParticipantOption:
+      type: object
+      additionalProperties: false
+      required:
+        - participantSlot
+        - displayName
+      properties:
+        participantSlot:
+          type: integer
+          format: int32
+          enum:
+            - 1
+            - 2
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 30
+
+    InitiateMediaUploadRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - purpose
+        - kind
+        - fileName
+        - contentType
+        - byteSize
+      properties:
+        purpose:
+          type: string
+          enum:
+            - scoreChange
+            - comment
+            - diaryEntry
+        kind:
+          type: string
+          enum:
+            - image
+            - video
+        fileName:
+          type: string
+          minLength: 1
+          description: >-
+            The server strips surrounding whitespace and path segments; the resulting
+            basename must contain 1 to 255 Unicode code points and no control character.
+        contentType:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: >-
+            JPEG, PNG, WebP, MP4, WebM, or QuickTime. Matching is case-insensitive;
+            optional media-type parameters are discarded before validation.
+        byteSize:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 104857600
+      allOf:
+        - if:
+            properties:
+              purpose:
+                const: scoreChange
+            required:
+              - purpose
+          then:
+            properties:
+              kind:
+                const: image
+        - if:
+            properties:
+              kind:
+                const: image
+            required:
+              - kind
+          then:
+            properties:
+              contentType:
+                pattern: '^[iI][mM][aA][gG][eE]/(?:[jJ][pP][eE][gG]|[pP][nN][gG]|[wW][eE][bB][pP])(?:[ ]*;.*)?$'
+              byteSize:
+                maximum: 10485760
+        - if:
+            properties:
+              kind:
+                const: video
+            required:
+              - kind
+          then:
+            properties:
+              contentType:
+                pattern: '^[vV][iI][dD][eE][oO]/(?:[mM][pP]4|[wW][eE][bB][mM]|[qQ][uU][iI][cC][kK][tT][iI][mM][eE])(?:[ ]*;.*)?$'
+    InitiatedMediaUploadResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - uploadId
+        - uploadUrl
+        - requiredHeaders
+        - expiresAt
+      properties:
+        uploadId:
+          $ref: "#/components/schemas/CanonicalUuid"
+        uploadUrl:
+          type: string
+          format: uri
+          pattern: '^https://'
+        requiredHeaders:
+          $ref: "#/components/schemas/MediaUploadRequiredHeaders"
+        expiresAt:
+          type: string
+          format: date-time
+    MediaUploadRequiredHeaders:
+      type: object
+      additionalProperties: false
+      required:
+        - Content-Type
+        - Cache-Control
+      properties:
+        Content-Type:
+          type: string
+          enum:
+            - image/jpeg
+            - image/png
+            - image/webp
+            - video/mp4
+            - video/webm
+            - video/quicktime
+        Cache-Control:
+          type: string
+          enum:
+            - private, no-store, max-age=0
+    CompletedMediaUploadResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - uploadId
+        - kind
+        - fileName
+        - contentType
+        - byteSize
+      properties:
+        uploadId:
+          $ref: "#/components/schemas/CanonicalUuid"
+        kind:
+          type: string
+          enum:
+            - image
+            - video
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        contentType:
+          $ref: "#/components/schemas/StoredMediaContentType"
+        byteSize:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 104857600
+      allOf:
+        - if:
+            properties:
+              kind:
+                const: image
+          then:
+            properties:
+              contentType:
+                enum:
+                  - image/jpeg
+                  - image/png
+                  - image/webp
+              byteSize:
+                maximum: 10485760
+        - if:
+            properties:
+              kind:
+                const: video
+          then:
+            properties:
+              contentType:
+                enum:
+                  - video/mp4
+                  - video/webm
+                  - video/quicktime
+    MediaDownloadUrlResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - downloadUrl
+        - expiresAt
+      properties:
+        downloadUrl:
+          type: string
+          format: uri
+          pattern: '^https://'
+        expiresAt:
+          type: string
+          format: date-time
+    StoredMediaContentType:
+      type: string
+      enum:
+        - image/jpeg
+        - image/png
+        - image/webp
+        - video/mp4
+        - video/webm
+        - video/quicktime
+    AttachedMedia:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - kind
+        - fileName
+        - contentType
+        - byteSize
+      properties:
+        id:
+          $ref: "#/components/schemas/CanonicalUuid"
+        kind:
+          type: string
+          enum:
+            - IMAGE
+            - VIDEO
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        contentType:
+          $ref: "#/components/schemas/StoredMediaContentType"
+        byteSize:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 104857600
+    FlexibleAttachmentGroup:
+      type: array
+      maxItems: 4
+      description: Empty, at most four images, or exactly one video; image/video mixing is invalid
+      items:
+        $ref: "#/components/schemas/AttachedMedia"
+      oneOf:
+        - type: array
+          maxItems: 4
+          items:
+            allOf:
+              - $ref: "#/components/schemas/AttachedMedia"
+              - type: object
+                properties:
+                  kind:
+                    enum:
+                      - IMAGE
+                  contentType:
+                    enum:
+                      - image/jpeg
+                      - image/png
+                      - image/webp
+                  byteSize:
+                    maximum: 10485760
+        - type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            allOf:
+              - $ref: "#/components/schemas/AttachedMedia"
+              - type: object
+                properties:
+                  kind:
+                    enum:
+                      - VIDEO
+                  contentType:
+                    enum:
+                      - video/mp4
+                      - video/webm
+                      - video/quicktime
+    ScoreChangeAttachedMedia:
+      allOf:
+        - $ref: "#/components/schemas/AttachedMedia"
+        - type: object
+          properties:
+            kind:
+              enum:
+                - IMAGE
+            contentType:
+              enum:
+                - image/jpeg
+                - image/png
+                - image/webp
+            byteSize:
+              maximum: 10485760
+
+    RelationshipParticipant:
+      type: object
+      additionalProperties: false
+      required:
+        - slot
+        - displayName
+        - mine
+      properties:
+        slot:
+          type: integer
+          format: int32
+          enum:
+            - 1
+            - 2
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 30
+        mine:
+          type: boolean
+    RelationshipScore:
+      type: object
+      additionalProperties: false
+      required:
+        - sourceParticipant
+        - targetParticipant
+        - currentScore
+        - updatedAt
+      properties:
+        sourceParticipant:
+          $ref: "#/components/schemas/RelationshipParticipant"
+        targetParticipant:
+          $ref: "#/components/schemas/RelationshipParticipant"
+        currentScore:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+        updatedAt:
+          type: string
+          format: date-time
+    RelationshipScoresResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - self
+        - partner
+        - outgoing
+        - incoming
+      properties:
+        self:
+          $ref: "#/components/schemas/RelationshipParticipant"
+        partner:
+          $ref: "#/components/schemas/RelationshipParticipant"
+        outgoing:
+          $ref: "#/components/schemas/RelationshipScore"
+        incoming:
+          $ref: "#/components/schemas/RelationshipScore"
+    ChangeScoreRequest:
+      type: object
+      additionalProperties: false
+      description: >-
+        Exactly one of delta or targetScore must be present. A supplied delta must be
+        non-zero. These cross-field rules are enforced by the server and return
+        INVALID_RELATIONSHIP_REQUEST when violated.
+      properties:
+        delta:
+          type:
+            - integer
+            - "null"
+          format: int32
+          minimum: -100
+          maximum: 100
+          description: A non-null value must be non-zero
+        targetScore:
+          type:
+            - integer
+            - "null"
+          format: int32
+          minimum: 0
+          maximum: 100
+        reason:
+          type:
+            - string
+            - "null"
+          maxLength: 200
+          description: Blank values are normalized to null; omission means no reason
+        mediaUploadIds:
+          type:
+            - array
+            - "null"
+          maxItems: 1
+          uniqueItems: true
+          description: >-
+            Completed, parentless SCORE_CHANGE uploads owned by the authenticated
+            participant. The final group is empty or exactly one image; video is rejected.
+          items:
+            $ref: "#/components/schemas/CanonicalUuid"
+    ScoreChange:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - sourceParticipant
+        - targetParticipant
+        - changedBy
+        - delta
+        - resultingScore
+        - reason
+        - createdAt
+        - commentCount
+        - attachments
+      properties:
+        id:
+          $ref: "#/components/schemas/PositiveInt64"
+        sourceParticipant:
+          $ref: "#/components/schemas/RelationshipParticipant"
+        targetParticipant:
+          $ref: "#/components/schemas/RelationshipParticipant"
+        changedBy:
+          $ref: "#/components/schemas/RelationshipParticipant"
+        delta:
+          type: integer
+          format: int32
+          minimum: -100
+          maximum: 100
+          description: Always non-zero; enforced by the server and persisted domain model
+        resultingScore:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+        reason:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 200
+        createdAt:
+          type: string
+          format: date-time
+        commentCount:
+          type: integer
+          format: int64
+          minimum: 0
+        attachments:
+          type: array
+          maxItems: 1
+          items:
+            $ref: "#/components/schemas/ScoreChangeAttachedMedia"
+    ScoreChangeComment:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - author
+        - content
+        - createdAt
+        - attachments
+      properties:
+        id:
+          $ref: "#/components/schemas/PositiveInt64"
+        author:
+          $ref: "#/components/schemas/RelationshipParticipant"
+        content:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 500
+          description: Null only for a media-only comment
+        createdAt:
+          type: string
+          format: date-time
+        attachments:
+          $ref: "#/components/schemas/FlexibleAttachmentGroup"
+      description: >-
+        Content is null only for a media-only comment. The server guarantees that
+        content is non-null or attachments is non-empty.
+    ScoreChangeHistoryResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - results
+        - paging
+      properties:
+        results:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/ScoreChange"
+        paging:
+          $ref: "#/components/schemas/RelationshipPaging"
+    RelationshipPaging:
+      type: object
+      additionalProperties: false
+      required:
+        - pageNumber
+        - pageSize
+        - hasNext
+        - totalCount
+      properties:
+        pageNumber:
+          type: integer
+          format: int32
+          minimum: 1
+        pageSize:
+          type: integer
+          format: int32
+          enum:
+            - 20
+        hasNext:
+          type: boolean
+        totalCount:
+          type: integer
+          format: int64
+          minimum: 0
+    ScoreChangeCreatedResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - change
+        - outgoing
+      properties:
+        change:
+          $ref: "#/components/schemas/ScoreChange"
+        outgoing:
+          $ref: "#/components/schemas/RelationshipScore"
+    ScoreChangeThreadResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - change
+        - comments
+      properties:
+        change:
+          $ref: "#/components/schemas/ScoreChange"
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScoreChangeComment"
+    CreateScoreChangeCommentRequest:
+      type: object
+      additionalProperties: false
+      description: >-
+        At least normalized content or one mediaUploadId must be supplied. The server
+        enforces this cross-field rule and returns INVALID_RELATIONSHIP_REQUEST when
+        both are absent or empty.
+      properties:
+        content:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 500
+          description: Values empty after server-side surrounding whitespace stripping are normalized to null
+        mediaUploadIds:
+          type:
+            - array
+            - "null"
+          maxItems: 4
+          uniqueItems: true
+          description: >-
+            Completed, parentless SCORE_CHANGE_COMMENT uploads owned by the authenticated
+            participant. The final group is empty, up to four images, or exactly one video;
+            images and video cannot be mixed.
+          items:
+            $ref: "#/components/schemas/CanonicalUuid"
+    ScoreChangeCommentCreatedResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - comment
+      properties:
+        comment:
+          $ref: "#/components/schemas/ScoreChangeComment"
+
+    DiaryParticipant:
+      type: object
+      additionalProperties: false
+      required:
+        - slot
+        - displayName
+      properties:
+        slot:
+          type: integer
+          format: int32
+          enum:
+            - 1
+            - 2
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 30
+    CreateDiaryEntryRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Must remain non-empty after server-side surrounding whitespace is stripped
+        mediaUploadIds:
+          type:
+            - array
+            - "null"
+          maxItems: 4
+          uniqueItems: true
+          description: >-
+            Completed, parentless DIARY_ENTRY uploads owned by the authenticated author.
+            The final group is empty, up to four images, or exactly one video; images and
+            video cannot be mixed.
+          items:
+            $ref: "#/components/schemas/CanonicalUuid"
+    UpdateDiaryEntryRequest:
+      type: object
+      additionalProperties: false
+      description: >-
+        At least content or mediaUploadIds must be supplied. The server enforces this
+        cross-field rule and returns INVALID_DIARY_REQUEST for an empty object.
+      properties:
+        content:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 1000
+          description: A non-null value must remain non-empty after server-side surrounding whitespace is stripped; null or omission preserves the current content
+        mediaUploadIds:
+          type:
+            - array
+            - "null"
+          maxItems: 4
+          uniqueItems: true
+          description: >-
+            Null or omission preserves attachments; an empty array clears them; otherwise
+            this is the exact final ordered group. Newly attached uploads must be completed
+            DIARY_ENTRY uploads owned by the author. The final group is up to four images or
+            exactly one video; images and video cannot be mixed.
+          items:
+            $ref: "#/components/schemas/CanonicalUuid"
+    CreateDiaryCommentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Must remain non-empty after server-side surrounding whitespace is stripped
+    UpdateDiaryCommentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Must remain non-empty after server-side surrounding whitespace is stripped
+    DiaryEntryListResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - results
+        - pageNumber
+        - pageSize
+        - hasNext
+        - totalCount
+      properties:
+        results:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/DiaryEntryResponse"
+        pageNumber:
+          type: integer
+          format: int32
+          minimum: 1
+        pageSize:
+          type: integer
+          format: int32
+          enum:
+            - 20
+        hasNext:
+          type: boolean
+        totalCount:
+          type: integer
+          format: int64
+          minimum: 0
+    DiaryEntryResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - author
+        - content
+        - createdAt
+        - updatedAt
+        - isMine
+        - attachments
+        - commentCount
+      properties:
+        id:
+          $ref: "#/components/schemas/PositiveInt64"
+        author:
+          $ref: "#/components/schemas/DiaryParticipant"
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          $ref: "#/components/schemas/NullableDateTime"
+        isMine:
+          type: boolean
+        attachments:
+          $ref: "#/components/schemas/FlexibleAttachmentGroup"
+        commentCount:
+          type: integer
+          format: int64
+          minimum: 0
+    DiaryEntryUpdatedResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - author
+        - content
+        - createdAt
+        - updatedAt
+        - isMine
+        - attachments
+        - commentCount
+      properties:
+        id:
+          $ref: "#/components/schemas/PositiveInt64"
+        author:
+          $ref: "#/components/schemas/DiaryParticipant"
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        isMine:
+          type: boolean
+          enum:
+            - true
+        attachments:
+          $ref: "#/components/schemas/FlexibleAttachmentGroup"
+        commentCount:
+          type: integer
+          format: int64
+          minimum: 0
+    DiaryEntryDetailResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - author
+        - content
+        - createdAt
+        - updatedAt
+        - isMine
+        - attachments
+        - commentCount
+        - comments
+      properties:
+        id:
+          $ref: "#/components/schemas/PositiveInt64"
+        author:
+          $ref: "#/components/schemas/DiaryParticipant"
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          $ref: "#/components/schemas/NullableDateTime"
+        isMine:
+          type: boolean
+        attachments:
+          $ref: "#/components/schemas/FlexibleAttachmentGroup"
+        commentCount:
+          type: integer
+          format: int64
+          minimum: 0
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiaryCommentResponse"
+    DiaryCommentResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - author
+        - content
+        - createdAt
+        - updatedAt
+        - isMine
+      properties:
+        id:
+          $ref: "#/components/schemas/PositiveInt64"
+        author:
+          $ref: "#/components/schemas/DiaryParticipant"
+        content:
+          type: string
+          minLength: 1
+          maxLength: 500
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          $ref: "#/components/schemas/NullableDateTime"
+        isMine:
+          type: boolean
+    DiaryCommentUpdatedResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - author
+        - content
+        - createdAt
+        - updatedAt
+        - isMine
+      properties:
+        id:
+          $ref: "#/components/schemas/PositiveInt64"
+        author:
+          $ref: "#/components/schemas/DiaryParticipant"
+        content:
+          type: string
+          minLength: 1
+          maxLength: 500
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        isMine:
+          type: boolean
+          enum:
+            - true
+
+    NotificationFidRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - fid
+      properties:
+        fid:
+          type: string
+          minLength: 22
+          maxLength: 22
+          pattern: '^[A-Za-z0-9_-]{22}$'
+
+    ApiProblem:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - status
+        - detail
+        - instance
+        - errorCode
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+        errorCode:
+          type: string
+    NotificationApiProblem:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - status
+        - detail
+        - errorCode
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        errorCode:
+          type: string
+    AuthenticationRequiredProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Authentication required]
+            status:
+              enum: [401]
+            detail:
+              enum: [Valid HTTP Basic participant credentials are required.]
+            errorCode:
+              enum: [AUTHENTICATION_REQUIRED]
+    AuthenticationUnavailableProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Authentication unavailable]
+            status:
+              enum: [503]
+            detail:
+              enum: [Authentication is temporarily unavailable.]
+            errorCode:
+              enum: [AUTHENTICATION_UNAVAILABLE]
+    UnsupportedMediaTypeProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Unsupported media type]
+            status:
+              enum: [415]
+            detail:
+              enum: [Content-Type must be application/json.]
+            errorCode:
+              enum: [UNSUPPORTED_MEDIA_TYPE]
+    LoginOptionsUnavailableProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Login options unavailable]
+            status:
+              enum: [503]
+            detail:
+              enum: [The participant login options are temporarily unavailable.]
+            errorCode:
+              enum: [LOGIN_OPTIONS_UNAVAILABLE]
+    InvalidMediaUploadRequestProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Invalid media upload request]
+            status:
+              enum: [400]
+            detail:
+              enum: [The media upload request is invalid.]
+            errorCode:
+              enum: [INVALID_MEDIA_UPLOAD_REQUEST]
+    MediaUploadForbiddenProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Media upload forbidden]
+            status:
+              enum: [403]
+            detail:
+              enum: [The media upload is not owned by the authenticated participant.]
+            errorCode:
+              enum: [MEDIA_UPLOAD_FORBIDDEN]
+    MediaUploadNotFoundProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Media upload not found]
+            status:
+              enum: [404]
+            detail:
+              enum: [The media upload or authorized parent was not found.]
+            errorCode:
+              enum: [MEDIA_UPLOAD_NOT_FOUND]
+    MediaUploadConflictProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Media upload conflict]
+            status:
+              enum: [409]
+            detail:
+              enum: [The media upload cannot be processed in its current state.]
+            errorCode:
+              enum: [MEDIA_UPLOAD_CONFLICT]
+    MediaUploadsUnavailableProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Media uploads unavailable]
+            status:
+              enum: [503]
+            detail:
+              enum: [Media uploads are temporarily unavailable.]
+            errorCode:
+              enum: [MEDIA_UPLOADS_UNAVAILABLE]
+    InvalidMediaDownloadRequestProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Invalid media download request]
+            status:
+              enum: [400]
+            detail:
+              enum: [The media download request is invalid.]
+            errorCode:
+              enum: [INVALID_MEDIA_DOWNLOAD_REQUEST]
+    MediaAttachmentNotFoundProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Media attachment not found]
+            status:
+              enum: [404]
+            detail:
+              enum: [The media attachment was not found.]
+            errorCode:
+              enum: [MEDIA_ATTACHMENT_NOT_FOUND]
+    MediaDownloadUnavailableProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Media download unavailable]
+            status:
+              enum: [503]
+            detail:
+              enum: [Media download is temporarily unavailable.]
+            errorCode:
+              enum: [MEDIA_DOWNLOAD_UNAVAILABLE]
+    InvalidRelationshipRequestProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Invalid relationship request]
+            status:
+              enum: [400]
+            detail:
+              enum: [The relationship request is invalid.]
+            errorCode:
+              enum: [INVALID_RELATIONSHIP_REQUEST]
+    RelationshipNotFoundProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Relationship resource not found]
+            status:
+              enum: [404]
+            detail:
+              enum: [The requested relationship resource was not found.]
+            errorCode:
+              enum: [RELATIONSHIP_NOT_FOUND]
+    RelationshipForbiddenProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Relationship access denied]
+            status:
+              enum: [403]
+            detail:
+              enum: [Access to this relationship resource is denied.]
+            errorCode:
+              enum: [RELATIONSHIP_FORBIDDEN]
+    RelationshipConflictProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Relationship conflict]
+            status:
+              enum: [409]
+            detail:
+              enum: [The relationship request conflicts with current state.]
+            errorCode:
+              enum: [RELATIONSHIP_CONFLICT]
+    RelationshipUnavailableProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Relationship unavailable]
+            status:
+              enum: [503]
+            detail:
+              enum: [Relationship data is temporarily unavailable.]
+            errorCode:
+              enum: [RELATIONSHIP_UNAVAILABLE]
+    InvalidDiaryRequestProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Invalid diary request]
+            status:
+              enum: [400]
+            detail:
+              enum: [The diary request is invalid.]
+            errorCode:
+              enum: [INVALID_DIARY_REQUEST]
+    DiaryNotFoundProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Diary resource not found]
+            status:
+              enum: [404]
+            detail:
+              enum: [The requested diary resource was not found.]
+            errorCode:
+              enum: [DIARY_NOT_FOUND]
+    DiaryForbiddenProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Diary mutation forbidden]
+            status:
+              enum: [403]
+            detail:
+              enum: [Only the author can change this diary resource.]
+            errorCode:
+              enum: [DIARY_FORBIDDEN]
+    DiaryConflictProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Diary conflict]
+            status:
+              enum: [409]
+            detail:
+              enum: [The diary request conflicts with current state.]
+            errorCode:
+              enum: [DIARY_CONFLICT]
+    DiaryUnavailableProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Diary unavailable]
+            status:
+              enum: [503]
+            detail:
+              enum: [Diary data is temporarily unavailable.]
+            errorCode:
+              enum: [DIARY_UNAVAILABLE]
+    InvalidNotificationFidProblem:
+      allOf:
+        - $ref: "#/components/schemas/NotificationApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Invalid notification FID request]
+            status:
+              enum: [400]
+            detail:
+              enum: [Request must contain one valid Firebase installation ID.]
+            errorCode:
+              enum: [INVALID_NOTIFICATION_FID]
+    NotificationFidUnavailableProblem:
+      allOf:
+        - $ref: "#/components/schemas/NotificationApiProblem"
+        - type: object
+          properties:
+            title:
+              enum: [Notification FID service unavailable]
+            status:
+              enum: [503]
+            detail:
+              enum: [Notification FID service is temporarily unavailable.]
+            errorCode:
+              enum: [NOTIFICATION_FID_UNAVAILABLE]

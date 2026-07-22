@@ -1,0 +1,28 @@
+generate:
+  - types
+  - client
+accessModifier: internal
+namingStrategy: idiomatic
+filter:
+  operations:
+    - getHealth
+    - listLoginOptions
+    - initiateMediaUpload
+    - completeMediaUpload
+    - discardMediaUpload
+    - issueMediaDownloadUrl
+    - getRelationshipScores
+    - listScoreChanges
+    - createScoreChange
+    - getScoreChange
+    - createScoreChangeComment
+    - listDiaryEntries
+    - createDiaryEntry
+    - getDiaryEntry
+    - updateDiaryEntry
+    - deleteDiaryEntry
+    - createDiaryEntryComment
+    - updateDiaryEntryComment
+    - deleteDiaryEntryComment
+    - registerNotificationFid
+    - unregisterNotificationFid

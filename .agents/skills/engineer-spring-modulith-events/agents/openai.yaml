@@ -1,0 +1,4 @@
+interface:
+  display_name: "Engineer Spring Modulith Events"
+  short_description: "Spring Modulith 이벤트·트랜잭션 안정성 설계"
+  default_prompt: "Use $engineer-spring-modulith-events to design this event flow for transactional safety, idempotency, and recovery."

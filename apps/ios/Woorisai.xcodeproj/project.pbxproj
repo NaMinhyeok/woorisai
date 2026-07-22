@@ -1,0 +1,1286 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		078DA3B8BF4990EE236CB381 /* WoorisaiTextInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504C2CA676C2283C75A89CE2 /* WoorisaiTextInput.swift */; };
+		080F953B16C9ECFC78BD2F87 /* WoorisaiAPISecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42F7CBF836FE7D93FBB5E422 /* WoorisaiAPISecurityTests.swift */; };
+		08541CBCD858AC685D505A72 /* WoorisaiCredentialValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB0308C06FF4A6EC28E2A81 /* WoorisaiCredentialValidation.swift */; };
+		0875AD092BBE5A7332AC2CD0 /* RelationshipModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3023E181908B31C4D4E22E89 /* RelationshipModel.swift */; };
+		08BA050338A7087392F35FA5 /* WoorisaiMediaAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE95E8D90CD2C5CE8E6D059 /* WoorisaiMediaAPI.swift */; };
+		0CD093B4BC667804EF42EA0A /* WoorisaiNotificationAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7DF92B71ECF71DB02663BEB /* WoorisaiNotificationAPITests.swift */; };
+		0E453322DB5433D050CA53DF /* WoorisaiDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E977F9625B38730AA0754F6E /* WoorisaiDesignSystem.swift */; };
+		1B310268E530569EB0538E6A /* openapi.yaml in Resources */ = {isa = PBXBuildFile; fileRef = A8914F28C22B6C25363853A4 /* openapi.yaml */; };
+		1C307F126A78B6B4DBD8F0F8 /* WoorisaiAPIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F76F28C7930A95A511B832 /* WoorisaiAPIClientTests.swift */; };
+		2A3F2B0051E1E63844B0DC56 /* OpenAPIURLSession in Frameworks */ = {isa = PBXBuildFile; productRef = 944CAB6ED8CA020A36DFBACC /* OpenAPIURLSession */; };
+		374C922C2523DBF1A64E33CC /* WoorisaiAPI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2E7D04D016E81AC8374C19ED /* WoorisaiAPI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		37718E5D45C5CB0AB112AF7A /* NotificationModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3443E4C7DC63337254603F5A /* NotificationModelTests.swift */; };
+		497E4D28995BAE601AF137CC /* LoginOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C329B0E13F53B6313F8F9D6 /* LoginOptionsView.swift */; };
+		596C9564C98DE058F3ABE59B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 48EA39B38C8BA4876BED02D2 /* PrivacyInfo.xcprivacy */; };
+		59A69753C46836A9AD276F62 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E58C85C20DC0DA675659BA7C /* FirebaseCore */; };
+		65269832E3991CF2F7DF0F03 /* MediaDownloadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1DBC2440F658F77E4B504BA /* MediaDownloadModel.swift */; };
+		65D65C07B47B5D2271CDCC2F /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 494190F8106AE3DC7A296104 /* OpenAPIRuntime */; };
+		67C5E61029095849A0B6A3FB /* WoorisaiAPISecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016E0342D25764971F0C8C5D /* WoorisaiAPISecurity.swift */; };
+		6828AEEFB502D410EF4A2B04 /* WoorisaiAPI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2E7D04D016E81AC8374C19ED /* WoorisaiAPI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		6975167D9DD404CD47F15723 /* OpenAPIURLSession in Frameworks */ = {isa = PBXBuildFile; productRef = 002DF869EC6ABEBE787C670E /* OpenAPIURLSession */; };
+		6D556465B3D825861E49339F /* DiaryModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E2DEEBE274D14A59AF70729 /* DiaryModelTests.swift */; };
+		6DFD2F90E2FF089F6B2F81E6 /* MediaAttachmentComposerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4ED17D71DD28BBEEA415A55 /* MediaAttachmentComposerTests.swift */; };
+		6ED2EF8C38A74C43BFD28E2E /* FirebaseInstallations in Frameworks */ = {isa = PBXBuildFile; productRef = 7E253B87C82550F0533B945C /* FirebaseInstallations */; };
+		725234D7A69EADCD6688750C /* WoorisaiAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E7D04D016E81AC8374C19ED /* WoorisaiAPI.framework */; };
+		77D32A0FEC803FE45946EA7F /* WoorisaiAPIErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42D77E27E13F2E22B89F2822 /* WoorisaiAPIErrorTests.swift */; };
+		7D2CEF741F37F68E5D935497 /* HTTPTypes in Frameworks */ = {isa = PBXBuildFile; productRef = 24D133E91D3ECBEE13C091FA /* HTTPTypes */; };
+		7EA23DFDC59DB0B8BE4B5573 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4CB1B40F6900607FAEF7BDE0 /* Assets.xcassets */; };
+		7F3EE5DEFD7D60F5B493DFD1 /* DiaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F4E9B5B613A1DDF402DAA8 /* DiaryView.swift */; };
+		832BD052946232BEE8FE47B9 /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 023B9ABB012B2EC308A4C985 /* OpenAPIRuntime */; };
+		87BB05E526F68B2DE14BC2D3 /* WoorisaiAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70CC22C8885B027430F25295 /* WoorisaiAppDelegate.swift */; };
+		88C66C980B4BEF146A37B039 /* LoginOptionsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69598E271D3A2C640DACA11F /* LoginOptionsModel.swift */; };
+		897B26692FD0F92EE6CD1BF0 /* WoorisaiDiaryAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A91E2F497BFD528F20517E /* WoorisaiDiaryAPITests.swift */; };
+		8A4498C35707B1E5BF8BBB01 /* NotificationRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BBD3654D73EBD197778D442 /* NotificationRouting.swift */; };
+		8D574703CB655AB5E9B99C18 /* WoorisaiAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C3FB69EA91C8716D02D2DB6 /* WoorisaiAPIClient.swift */; };
+		8ED47267EA0056616F7B1465 /* HTTPTypes in Frameworks */ = {isa = PBXBuildFile; productRef = EA6FED18F71C6AB716F89663 /* HTTPTypes */; };
+		92F2C08B6F40854A56E3792D /* OpenAPIURLSession in Frameworks */ = {isa = PBXBuildFile; productRef = B89629E6A5CDE6B45429DF4C /* OpenAPIURLSession */; };
+		92FABCA7408A16C2A6A4FCC6 /* WoorisaiAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E7D04D016E81AC8374C19ED /* WoorisaiAPI.framework */; };
+		98F3FD85F70F05CE5B891941 /* WoorisaiDesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DAF64442B84C597174CC116 /* WoorisaiDesignSystemTests.swift */; };
+		9B51D7F2A1F9A926FF0CD4DB /* MediaUploadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86D512CC8D5C8D27F2924FF /* MediaUploadModel.swift */; };
+		9C4A3FD346D98BEED93C7820 /* AuthenticationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF8AE3E17CE3F4522F76D04B /* AuthenticationModel.swift */; };
+		9ED3CEEE76BC9CB487E1F4C9 /* WoorisaiAPI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2E7D04D016E81AC8374C19ED /* WoorisaiAPI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		9EEE4609734523DB1B96A03F /* AuthenticationModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5D5403E383CBDFEFD4475A /* AuthenticationModelTests.swift */; };
+		A0DA23F13C46DA54945DB366 /* DiaryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A3395049A85CADD678AF17 /* DiaryModel.swift */; };
+		A38E8CA213687480ED4A2F15 /* WoorisaiAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E7D04D016E81AC8374C19ED /* WoorisaiAPI.framework */; };
+		A3D1B56924A76C852603B29E /* WoorisaiLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E662786A1559E2619E0A1727 /* WoorisaiLaunchTests.swift */; };
+		A8B089BD20E57081A7CA47D6 /* NotificationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C81581956669C817FAF1A9 /* NotificationModel.swift */; };
+		B1EA8723F27875648C0FD41C /* LoginOptionsModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69B8D1F311F3C8A284C6AA82 /* LoginOptionsModelTests.swift */; };
+		B20279B3E777D92970EB22CD /* HTTPTypes in Frameworks */ = {isa = PBXBuildFile; productRef = F9DA49E2160A95F8C0DE5F12 /* HTTPTypes */; };
+		BB523B14A36A83AA80347BCF /* MediaModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163C17EB85034CF3A5294251 /* MediaModelTests.swift */; };
+		BF35156CF63E02ACA0BF636D /* WoorisaiMediaAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B57791B84326D1027855CB /* WoorisaiMediaAPITests.swift */; };
+		C13225DC17B33AFD84229711 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 489ABB621BD4B3382F0C0C3A /* FirebaseMessaging */; };
+		C155A3741F573F119AFD2B0F /* MediaAttachmentComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86476FE905B2A2A98945F8E9 /* MediaAttachmentComposer.swift */; };
+		CDB3E0956B0DF9DC72EB8BCB /* OpenAPIURLSession in Frameworks */ = {isa = PBXBuildFile; productRef = 567EB51AA7D025E0AFD3CB9E /* OpenAPIURLSession */; };
+		D0E98D764002417CB5231A15 /* HTTPTypes in Frameworks */ = {isa = PBXBuildFile; productRef = 8080F0C7301C5DB92DE71A2B /* HTTPTypes */; };
+		D1D95A8BC17651DFCB7670CB /* WoorisaiCredentialValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A66EEABE8FDC71D9BB39BAF /* WoorisaiCredentialValidationTests.swift */; };
+		D3B2B8A961223C8AD38B310F /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 1A5A1CFBDB7A8D9F9A2BCAD9 /* OpenAPIRuntime */; };
+		D50556CAC20DC147278D7A42 /* RuntimeConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFA757BF6C16BF15B169D9B1 /* RuntimeConfiguration.swift */; };
+		D8B4730C8BA91CF333F019D0 /* WoorisaiRelationshipAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3EEC8E27EAEF654BDECD80C /* WoorisaiRelationshipAPITests.swift */; };
+		E042F0468444338E88506079 /* RuntimeConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264A194A52EFFBD3C21047E2 /* RuntimeConfigurationTests.swift */; };
+		E2C8CC58B5E743000926D78A /* WoorisaiAPIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91DA4EA9B105368B6D4D7081 /* WoorisaiAPIError.swift */; };
+		E4B25236D9EF81D2FDE94DC2 /* WoorisaiDiaryAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F4CC053300CA7A376951318 /* WoorisaiDiaryAPI.swift */; };
+		E71A454BC61CCE229E0C2FAB /* WoorisaiNotificationAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A22E638070EE9C908F5CE154 /* WoorisaiNotificationAPI.swift */; };
+		EA0AF0C3B7628520CC9B0B88 /* WoorisaiApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9838A7619AE4DB6AA9775BC6 /* WoorisaiApp.swift */; };
+		EDEE9D2F5829F56A4612AAC7 /* FirebaseNotificationBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70A1DD2A52AA5C72AD141605 /* FirebaseNotificationBridge.swift */; };
+		F083B87F054EDD0690D35C3A /* RelationshipModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FE64A009715C385F5653CA /* RelationshipModelTests.swift */; };
+		F4E95D9BD35C7D8ABB10DD02 /* WoorisaiRelationshipAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 138E16AB78EFF85EF7FDA33D /* WoorisaiRelationshipAPI.swift */; };
+		F66E3D2597290EFF9676C73B /* openapi-generator-config.yaml in Resources */ = {isa = PBXBuildFile; fileRef = 923A25E82263682B2BCE9048 /* openapi-generator-config.yaml */; };
+		FCC8824ED4E560F327139EFB /* RelationshipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 628BB76BCF7198B6FEA2497B /* RelationshipView.swift */; };
+		FD28C142591CC14E35746D15 /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 40825299BDEB62D8836BE111 /* OpenAPIRuntime */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		02783108E40B5A06136E84B1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1A55A4AA7EB7AE0CDDE7B208 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B7665ABBC73680B0CF8B59E2;
+			remoteInfo = WoorisaiAPI;
+		};
+		26CE3E5262398E8D835EFB52 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1A55A4AA7EB7AE0CDDE7B208 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B7665ABBC73680B0CF8B59E2;
+			remoteInfo = WoorisaiAPI;
+		};
+		294049C6D08B747EE7335F9B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1A55A4AA7EB7AE0CDDE7B208 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B7665ABBC73680B0CF8B59E2;
+			remoteInfo = WoorisaiAPI;
+		};
+		88DABB0A1AAFFF5E4C868F32 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1A55A4AA7EB7AE0CDDE7B208 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0F410CD2E8B3B3C01798F931;
+			remoteInfo = Woorisai;
+		};
+		F157FBE7C7EDE5AB7ACFDA61 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1A55A4AA7EB7AE0CDDE7B208 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0F410CD2E8B3B3C01798F931;
+			remoteInfo = Woorisai;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		261B260CA6A67218B3C62DD7 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				9ED3CEEE76BC9CB487E1F4C9 /* WoorisaiAPI.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		591D425CDCF6CDCAAEBBC226 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				374C922C2523DBF1A64E33CC /* WoorisaiAPI.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8E49DE9DC679F30C31121021 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				6828AEEFB502D410EF4A2B04 /* WoorisaiAPI.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		016E0342D25764971F0C8C5D /* WoorisaiAPISecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAPISecurity.swift; sourceTree = "<group>"; };
+		07F76F28C7930A95A511B832 /* WoorisaiAPIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAPIClientTests.swift; sourceTree = "<group>"; };
+		08480AE90AD7224FE235F6A4 /* WoorisaiAPITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WoorisaiAPITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		08FE64A009715C385F5653CA /* RelationshipModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelationshipModelTests.swift; sourceTree = "<group>"; };
+		09C81581956669C817FAF1A9 /* NotificationModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationModel.swift; sourceTree = "<group>"; };
+		0C3FB69EA91C8716D02D2DB6 /* WoorisaiAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAPIClient.swift; sourceTree = "<group>"; };
+		138E16AB78EFF85EF7FDA33D /* WoorisaiRelationshipAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiRelationshipAPI.swift; sourceTree = "<group>"; };
+		163C17EB85034CF3A5294251 /* MediaModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaModelTests.swift; sourceTree = "<group>"; };
+		264A194A52EFFBD3C21047E2 /* RuntimeConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeConfigurationTests.swift; sourceTree = "<group>"; };
+		2C329B0E13F53B6313F8F9D6 /* LoginOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginOptionsView.swift; sourceTree = "<group>"; };
+		2E2DEEBE274D14A59AF70729 /* DiaryModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryModelTests.swift; sourceTree = "<group>"; };
+		2E7D04D016E81AC8374C19ED /* WoorisaiAPI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = WoorisaiAPI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		3023E181908B31C4D4E22E89 /* RelationshipModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelationshipModel.swift; sourceTree = "<group>"; };
+		3443E4C7DC63337254603F5A /* NotificationModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationModelTests.swift; sourceTree = "<group>"; };
+		42D77E27E13F2E22B89F2822 /* WoorisaiAPIErrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAPIErrorTests.swift; sourceTree = "<group>"; };
+		42F7CBF836FE7D93FBB5E422 /* WoorisaiAPISecurityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAPISecurityTests.swift; sourceTree = "<group>"; };
+		48EA39B38C8BA4876BED02D2 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		4A66EEABE8FDC71D9BB39BAF /* WoorisaiCredentialValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiCredentialValidationTests.swift; sourceTree = "<group>"; };
+		4CB1B40F6900607FAEF7BDE0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4DAF64442B84C597174CC116 /* WoorisaiDesignSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiDesignSystemTests.swift; sourceTree = "<group>"; };
+		504C2CA676C2283C75A89CE2 /* WoorisaiTextInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiTextInput.swift; sourceTree = "<group>"; };
+		510FB592BC2CF5306A38C6C3 /* WoorisaiTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WoorisaiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		58B57791B84326D1027855CB /* WoorisaiMediaAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiMediaAPITests.swift; sourceTree = "<group>"; };
+		628BB76BCF7198B6FEA2497B /* RelationshipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelationshipView.swift; sourceTree = "<group>"; };
+		69598E271D3A2C640DACA11F /* LoginOptionsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginOptionsModel.swift; sourceTree = "<group>"; };
+		69B8D1F311F3C8A284C6AA82 /* LoginOptionsModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginOptionsModelTests.swift; sourceTree = "<group>"; };
+		70A1DD2A52AA5C72AD141605 /* FirebaseNotificationBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirebaseNotificationBridge.swift; sourceTree = "<group>"; };
+		70CC22C8885B027430F25295 /* WoorisaiAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAppDelegate.swift; sourceTree = "<group>"; };
+		7F4CC053300CA7A376951318 /* WoorisaiDiaryAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiDiaryAPI.swift; sourceTree = "<group>"; };
+		86476FE905B2A2A98945F8E9 /* MediaAttachmentComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaAttachmentComposer.swift; sourceTree = "<group>"; };
+		8BBD3654D73EBD197778D442 /* NotificationRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationRouting.swift; sourceTree = "<group>"; };
+		91DA4EA9B105368B6D4D7081 /* WoorisaiAPIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAPIError.swift; sourceTree = "<group>"; };
+		923A25E82263682B2BCE9048 /* openapi-generator-config.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = "openapi-generator-config.yaml"; sourceTree = "<group>"; };
+		9838A7619AE4DB6AA9775BC6 /* WoorisaiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiApp.swift; sourceTree = "<group>"; };
+		99F4E9B5B613A1DDF402DAA8 /* DiaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryView.swift; sourceTree = "<group>"; };
+		9AE95E8D90CD2C5CE8E6D059 /* WoorisaiMediaAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiMediaAPI.swift; sourceTree = "<group>"; };
+		9D5D5403E383CBDFEFD4475A /* AuthenticationModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationModelTests.swift; sourceTree = "<group>"; };
+		A0A91E2F497BFD528F20517E /* WoorisaiDiaryAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiDiaryAPITests.swift; sourceTree = "<group>"; };
+		A1DBC2440F658F77E4B504BA /* MediaDownloadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDownloadModel.swift; sourceTree = "<group>"; };
+		A22E638070EE9C908F5CE154 /* WoorisaiNotificationAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiNotificationAPI.swift; sourceTree = "<group>"; };
+		A8914F28C22B6C25363853A4 /* openapi.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = openapi.yaml; sourceTree = "<group>"; };
+		C39C91A64F78599847AF8468 /* Woorisai.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Woorisai.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C4ED17D71DD28BBEEA415A55 /* MediaAttachmentComposerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaAttachmentComposerTests.swift; sourceTree = "<group>"; };
+		C5A3395049A85CADD678AF17 /* DiaryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryModel.swift; sourceTree = "<group>"; };
+		C86D512CC8D5C8D27F2924FF /* MediaUploadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaUploadModel.swift; sourceTree = "<group>"; };
+		CDB0308C06FF4A6EC28E2A81 /* WoorisaiCredentialValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiCredentialValidation.swift; sourceTree = "<group>"; };
+		CF8AE3E17CE3F4522F76D04B /* AuthenticationModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationModel.swift; sourceTree = "<group>"; };
+		CFA757BF6C16BF15B169D9B1 /* RuntimeConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeConfiguration.swift; sourceTree = "<group>"; };
+		DA182CCE54B698F5D041230F /* WoorisaiUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WoorisaiUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E3EEC8E27EAEF654BDECD80C /* WoorisaiRelationshipAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiRelationshipAPITests.swift; sourceTree = "<group>"; };
+		E662786A1559E2619E0A1727 /* WoorisaiLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiLaunchTests.swift; sourceTree = "<group>"; };
+		E7DF92B71ECF71DB02663BEB /* WoorisaiNotificationAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiNotificationAPITests.swift; sourceTree = "<group>"; };
+		E977F9625B38730AA0754F6E /* WoorisaiDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiDesignSystem.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		3100EEA00CF1E8247C52772F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				59A69753C46836A9AD276F62 /* FirebaseCore in Frameworks */,
+				6ED2EF8C38A74C43BFD28E2E /* FirebaseInstallations in Frameworks */,
+				C13225DC17B33AFD84229711 /* FirebaseMessaging in Frameworks */,
+				D0E98D764002417CB5231A15 /* HTTPTypes in Frameworks */,
+				D3B2B8A961223C8AD38B310F /* OpenAPIRuntime in Frameworks */,
+				2A3F2B0051E1E63844B0DC56 /* OpenAPIURLSession in Frameworks */,
+				92FABCA7408A16C2A6A4FCC6 /* WoorisaiAPI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7205FBE81E2C27F3A4508BCE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B20279B3E777D92970EB22CD /* HTTPTypes in Frameworks */,
+				FD28C142591CC14E35746D15 /* OpenAPIRuntime in Frameworks */,
+				CDB3E0956B0DF9DC72EB8BCB /* OpenAPIURLSession in Frameworks */,
+				725234D7A69EADCD6688750C /* WoorisaiAPI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		938A6B3F02182607CBADC299 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8ED47267EA0056616F7B1465 /* HTTPTypes in Frameworks */,
+				832BD052946232BEE8FE47B9 /* OpenAPIRuntime in Frameworks */,
+				92F2C08B6F40854A56E3792D /* OpenAPIURLSession in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A4565FAC8E69E7FD5EC61752 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7D2CEF741F37F68E5D935497 /* HTTPTypes in Frameworks */,
+				65D65C07B47B5D2271CDCC2F /* OpenAPIRuntime in Frameworks */,
+				6975167D9DD404CD47F15723 /* OpenAPIURLSession in Frameworks */,
+				A38E8CA213687480ED4A2F15 /* WoorisaiAPI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		112FD871145BEC4E63192891 /* Media */ = {
+			isa = PBXGroup;
+			children = (
+				86476FE905B2A2A98945F8E9 /* MediaAttachmentComposer.swift */,
+				A1DBC2440F658F77E4B504BA /* MediaDownloadModel.swift */,
+				C86D512CC8D5C8D27F2924FF /* MediaUploadModel.swift */,
+			);
+			path = Media;
+			sourceTree = "<group>";
+		};
+		12AAF97096E82D0DB684D767 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C39C91A64F78599847AF8468 /* Woorisai.app */,
+				2E7D04D016E81AC8374C19ED /* WoorisaiAPI.framework */,
+				08480AE90AD7224FE235F6A4 /* WoorisaiAPITests.xctest */,
+				510FB592BC2CF5306A38C6C3 /* WoorisaiTests.xctest */,
+				DA182CCE54B698F5D041230F /* WoorisaiUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		20B2F5E78AAE39F5AD6801D9 /* WoorisaiUITests */ = {
+			isa = PBXGroup;
+			children = (
+				E662786A1559E2619E0A1727 /* WoorisaiLaunchTests.swift */,
+			);
+			path = WoorisaiUITests;
+			sourceTree = "<group>";
+		};
+		3490DC5713BF0C5A7268F3A5 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				4CB1B40F6900607FAEF7BDE0 /* Assets.xcassets */,
+				48EA39B38C8BA4876BED02D2 /* PrivacyInfo.xcprivacy */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		5959C3C17EC9EA35DB2BAB53 /* Relationship */ = {
+			isa = PBXGroup;
+			children = (
+				3023E181908B31C4D4E22E89 /* RelationshipModel.swift */,
+				628BB76BCF7198B6FEA2497B /* RelationshipView.swift */,
+			);
+			path = Relationship;
+			sourceTree = "<group>";
+		};
+		5B5D23265F157B95F96AC41E = {
+			isa = PBXGroup;
+			children = (
+				C1F249D7B0733862443C6484 /* Woorisai */,
+				6CB852E091489787AF58E5FD /* WoorisaiAPITests */,
+				DDE61BD6E57993E923360453 /* WoorisaiTests */,
+				20B2F5E78AAE39F5AD6801D9 /* WoorisaiUITests */,
+				12AAF97096E82D0DB684D767 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		6A18EA9E4BD8FBAF5ED94049 /* API */ = {
+			isa = PBXGroup;
+			children = (
+				923A25E82263682B2BCE9048 /* openapi-generator-config.yaml */,
+				A8914F28C22B6C25363853A4 /* openapi.yaml */,
+				0C3FB69EA91C8716D02D2DB6 /* WoorisaiAPIClient.swift */,
+				91DA4EA9B105368B6D4D7081 /* WoorisaiAPIError.swift */,
+				016E0342D25764971F0C8C5D /* WoorisaiAPISecurity.swift */,
+				CDB0308C06FF4A6EC28E2A81 /* WoorisaiCredentialValidation.swift */,
+				7F4CC053300CA7A376951318 /* WoorisaiDiaryAPI.swift */,
+				9AE95E8D90CD2C5CE8E6D059 /* WoorisaiMediaAPI.swift */,
+				A22E638070EE9C908F5CE154 /* WoorisaiNotificationAPI.swift */,
+				138E16AB78EFF85EF7FDA33D /* WoorisaiRelationshipAPI.swift */,
+				504C2CA676C2283C75A89CE2 /* WoorisaiTextInput.swift */,
+			);
+			path = API;
+			sourceTree = "<group>";
+		};
+		6CB852E091489787AF58E5FD /* WoorisaiAPITests */ = {
+			isa = PBXGroup;
+			children = (
+				07F76F28C7930A95A511B832 /* WoorisaiAPIClientTests.swift */,
+				42D77E27E13F2E22B89F2822 /* WoorisaiAPIErrorTests.swift */,
+				42F7CBF836FE7D93FBB5E422 /* WoorisaiAPISecurityTests.swift */,
+				4A66EEABE8FDC71D9BB39BAF /* WoorisaiCredentialValidationTests.swift */,
+				A0A91E2F497BFD528F20517E /* WoorisaiDiaryAPITests.swift */,
+				58B57791B84326D1027855CB /* WoorisaiMediaAPITests.swift */,
+				E7DF92B71ECF71DB02663BEB /* WoorisaiNotificationAPITests.swift */,
+				E3EEC8E27EAEF654BDECD80C /* WoorisaiRelationshipAPITests.swift */,
+			);
+			path = WoorisaiAPITests;
+			sourceTree = "<group>";
+		};
+		6E8584FBCA5A96C6ED9DD652 /* Login */ = {
+			isa = PBXGroup;
+			children = (
+				CF8AE3E17CE3F4522F76D04B /* AuthenticationModel.swift */,
+				69598E271D3A2C640DACA11F /* LoginOptionsModel.swift */,
+				2C329B0E13F53B6313F8F9D6 /* LoginOptionsView.swift */,
+			);
+			path = Login;
+			sourceTree = "<group>";
+		};
+		96D070506E2EC438D64E39D3 /* Notification */ = {
+			isa = PBXGroup;
+			children = (
+				70A1DD2A52AA5C72AD141605 /* FirebaseNotificationBridge.swift */,
+				09C81581956669C817FAF1A9 /* NotificationModel.swift */,
+				8BBD3654D73EBD197778D442 /* NotificationRouting.swift */,
+			);
+			path = Notification;
+			sourceTree = "<group>";
+		};
+		AAB8DCE22E060B7C5EED60D5 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				D970346640A021E12F047592 /* Diary */,
+				6E8584FBCA5A96C6ED9DD652 /* Login */,
+				112FD871145BEC4E63192891 /* Media */,
+				96D070506E2EC438D64E39D3 /* Notification */,
+				5959C3C17EC9EA35DB2BAB53 /* Relationship */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		C00ECA09F2CD61F0C7EEA05D /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				6A18EA9E4BD8FBAF5ED94049 /* API */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		C1F249D7B0733862443C6484 /* Woorisai */ = {
+			isa = PBXGroup;
+			children = (
+				C6B78EE616D49DE5AF53C79F /* App */,
+				C00ECA09F2CD61F0C7EEA05D /* Core */,
+				AAB8DCE22E060B7C5EED60D5 /* Features */,
+				3490DC5713BF0C5A7268F3A5 /* Resources */,
+			);
+			path = Woorisai;
+			sourceTree = "<group>";
+		};
+		C6B78EE616D49DE5AF53C79F /* App */ = {
+			isa = PBXGroup;
+			children = (
+				CFA757BF6C16BF15B169D9B1 /* RuntimeConfiguration.swift */,
+				9838A7619AE4DB6AA9775BC6 /* WoorisaiApp.swift */,
+				70CC22C8885B027430F25295 /* WoorisaiAppDelegate.swift */,
+				E977F9625B38730AA0754F6E /* WoorisaiDesignSystem.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		D970346640A021E12F047592 /* Diary */ = {
+			isa = PBXGroup;
+			children = (
+				C5A3395049A85CADD678AF17 /* DiaryModel.swift */,
+				99F4E9B5B613A1DDF402DAA8 /* DiaryView.swift */,
+			);
+			path = Diary;
+			sourceTree = "<group>";
+		};
+		DDE61BD6E57993E923360453 /* WoorisaiTests */ = {
+			isa = PBXGroup;
+			children = (
+				9D5D5403E383CBDFEFD4475A /* AuthenticationModelTests.swift */,
+				2E2DEEBE274D14A59AF70729 /* DiaryModelTests.swift */,
+				69B8D1F311F3C8A284C6AA82 /* LoginOptionsModelTests.swift */,
+				C4ED17D71DD28BBEEA415A55 /* MediaAttachmentComposerTests.swift */,
+				163C17EB85034CF3A5294251 /* MediaModelTests.swift */,
+				3443E4C7DC63337254603F5A /* NotificationModelTests.swift */,
+				08FE64A009715C385F5653CA /* RelationshipModelTests.swift */,
+				264A194A52EFFBD3C21047E2 /* RuntimeConfigurationTests.swift */,
+				4DAF64442B84C597174CC116 /* WoorisaiDesignSystemTests.swift */,
+			);
+			path = WoorisaiTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0F410CD2E8B3B3C01798F931 /* Woorisai */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C6E90E463E6801A70D0B74AC /* Build configuration list for PBXNativeTarget "Woorisai" */;
+			buildPhases = (
+				EA8DF77DA39ABF06628D8712 /* Sources */,
+				110056952D4F02D47104A7BA /* Resources */,
+				3100EEA00CF1E8247C52772F /* Frameworks */,
+				591D425CDCF6CDCAAEBBC226 /* Embed Frameworks */,
+				63CD3ED68D895451B14B6214 /* Inject Firebase Apple client configuration */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C15F6D9B72CEF2AEB828F71C /* PBXTargetDependency */,
+			);
+			name = Woorisai;
+			packageProductDependencies = (
+				E58C85C20DC0DA675659BA7C /* FirebaseCore */,
+				7E253B87C82550F0533B945C /* FirebaseInstallations */,
+				489ABB621BD4B3382F0C0C3A /* FirebaseMessaging */,
+				8080F0C7301C5DB92DE71A2B /* HTTPTypes */,
+				1A5A1CFBDB7A8D9F9A2BCAD9 /* OpenAPIRuntime */,
+				944CAB6ED8CA020A36DFBACC /* OpenAPIURLSession */,
+			);
+			productName = Woorisai;
+			productReference = C39C91A64F78599847AF8468 /* Woorisai.app */;
+			productType = "com.apple.product-type.application";
+		};
+		396D8B13E1119D4A39D80697 /* WoorisaiAPITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 26EA90013DEF15F84DE5120C /* Build configuration list for PBXNativeTarget "WoorisaiAPITests" */;
+			buildPhases = (
+				F2F71432F1A50DCA1F16D540 /* Sources */,
+				A4565FAC8E69E7FD5EC61752 /* Frameworks */,
+				261B260CA6A67218B3C62DD7 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				66036BB350B3BC5B46C19117 /* PBXTargetDependency */,
+			);
+			name = WoorisaiAPITests;
+			packageProductDependencies = (
+				24D133E91D3ECBEE13C091FA /* HTTPTypes */,
+				494190F8106AE3DC7A296104 /* OpenAPIRuntime */,
+				002DF869EC6ABEBE787C670E /* OpenAPIURLSession */,
+			);
+			productName = WoorisaiAPITests;
+			productReference = 08480AE90AD7224FE235F6A4 /* WoorisaiAPITests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		789C8BA14D842FA1B9C3C945 /* WoorisaiUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 29BFE208AB98A3BE01D1F809 /* Build configuration list for PBXNativeTarget "WoorisaiUITests" */;
+			buildPhases = (
+				EA55B13201E1F971F9CD63A3 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				58522F9756FA4137AC77F168 /* PBXTargetDependency */,
+			);
+			name = WoorisaiUITests;
+			packageProductDependencies = (
+			);
+			productName = WoorisaiUITests;
+			productReference = DA182CCE54B698F5D041230F /* WoorisaiUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		983FD9F870184765E3BDCA4E /* WoorisaiTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C96AA8B2E74E04375764F874 /* Build configuration list for PBXNativeTarget "WoorisaiTests" */;
+			buildPhases = (
+				47DD8C25135FE4C34B31B691 /* Sources */,
+				7205FBE81E2C27F3A4508BCE /* Frameworks */,
+				8E49DE9DC679F30C31121021 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4BC81ECF982B68E594149E4B /* PBXTargetDependency */,
+				5BB1263548864EFF7DAAFBBF /* PBXTargetDependency */,
+			);
+			name = WoorisaiTests;
+			packageProductDependencies = (
+				F9DA49E2160A95F8C0DE5F12 /* HTTPTypes */,
+				40825299BDEB62D8836BE111 /* OpenAPIRuntime */,
+				567EB51AA7D025E0AFD3CB9E /* OpenAPIURLSession */,
+			);
+			productName = WoorisaiTests;
+			productReference = 510FB592BC2CF5306A38C6C3 /* WoorisaiTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		B7665ABBC73680B0CF8B59E2 /* WoorisaiAPI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9C45CE6D32A92FFBB4FDF167 /* Build configuration list for PBXNativeTarget "WoorisaiAPI" */;
+			buildPhases = (
+				604EEC4339FB0F8C3ACD5483 /* Sources */,
+				C2A82C7DCAD0D70F6F083C2C /* Resources */,
+				938A6B3F02182607CBADC299 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				268A57AA2BF2019FDC466166 /* PBXTargetDependency */,
+			);
+			name = WoorisaiAPI;
+			packageProductDependencies = (
+				EA6FED18F71C6AB716F89663 /* HTTPTypes */,
+				023B9ABB012B2EC308A4C985 /* OpenAPIRuntime */,
+				B89629E6A5CDE6B45429DF4C /* OpenAPIURLSession */,
+			);
+			productName = WoorisaiAPI;
+			productReference = 2E7D04D016E81AC8374C19ED /* WoorisaiAPI.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1A55A4AA7EB7AE0CDDE7B208 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					0F410CD2E8B3B3C01798F931 = {
+						DevelopmentTeam = 83KHWR8L3R;
+						ProvisioningStyle = Automatic;
+					};
+					396D8B13E1119D4A39D80697 = {
+						DevelopmentTeam = 83KHWR8L3R;
+						ProvisioningStyle = Automatic;
+					};
+					789C8BA14D842FA1B9C3C945 = {
+						DevelopmentTeam = 83KHWR8L3R;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 0F410CD2E8B3B3C01798F931;
+					};
+					983FD9F870184765E3BDCA4E = {
+						DevelopmentTeam = 83KHWR8L3R;
+						ProvisioningStyle = Automatic;
+					};
+					B7665ABBC73680B0CF8B59E2 = {
+						DevelopmentTeam = 83KHWR8L3R;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = D20F44EB2706DCC57C63DD8A /* Build configuration list for PBXProject "Woorisai" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 5B5D23265F157B95F96AC41E;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				092DCE4A81AD54AE751A3905 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				2ADE5DCE27FCC09D1DFA1A6A /* XCRemoteSwiftPackageReference "swift-http-types" */,
+				E2546FFA6B04528A080EC16D /* XCRemoteSwiftPackageReference "swift-openapi-generator" */,
+				3F668DB6E478C3835B637788 /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */,
+				629DD8D81D9AD40CF14B7845 /* XCRemoteSwiftPackageReference "swift-openapi-urlsession" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 12AAF97096E82D0DB684D767 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B7665ABBC73680B0CF8B59E2 /* WoorisaiAPI */,
+				0F410CD2E8B3B3C01798F931 /* Woorisai */,
+				396D8B13E1119D4A39D80697 /* WoorisaiAPITests */,
+				983FD9F870184765E3BDCA4E /* WoorisaiTests */,
+				789C8BA14D842FA1B9C3C945 /* WoorisaiUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		110056952D4F02D47104A7BA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7EA23DFDC59DB0B8BE4B5573 /* Assets.xcassets in Resources */,
+				596C9564C98DE058F3ABE59B /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C2A82C7DCAD0D70F6F083C2C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F66E3D2597290EFF9676C73B /* openapi-generator-config.yaml in Resources */,
+				1B310268E530569EB0538E6A /* openapi.yaml in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		63CD3ED68D895451B14B6214 /* Inject Firebase Apple client configuration */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Inject Firebase Apple client configuration";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\nfirebase_bundle_path=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist\"\nfirebase_config_path=\"\"\nfirebase_expected_realm_sha256=\"\"\nfirebase_other_realm_sha256=\"\"\nfirebase_config_is_explicit=false\nfirebase_is_release_archive=false\nfirebase_configuration_required=false\nrm -f \"${firebase_bundle_path}\"\n\nif [ \"${CONFIGURATION}\" = \"Release\" ] && [ \"${ACTION}\" = \"install\" ]; then\n  firebase_is_release_archive=true\nfi\nif [ \"${PLATFORM_NAME}\" = \"iphoneos\" ] || [ \"${firebase_is_release_archive}\" = true ]; then\n  firebase_configuration_required=true\nfi\n\ncase \"${CONFIGURATION}\" in\n  Debug)\n    if [ -n \"${WOORISAI_FIREBASE_DEBUG_CONFIG_PATH:-}\" ]; then\n      firebase_config_path=\"${WOORISAI_FIREBASE_DEBUG_CONFIG_PATH}\"\n      firebase_config_is_explicit=true\n    fi\n    firebase_expected_realm_sha256=\"${WOORISAI_FIREBASE_DEBUG_REALM_SHA256:-}\"\n    firebase_other_realm_sha256=\"${WOORISAI_FIREBASE_RELEASE_REALM_SHA256:-}\"\n    ;;\n  Release)\n    if [ -n \"${WOORISAI_FIREBASE_RELEASE_CONFIG_PATH:-}\" ]; then\n      firebase_config_path=\"${WOORISAI_FIREBASE_RELEASE_CONFIG_PATH}\"\n      firebase_config_is_explicit=true\n    else\n      firebase_config_path=\"${SRCROOT}/Woorisai/Resources/GoogleService-Info.plist\"\n    fi\n    firebase_expected_realm_sha256=\"${WOORISAI_FIREBASE_RELEASE_REALM_SHA256:-}\"\n    firebase_other_realm_sha256=\"${WOORISAI_FIREBASE_DEBUG_REALM_SHA256:-}\"\n    ;;\n  *)\n    echo \"error: Unsupported build configuration for Firebase client configuration.\"\n    exit 1\n    ;;\nesac\n\nif [ -z \"${firebase_config_path}\" ]; then\n  if [ \"${firebase_configuration_required}\" = true ]; then\n    echo \"error: Firebase Apple client configuration is required for a device build.\"\n    exit 1\n  fi\n  exit 0\nfi\n\nif [ ! -f \"${firebase_config_path}\" ]; then\n  if [ \"${firebase_config_is_explicit}\" = true ] || [ \"${firebase_configuration_required}\" = true ]; then\n    echo \"error: Required Firebase Apple client configuration is unavailable.\"\n    exit 1\n  fi\n  exit 0\nfi\n\nif [ -z \"${firebase_expected_realm_sha256}\" ]; then\n  if [ \"${firebase_config_is_explicit}\" = true ] || [ \"${firebase_configuration_required}\" = true ]; then\n    echo \"error: Protected Firebase realm assertion is required for this configuration.\"\n    exit 1\n  fi\n  echo \"warning: Firebase Apple client configuration was not injected because its protected realm assertion is unavailable.\"\n  exit 0\nfi\n\nif ! /usr/bin/printf '%s' \"${firebase_expected_realm_sha256}\" \\\n  | /usr/bin/grep -Eq '^[[:xdigit:]]{64}$'; then\n  echo \"error: Protected Firebase realm assertion is malformed.\"\n  exit 1\nfi\nfirebase_expected_realm_sha256=$(\n  /usr/bin/printf '%s' \"${firebase_expected_realm_sha256}\" | /usr/bin/tr '[:upper:]' '[:lower:]'\n)\n\nif [ -n \"${firebase_other_realm_sha256}\" ]; then\n  if ! /usr/bin/printf '%s' \"${firebase_other_realm_sha256}\" \\\n    | /usr/bin/grep -Eq '^[[:xdigit:]]{64}$'; then\n    echo \"error: Protected Firebase cross-realm assertion is malformed.\"\n    exit 1\n  fi\n  firebase_other_realm_sha256=$(\n    /usr/bin/printf '%s' \"${firebase_other_realm_sha256}\" | /usr/bin/tr '[:upper:]' '[:lower:]'\n  )\n  if [ \"${firebase_expected_realm_sha256}\" = \"${firebase_other_realm_sha256}\" ]; then\n    echo \"error: Debug and Release Firebase realms must be distinct.\"\n    exit 1\n  fi\nfi\n\nif ! /usr/bin/plutil -lint \"${firebase_config_path}\" >/dev/null 2>&1; then\n  echo \"error: Firebase Apple client configuration is not a valid plist.\"\n  exit 1\nfi\nfirebase_client_bundle_id=$(/usr/libexec/PlistBuddy -c \"Print :BUNDLE_ID\" \"${firebase_config_path}\" 2>/dev/null || true)\nfirebase_google_app_id=$(/usr/libexec/PlistBuddy -c \"Print :GOOGLE_APP_ID\" \"${firebase_config_path}\" 2>/dev/null || true)\nfirebase_project_id=$(/usr/libexec/PlistBuddy -c \"Print :PROJECT_ID\" \"${firebase_config_path}\" 2>/dev/null || true)\nfirebase_api_key=$(/usr/libexec/PlistBuddy -c \"Print :API_KEY\" \"${firebase_config_path}\" 2>/dev/null || true)\nfirebase_sender_id=$(/usr/libexec/PlistBuddy -c \"Print :GCM_SENDER_ID\" \"${firebase_config_path}\" 2>/dev/null || true)\nif [ \"${firebase_client_bundle_id}\" != \"${PRODUCT_BUNDLE_IDENTIFIER}\" ] || \\\n   [ -z \"${firebase_google_app_id}\" ] || [ -z \"${firebase_project_id}\" ] || \\\n   [ -z \"${firebase_api_key}\" ] || [ -z \"${firebase_sender_id}\" ]; then\n  echo \"error: Firebase Apple client configuration is invalid for this app target.\"\n  exit 1\nfi\n\nfirebase_actual_realm_sha256=$(\n  /usr/bin/printf '%s\\0%s\\0%s\\0%s\\0%s\\0' \\\n    \"${firebase_project_id}\" \"${firebase_google_app_id}\" \"${firebase_sender_id}\" \\\n    \"${firebase_api_key}\" \"${firebase_client_bundle_id}\" \\\n    | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}'\n)\nif [ \"${firebase_actual_realm_sha256}\" != \"${firebase_expected_realm_sha256}\" ]; then\n  echo \"error: Firebase Apple client configuration does not match the protected realm assertion.\"\n  exit 1\nfi\n\nmkdir -p \"$(dirname \"${firebase_bundle_path}\")\"\n/usr/bin/ditto \"${firebase_config_path}\" \"${firebase_bundle_path}\"\n/usr/bin/plutil -lint \"${firebase_bundle_path}\" >/dev/null\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		47DD8C25135FE4C34B31B691 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9EEE4609734523DB1B96A03F /* AuthenticationModelTests.swift in Sources */,
+				6D556465B3D825861E49339F /* DiaryModelTests.swift in Sources */,
+				B1EA8723F27875648C0FD41C /* LoginOptionsModelTests.swift in Sources */,
+				6DFD2F90E2FF089F6B2F81E6 /* MediaAttachmentComposerTests.swift in Sources */,
+				BB523B14A36A83AA80347BCF /* MediaModelTests.swift in Sources */,
+				37718E5D45C5CB0AB112AF7A /* NotificationModelTests.swift in Sources */,
+				F083B87F054EDD0690D35C3A /* RelationshipModelTests.swift in Sources */,
+				E042F0468444338E88506079 /* RuntimeConfigurationTests.swift in Sources */,
+				98F3FD85F70F05CE5B891941 /* WoorisaiDesignSystemTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		604EEC4339FB0F8C3ACD5483 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8D574703CB655AB5E9B99C18 /* WoorisaiAPIClient.swift in Sources */,
+				E2C8CC58B5E743000926D78A /* WoorisaiAPIError.swift in Sources */,
+				67C5E61029095849A0B6A3FB /* WoorisaiAPISecurity.swift in Sources */,
+				08541CBCD858AC685D505A72 /* WoorisaiCredentialValidation.swift in Sources */,
+				E4B25236D9EF81D2FDE94DC2 /* WoorisaiDiaryAPI.swift in Sources */,
+				08BA050338A7087392F35FA5 /* WoorisaiMediaAPI.swift in Sources */,
+				E71A454BC61CCE229E0C2FAB /* WoorisaiNotificationAPI.swift in Sources */,
+				F4E95D9BD35C7D8ABB10DD02 /* WoorisaiRelationshipAPI.swift in Sources */,
+				078DA3B8BF4990EE236CB381 /* WoorisaiTextInput.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EA55B13201E1F971F9CD63A3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A3D1B56924A76C852603B29E /* WoorisaiLaunchTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EA8DF77DA39ABF06628D8712 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9C4A3FD346D98BEED93C7820 /* AuthenticationModel.swift in Sources */,
+				A0DA23F13C46DA54945DB366 /* DiaryModel.swift in Sources */,
+				7F3EE5DEFD7D60F5B493DFD1 /* DiaryView.swift in Sources */,
+				EDEE9D2F5829F56A4612AAC7 /* FirebaseNotificationBridge.swift in Sources */,
+				88C66C980B4BEF146A37B039 /* LoginOptionsModel.swift in Sources */,
+				497E4D28995BAE601AF137CC /* LoginOptionsView.swift in Sources */,
+				C155A3741F573F119AFD2B0F /* MediaAttachmentComposer.swift in Sources */,
+				65269832E3991CF2F7DF0F03 /* MediaDownloadModel.swift in Sources */,
+				9B51D7F2A1F9A926FF0CD4DB /* MediaUploadModel.swift in Sources */,
+				A8B089BD20E57081A7CA47D6 /* NotificationModel.swift in Sources */,
+				8A4498C35707B1E5BF8BBB01 /* NotificationRouting.swift in Sources */,
+				0875AD092BBE5A7332AC2CD0 /* RelationshipModel.swift in Sources */,
+				FCC8824ED4E560F327139EFB /* RelationshipView.swift in Sources */,
+				D50556CAC20DC147278D7A42 /* RuntimeConfiguration.swift in Sources */,
+				EA0AF0C3B7628520CC9B0B88 /* WoorisaiApp.swift in Sources */,
+				87BB05E526F68B2DE14BC2D3 /* WoorisaiAppDelegate.swift in Sources */,
+				0E453322DB5433D050CA53DF /* WoorisaiDesignSystem.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F2F71432F1A50DCA1F16D540 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1C307F126A78B6B4DBD8F0F8 /* WoorisaiAPIClientTests.swift in Sources */,
+				77D32A0FEC803FE45946EA7F /* WoorisaiAPIErrorTests.swift in Sources */,
+				080F953B16C9ECFC78BD2F87 /* WoorisaiAPISecurityTests.swift in Sources */,
+				D1D95A8BC17651DFCB7670CB /* WoorisaiCredentialValidationTests.swift in Sources */,
+				897B26692FD0F92EE6CD1BF0 /* WoorisaiDiaryAPITests.swift in Sources */,
+				BF35156CF63E02ACA0BF636D /* WoorisaiMediaAPITests.swift in Sources */,
+				0CD093B4BC667804EF42EA0A /* WoorisaiNotificationAPITests.swift in Sources */,
+				D8B4730C8BA91CF333F019D0 /* WoorisaiRelationshipAPITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		268A57AA2BF2019FDC466166 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = C3E58C89D015D9BF7AB6C71C /* OpenAPIGenerator */;
+		};
+		4BC81ECF982B68E594149E4B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0F410CD2E8B3B3C01798F931 /* Woorisai */;
+			targetProxy = F157FBE7C7EDE5AB7ACFDA61 /* PBXContainerItemProxy */;
+		};
+		58522F9756FA4137AC77F168 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0F410CD2E8B3B3C01798F931 /* Woorisai */;
+			targetProxy = 88DABB0A1AAFFF5E4C868F32 /* PBXContainerItemProxy */;
+		};
+		5BB1263548864EFF7DAAFBBF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B7665ABBC73680B0CF8B59E2 /* WoorisaiAPI */;
+			targetProxy = 294049C6D08B747EE7335F9B /* PBXContainerItemProxy */;
+		};
+		66036BB350B3BC5B46C19117 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B7665ABBC73680B0CF8B59E2 /* WoorisaiAPI */;
+			targetProxy = 02783108E40B5A06136E84B1 /* PBXContainerItemProxy */;
+		};
+		C15F6D9B72CEF2AEB828F71C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B7665ABBC73680B0CF8B59E2 /* WoorisaiAPI */;
+			targetProxy = 26CE3E5262398E8D835EFB52 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		01C12D3E2612E06ADF64D77D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.naminhyeok.woorisai.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Woorisai.app/Woorisai";
+			};
+			name = Release;
+		};
+		04AAFCE4F2E4340BDEDED0B8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.naminhyeok.woorisai.api;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		05CA021304E0BE23FF35C2D2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.naminhyeok.woorisai.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Woorisai.app/Woorisai";
+			};
+			name = Debug;
+		};
+		1C724C148707B50CE39B3FD7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				APS_ENVIRONMENT = development;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 5;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 83KHWR8L3R;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				WOORISAI_API_HOST = staging.invalid;
+			};
+			name = Debug;
+		};
+		28C601FBC29657CA0C27E937 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.naminhyeok.woorisai.api;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		72375447FC0B3F3ECC835E33 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.naminhyeok.woorisai.ui-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = Woorisai;
+			};
+			name = Debug;
+		};
+		7707362746A30F13AD82225D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Woorisai/Resources/Woorisai.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Woorisai/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.naminhyeok.woorisai;
+				PRODUCT_NAME = Woorisai;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		BD86C4DABBF61F51CC4E1B13 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.naminhyeok.woorisai.api-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		C2723920F77DBFD0457B5B1F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				APS_ENVIRONMENT = production;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 5;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 83KHWR8L3R;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				WOORISAI_API_HOST = production.invalid;
+			};
+			name = Release;
+		};
+		CBD929A8820D4853DDEE7DB9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Woorisai/Resources/Woorisai.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Woorisai/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.naminhyeok.woorisai;
+				PRODUCT_NAME = Woorisai;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		F1EA4779EA7F34D1D81C65B6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.naminhyeok.woorisai.api-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		F279037DD5E8CC99B0FBA3FC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.naminhyeok.woorisai.ui-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = Woorisai;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		26EA90013DEF15F84DE5120C /* Build configuration list for PBXNativeTarget "WoorisaiAPITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F1EA4779EA7F34D1D81C65B6 /* Debug */,
+				BD86C4DABBF61F51CC4E1B13 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		29BFE208AB98A3BE01D1F809 /* Build configuration list for PBXNativeTarget "WoorisaiUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				72375447FC0B3F3ECC835E33 /* Debug */,
+				F279037DD5E8CC99B0FBA3FC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9C45CE6D32A92FFBB4FDF167 /* Build configuration list for PBXNativeTarget "WoorisaiAPI" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				04AAFCE4F2E4340BDEDED0B8 /* Debug */,
+				28C601FBC29657CA0C27E937 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C6E90E463E6801A70D0B74AC /* Build configuration list for PBXNativeTarget "Woorisai" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CBD929A8820D4853DDEE7DB9 /* Debug */,
+				7707362746A30F13AD82225D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C96AA8B2E74E04375764F874 /* Build configuration list for PBXNativeTarget "WoorisaiTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				05CA021304E0BE23FF35C2D2 /* Debug */,
+				01C12D3E2612E06ADF64D77D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D20F44EB2706DCC57C63DD8A /* Build configuration list for PBXProject "Woorisai" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1C724C148707B50CE39B3FD7 /* Debug */,
+				C2723920F77DBFD0457B5B1F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		092DCE4A81AD54AE751A3905 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = exactVersion;
+				version = 12.16.0;
+			};
+		};
+		2ADE5DCE27FCC09D1DFA1A6A /* XCRemoteSwiftPackageReference "swift-http-types" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-http-types";
+			requirement = {
+				kind = exactVersion;
+				version = 1.6.0;
+			};
+		};
+		3F668DB6E478C3835B637788 /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-openapi-runtime";
+			requirement = {
+				kind = exactVersion;
+				version = 1.12.0;
+			};
+		};
+		629DD8D81D9AD40CF14B7845 /* XCRemoteSwiftPackageReference "swift-openapi-urlsession" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-openapi-urlsession";
+			requirement = {
+				kind = exactVersion;
+				version = 1.3.1;
+			};
+		};
+		E2546FFA6B04528A080EC16D /* XCRemoteSwiftPackageReference "swift-openapi-generator" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-openapi-generator";
+			requirement = {
+				kind = exactVersion;
+				version = 1.13.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		002DF869EC6ABEBE787C670E /* OpenAPIURLSession */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629DD8D81D9AD40CF14B7845 /* XCRemoteSwiftPackageReference "swift-openapi-urlsession" */;
+			productName = OpenAPIURLSession;
+		};
+		023B9ABB012B2EC308A4C985 /* OpenAPIRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3F668DB6E478C3835B637788 /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */;
+			productName = OpenAPIRuntime;
+		};
+		1A5A1CFBDB7A8D9F9A2BCAD9 /* OpenAPIRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3F668DB6E478C3835B637788 /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */;
+			productName = OpenAPIRuntime;
+		};
+		24D133E91D3ECBEE13C091FA /* HTTPTypes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2ADE5DCE27FCC09D1DFA1A6A /* XCRemoteSwiftPackageReference "swift-http-types" */;
+			productName = HTTPTypes;
+		};
+		40825299BDEB62D8836BE111 /* OpenAPIRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3F668DB6E478C3835B637788 /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */;
+			productName = OpenAPIRuntime;
+		};
+		489ABB621BD4B3382F0C0C3A /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 092DCE4A81AD54AE751A3905 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		494190F8106AE3DC7A296104 /* OpenAPIRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3F668DB6E478C3835B637788 /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */;
+			productName = OpenAPIRuntime;
+		};
+		567EB51AA7D025E0AFD3CB9E /* OpenAPIURLSession */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629DD8D81D9AD40CF14B7845 /* XCRemoteSwiftPackageReference "swift-openapi-urlsession" */;
+			productName = OpenAPIURLSession;
+		};
+		7E253B87C82550F0533B945C /* FirebaseInstallations */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 092DCE4A81AD54AE751A3905 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseInstallations;
+		};
+		8080F0C7301C5DB92DE71A2B /* HTTPTypes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2ADE5DCE27FCC09D1DFA1A6A /* XCRemoteSwiftPackageReference "swift-http-types" */;
+			productName = HTTPTypes;
+		};
+		944CAB6ED8CA020A36DFBACC /* OpenAPIURLSession */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629DD8D81D9AD40CF14B7845 /* XCRemoteSwiftPackageReference "swift-openapi-urlsession" */;
+			productName = OpenAPIURLSession;
+		};
+		B89629E6A5CDE6B45429DF4C /* OpenAPIURLSession */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629DD8D81D9AD40CF14B7845 /* XCRemoteSwiftPackageReference "swift-openapi-urlsession" */;
+			productName = OpenAPIURLSession;
+		};
+		C3E58C89D015D9BF7AB6C71C /* OpenAPIGenerator */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2546FFA6B04528A080EC16D /* XCRemoteSwiftPackageReference "swift-openapi-generator" */;
+			productName = "plugin:OpenAPIGenerator";
+		};
+		E58C85C20DC0DA675659BA7C /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 092DCE4A81AD54AE751A3905 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		EA6FED18F71C6AB716F89663 /* HTTPTypes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2ADE5DCE27FCC09D1DFA1A6A /* XCRemoteSwiftPackageReference "swift-http-types" */;
+			productName = HTTPTypes;
+		};
+		F9DA49E2160A95F8C0DE5F12 /* HTTPTypes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2ADE5DCE27FCC09D1DFA1A6A /* XCRemoteSwiftPackageReference "swift-http-types" */;
+			productName = HTTPTypes;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 1A55A4AA7EB7AE0CDDE7B208 /* Project object */;
+}

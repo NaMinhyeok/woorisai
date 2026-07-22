@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design Spring Modulith Boundaries"
+  short_description: "Spring Modulith 모듈 경계와 공개 계약 설계"
+  default_prompt: "Use $design-spring-modulith-boundaries to review the ownership, dependency direction, and public contracts for this module change."

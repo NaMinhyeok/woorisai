@@ -1,0 +1,44 @@
+# Deny everything, then admit only the files needed to build the backend image.
+**
+!Dockerfile
+
+!backend/
+backend/**
+!backend/build.gradle.kts
+!backend/settings.gradle.kts
+!backend/gradle.lockfile
+!backend/gradlew
+
+!backend/gradle/
+backend/gradle/**
+!backend/gradle/wrapper/
+backend/gradle/wrapper/**
+!backend/gradle/wrapper/gradle-wrapper.jar
+!backend/gradle/wrapper/gradle-wrapper.properties
+
+!backend/src/
+backend/src/**
+!backend/src/main/
+backend/src/main/**
+!backend/src/main/java/
+!backend/src/main/java/**
+!backend/src/main/resources/
+!backend/src/main/resources/**
+
+!contracts/
+contracts/**
+!contracts/openapi-v2.yaml
+
+# Defense in depth: never send locally staged credentials to the Docker daemon,
+# including credentials accidentally placed below an otherwise allowed source tree.
+**/.env*
+**/*.p8
+**/*.p12
+**/*.mobileprovision
+**/*.pem
+**/*.key
+**/*.keystore
+**/*.jks
+**/firebase-service-account*.json
+**/secrets/**
+**/.private/**

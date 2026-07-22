@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manage Woorisai Delivery"
+  short_description: "로컬 검증부터 Railway·TestFlight 승격까지"
+  default_prompt: "Use $manage-woorisai-delivery to verify this revision locally and prepare its gated production delivery."

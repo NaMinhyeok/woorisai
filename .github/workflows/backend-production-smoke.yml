@@ -1,0 +1,81 @@
+name: Backend production smoke
+
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-production-smoke-${{ github.event.deployment.id }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Production edge smoke
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'friendly-rating / production' &&
+      github.event.deployment.creator.login == 'railway-app[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      BACKEND_BASE_URL: ${{ secrets.BACKEND_BASE_URL }}
+    steps:
+      - name: Verify public readiness and authentication boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          backend_url_re='^https://([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$'
+          backend_base_url_lower="$(printf '%s' "${BACKEND_BASE_URL:-}" | tr '[:upper:]' '[:lower:]')"
+          if [[ ! "${BACKEND_BASE_URL:-}" =~ ${backend_url_re} ]] || \
+            [[ "${backend_base_url_lower}" == *.invalid ]]; then
+            echo "BACKEND_BASE_URL must be a configured production HTTPS origin" >&2
+            exit 1
+          fi
+          unset backend_base_url_lower
+
+          invalid_actor=invalid-slot
+          invalid_pin=0000
+          response_dir="$(mktemp -d)"
+          trap 'rm -rf "${response_dir}"' EXIT
+
+          curl \
+            --proto '=https' \
+            --tlsv1.2 \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 5 \
+            --retry-all-errors \
+            --connect-timeout 5 \
+            --max-time 15 \
+            --output "${response_dir}/health" \
+            "${BACKEND_BASE_URL}/health"
+
+          login_status="$(curl \
+            --proto '=https' \
+            --tlsv1.2 \
+            --silent \
+            --show-error \
+            --connect-timeout 5 \
+            --max-time 15 \
+            --output "${response_dir}/login-options" \
+            --write-out '%{http_code}' \
+            "${BACKEND_BASE_URL}/api/v2/auth/login-options")"
+          test "${login_status}" = "200"
+
+          protected_status="$(curl \
+            --proto '=https' \
+            --tlsv1.2 \
+            --silent \
+            --show-error \
+            --connect-timeout 5 \
+            --max-time 15 \
+            --user "${invalid_actor}:${invalid_pin}" \
+            --dump-header "${response_dir}/protected-headers" \
+            --output "${response_dir}/protected-body" \
+            --write-out '%{http_code}' \
+            "${BACKEND_BASE_URL}/api/v2/relationship-scores")"
+          test "${protected_status}" = "401"
+          grep --ignore-case --quiet '^cache-control:.*no-store' "${response_dir}/protected-headers"

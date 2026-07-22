@@ -1,0 +1,311 @@
+name: Woorisai
+
+options:
+  bundleIdPrefix: com.naminhyeok.woorisai
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "17.0"
+  minimumXcodeGenVersion: 2.46.0
+  transitivelyLinkDependencies: true
+  xcodeVersion: "26.6"
+
+configs:
+  Debug: debug
+  Release: release
+
+packages:
+  SwiftOpenAPIGenerator:
+    url: https://github.com/apple/swift-openapi-generator
+    exactVersion: 1.13.0
+  SwiftOpenAPIRuntime:
+    url: https://github.com/apple/swift-openapi-runtime
+    exactVersion: 1.12.0
+  SwiftOpenAPIURLSession:
+    url: https://github.com/apple/swift-openapi-urlsession
+    exactVersion: 1.3.1
+  SwiftHTTPTypes:
+    url: https://github.com/apple/swift-http-types
+    exactVersion: 1.6.0
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    exactVersion: 12.16.0
+
+settings:
+  base:
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 5
+    DEVELOPMENT_TEAM: 83KHWR8L3R
+    IPHONEOS_DEPLOYMENT_TARGET: 17.0
+    MARKETING_VERSION: 0.1.0
+    SWIFT_VERSION: 6.0
+    SWIFT_STRICT_CONCURRENCY: complete
+    TARGETED_DEVICE_FAMILY: 1
+  configs:
+    Debug:
+      APS_ENVIRONMENT: development
+      WOORISAI_API_HOST: staging.invalid
+    Release:
+      APS_ENVIRONMENT: production
+      WOORISAI_API_HOST: production.invalid
+
+targets:
+  WoorisaiAPI:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Woorisai/Core/API
+    dependencies:
+      - package: SwiftOpenAPIRuntime
+        product: OpenAPIRuntime
+      - package: SwiftOpenAPIURLSession
+        product: OpenAPIURLSession
+      - package: SwiftHTTPTypes
+        product: HTTPTypes
+    buildToolPlugins:
+      - plugin: OpenAPIGenerator
+        package: SwiftOpenAPIGenerator
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.naminhyeok.woorisai.api
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+        TARGETED_DEVICE_FAMILY: 1
+
+  Woorisai:
+    type: application
+    platform: iOS
+    sources:
+      - path: Woorisai/App
+      - path: Woorisai/Features
+      - path: Woorisai/Resources
+        buildPhase: resources
+        excludes:
+          - Info.plist
+          - Woorisai.entitlements
+          - GoogleService-Info*.plist
+    dependencies:
+      - target: WoorisaiAPI
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseInstallations
+      - package: Firebase
+        product: FirebaseMessaging
+    info:
+      path: Woorisai/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: 우리사이
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        FirebaseAppDelegateProxyEnabled: false
+        FirebaseMessagingInstallationIdEnabled: true
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        WoorisaiAPIHost: $(WOORISAI_API_HOST)
+        WoorisaiBuildConfiguration: $(CONFIGURATION)
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        PRODUCT_BUNDLE_IDENTIFIER: com.naminhyeok.woorisai
+        PRODUCT_NAME: Woorisai
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+        CODE_SIGN_ENTITLEMENTS: Woorisai/Resources/Woorisai.entitlements
+        TARGETED_DEVICE_FAMILY: 1
+    postBuildScripts:
+      - name: Inject Firebase Apple client configuration
+        basedOnDependencyAnalysis: false
+        script: |
+          set -eu
+          firebase_bundle_path="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist"
+          firebase_config_path=""
+          firebase_expected_realm_sha256=""
+          firebase_other_realm_sha256=""
+          firebase_config_is_explicit=false
+          firebase_is_release_archive=false
+          firebase_configuration_required=false
+          rm -f "${firebase_bundle_path}"
+
+          if [ "${CONFIGURATION}" = "Release" ] && [ "${ACTION}" = "install" ]; then
+            firebase_is_release_archive=true
+          fi
+          if [ "${PLATFORM_NAME}" = "iphoneos" ] || [ "${firebase_is_release_archive}" = true ]; then
+            firebase_configuration_required=true
+          fi
+
+          case "${CONFIGURATION}" in
+            Debug)
+              if [ -n "${WOORISAI_FIREBASE_DEBUG_CONFIG_PATH:-}" ]; then
+                firebase_config_path="${WOORISAI_FIREBASE_DEBUG_CONFIG_PATH}"
+                firebase_config_is_explicit=true
+              fi
+              firebase_expected_realm_sha256="${WOORISAI_FIREBASE_DEBUG_REALM_SHA256:-}"
+              firebase_other_realm_sha256="${WOORISAI_FIREBASE_RELEASE_REALM_SHA256:-}"
+              ;;
+            Release)
+              if [ -n "${WOORISAI_FIREBASE_RELEASE_CONFIG_PATH:-}" ]; then
+                firebase_config_path="${WOORISAI_FIREBASE_RELEASE_CONFIG_PATH}"
+                firebase_config_is_explicit=true
+              else
+                firebase_config_path="${SRCROOT}/Woorisai/Resources/GoogleService-Info.plist"
+              fi
+              firebase_expected_realm_sha256="${WOORISAI_FIREBASE_RELEASE_REALM_SHA256:-}"
+              firebase_other_realm_sha256="${WOORISAI_FIREBASE_DEBUG_REALM_SHA256:-}"
+              ;;
+            *)
+              echo "error: Unsupported build configuration for Firebase client configuration."
+              exit 1
+              ;;
+          esac
+
+          if [ -z "${firebase_config_path}" ]; then
+            if [ "${firebase_configuration_required}" = true ]; then
+              echo "error: Firebase Apple client configuration is required for a device build."
+              exit 1
+            fi
+            exit 0
+          fi
+
+          if [ ! -f "${firebase_config_path}" ]; then
+            if [ "${firebase_config_is_explicit}" = true ] || [ "${firebase_configuration_required}" = true ]; then
+              echo "error: Required Firebase Apple client configuration is unavailable."
+              exit 1
+            fi
+            exit 0
+          fi
+
+          if [ -z "${firebase_expected_realm_sha256}" ]; then
+            if [ "${firebase_config_is_explicit}" = true ] || [ "${firebase_configuration_required}" = true ]; then
+              echo "error: Protected Firebase realm assertion is required for this configuration."
+              exit 1
+            fi
+            echo "warning: Firebase Apple client configuration was not injected because its protected realm assertion is unavailable."
+            exit 0
+          fi
+
+          if ! /usr/bin/printf '%s' "${firebase_expected_realm_sha256}" \
+            | /usr/bin/grep -Eq '^[[:xdigit:]]{64}$'; then
+            echo "error: Protected Firebase realm assertion is malformed."
+            exit 1
+          fi
+          firebase_expected_realm_sha256=$(
+            /usr/bin/printf '%s' "${firebase_expected_realm_sha256}" | /usr/bin/tr '[:upper:]' '[:lower:]'
+          )
+
+          if [ -n "${firebase_other_realm_sha256}" ]; then
+            if ! /usr/bin/printf '%s' "${firebase_other_realm_sha256}" \
+              | /usr/bin/grep -Eq '^[[:xdigit:]]{64}$'; then
+              echo "error: Protected Firebase cross-realm assertion is malformed."
+              exit 1
+            fi
+            firebase_other_realm_sha256=$(
+              /usr/bin/printf '%s' "${firebase_other_realm_sha256}" | /usr/bin/tr '[:upper:]' '[:lower:]'
+            )
+            if [ "${firebase_expected_realm_sha256}" = "${firebase_other_realm_sha256}" ]; then
+              echo "error: Debug and Release Firebase realms must be distinct."
+              exit 1
+            fi
+          fi
+
+          if ! /usr/bin/plutil -lint "${firebase_config_path}" >/dev/null 2>&1; then
+            echo "error: Firebase Apple client configuration is not a valid plist."
+            exit 1
+          fi
+          firebase_client_bundle_id=$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" "${firebase_config_path}" 2>/dev/null || true)
+          firebase_google_app_id=$(/usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" "${firebase_config_path}" 2>/dev/null || true)
+          firebase_project_id=$(/usr/libexec/PlistBuddy -c "Print :PROJECT_ID" "${firebase_config_path}" 2>/dev/null || true)
+          firebase_api_key=$(/usr/libexec/PlistBuddy -c "Print :API_KEY" "${firebase_config_path}" 2>/dev/null || true)
+          firebase_sender_id=$(/usr/libexec/PlistBuddy -c "Print :GCM_SENDER_ID" "${firebase_config_path}" 2>/dev/null || true)
+          if [ "${firebase_client_bundle_id}" != "${PRODUCT_BUNDLE_IDENTIFIER}" ] || \
+             [ -z "${firebase_google_app_id}" ] || [ -z "${firebase_project_id}" ] || \
+             [ -z "${firebase_api_key}" ] || [ -z "${firebase_sender_id}" ]; then
+            echo "error: Firebase Apple client configuration is invalid for this app target."
+            exit 1
+          fi
+
+          firebase_actual_realm_sha256=$(
+            /usr/bin/printf '%s\0%s\0%s\0%s\0%s\0' \
+              "${firebase_project_id}" "${firebase_google_app_id}" "${firebase_sender_id}" \
+              "${firebase_api_key}" "${firebase_client_bundle_id}" \
+              | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}'
+          )
+          if [ "${firebase_actual_realm_sha256}" != "${firebase_expected_realm_sha256}" ]; then
+            echo "error: Firebase Apple client configuration does not match the protected realm assertion."
+            exit 1
+          fi
+
+          mkdir -p "$(dirname "${firebase_bundle_path}")"
+          /usr/bin/ditto "${firebase_config_path}" "${firebase_bundle_path}"
+          /usr/bin/plutil -lint "${firebase_bundle_path}" >/dev/null
+
+  WoorisaiAPITests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: WoorisaiAPITests
+    dependencies:
+      - target: WoorisaiAPI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.naminhyeok.woorisai.api-tests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: 1
+
+  WoorisaiTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: WoorisaiTests
+    dependencies:
+      - target: Woorisai
+      - target: WoorisaiAPI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.naminhyeok.woorisai.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: 1
+
+  WoorisaiUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: WoorisaiUITests
+    dependencies:
+      - target: Woorisai
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.naminhyeok.woorisai.ui-tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Woorisai
+        TARGETED_DEVICE_FAMILY: 1
+
+schemes:
+  WoorisaiAPI:
+    build:
+      targets:
+        WoorisaiAPI: all
+    test:
+      config: Debug
+      targets:
+        - name: WoorisaiAPITests
+
+  Woorisai:
+    build:
+      targets:
+        Woorisai: all
+        WoorisaiAPI: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - name: WoorisaiAPITests
+        - name: WoorisaiTests
+        - name: WoorisaiUITests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

@@ -1,0 +1,55 @@
+# Operating system
+.DS_Store
+Thumbs.db
+
+# IDE and editor-local state
+.idea/
+.vscode/
+*.iml
+
+# Local-only migration work and private material
+/.local/
+/.migration-work/
+/.private/
+/secrets/
+
+# Environment and credentials
+.env
+.env.*
+!.env.example
+!.env.local.example
+!.env.production.example
+*.p8
+*.p12
+*.mobileprovision
+*.pem
+*.key
+*.keystore
+*.jks
+firebase-service-account*.json
+/apps/ios/Woorisai/Resources/GoogleService-Info*.plist
+
+# Java and Gradle outputs
+.gradle/
+**/build/
+out/
+
+# Xcode and Swift local outputs
+/apps/ios/.local/
+DerivedData/
+**/DerivedData/
+**/xcuserdata/
+*.xcuserstate
+**/.swiftpm/
+**/.build/
+*.xcresult
+
+# Logs and local database/backup artifacts
+*.log
+*.dump
+*.backup
+*.db
+*.sqlite
+*.sqlite3
+
+# Deliberately do not ignore *.sql: committed Flyway migrations are source files.

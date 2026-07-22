@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test Spring Modulith"
+  short_description: "Spring Modulith 위험 기반 테스트 전략 수립"
+  default_prompt: "Use $test-spring-modulith to design and implement the smallest reliable test strategy for this change."

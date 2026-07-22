@@ -1,0 +1,223 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-hygiene:
+    name: Repository hygiene
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify secret and workflow boundaries
+        run: ./scripts/verify-secret-boundaries.sh
+      - name: Validate committed backend environment schemas
+        run: |
+          backend/scripts/validate-env.sh local backend/.env.local.example
+          backend/scripts/validate-env.sh production backend/.env.production.example
+
+  backend-check:
+    name: Backend check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Java 25
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+          cache-dependency-path: |
+            backend/build.gradle.kts
+            backend/settings.gradle.kts
+            backend/gradle.lockfile
+            backend/gradle/wrapper/gradle-wrapper.properties
+      - name: Validate contract, tests, PostgreSQL semantics, and artifact
+        working-directory: backend
+        run: ./gradlew --no-daemon check bootJar
+
+  container-smoke:
+    name: Container smoke
+    needs: backend-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+        env:
+          POSTGRES_DB: woorisai
+          POSTGRES_USER: woorisai_ci
+          POSTGRES_PASSWORD: woorisai_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U woorisai_ci -d woorisai"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Build repository-root image
+        run: docker build --pull --tag woorisai:ci .
+      - name: Verify non-root runtime
+        run: test "$(docker image inspect --format '{{.Config.User}}' woorisai:ci)" = "10001:10001"
+      - name: Start image against fresh PostgreSQL
+        run: |
+          docker run --detach \
+            --name woorisai-api \
+            --network host \
+            --env PORT=18080 \
+            --env SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/woorisai \
+            --env SPRING_DATASOURCE_USERNAME=woorisai_ci \
+            --env SPRING_DATASOURCE_PASSWORD=woorisai_ci \
+            woorisai:ci
+      - name: Verify startup Flyway and readiness
+        run: |
+          for _attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error http://127.0.0.1:18080/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs woorisai-api
+          exit 1
+      - name: Remove smoke container
+        if: always()
+        run: docker rm --force woorisai-api 2>/dev/null || true
+
+  ios-app-check:
+    name: iOS app gates
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify pinned Xcode
+        run: |
+          xcodebuild -version
+          xcodebuild -version | grep --fixed-strings --line-regexp "Xcode 26.6"
+          xcodebuild -version | grep --fixed-strings --line-regexp "Build version 17F113"
+      - name: Validate committed iOS environment schemas
+        run: |
+          apps/ios/scripts/validate-env.zsh \
+            --kind local \
+            --example-only \
+            apps/ios/.env.local.example
+          apps/ios/scripts/validate-env.zsh \
+            --kind production \
+            --example-only \
+            apps/ios/.env.production.example
+      - name: Resolve pinned Swift packages
+        run: >-
+          xcodebuild -resolvePackageDependencies
+          -project apps/ios/Woorisai.xcodeproj
+          -scheme Woorisai
+          -clonedSourcePackagesDirPath .local/ios-source-packages
+          -onlyUsePackageVersionsFromResolvedFile
+      - name: Create supported-screen simulators
+        id: simulators
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime='com.apple.CoreSimulator.SimRuntime.iOS-26-5'
+          iphone_15_id="$(xcrun simctl create \
+            'Woorisai CI iPhone 15 Pro' \
+            'com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro' \
+            "${runtime}")"
+          iphone_13_id="$(xcrun simctl create \
+            'Woorisai CI iPhone 13 Pro' \
+            'com.apple.CoreSimulator.SimDeviceType.iPhone-13-Pro' \
+            "${runtime}")"
+          printf 'iphone15=%s\n' "${iphone_15_id}" >>"${GITHUB_OUTPUT}"
+          printf 'iphone13=%s\n' "${iphone_13_id}" >>"${GITHUB_OUTPUT}"
+      - name: Build app and test bundles once
+        run: >-
+          xcodebuild build-for-testing
+          -project apps/ios/Woorisai.xcodeproj
+          -scheme Woorisai
+          -configuration Debug
+          -destination 'platform=iOS Simulator,id=${{ steps.simulators.outputs.iphone15 }}'
+          -derivedDataPath .local/ios-ci-debug
+          -clonedSourcePackagesDirPath .local/ios-source-packages
+          -enableCodeCoverage NO
+          -onlyUsePackageVersionsFromResolvedFile
+          -skipPackagePluginValidation
+          CODE_SIGNING_ALLOWED=NO
+      - name: Run API, app, and UI tests on iPhone 15 Pro
+        run: >-
+          xcodebuild test-without-building
+          -project apps/ios/Woorisai.xcodeproj
+          -scheme Woorisai
+          -configuration Debug
+          -destination 'platform=iOS Simulator,id=${{ steps.simulators.outputs.iphone15 }}'
+          -derivedDataPath .local/ios-ci-debug
+          -clonedSourcePackagesDirPath .local/ios-source-packages
+          -parallel-testing-enabled NO
+          -test-timeouts-enabled YES
+          -default-test-execution-time-allowance 120
+          -maximum-test-execution-time-allowance 600
+          -enableCodeCoverage NO
+          -onlyUsePackageVersionsFromResolvedFile
+          -skipPackagePluginValidation
+          CODE_SIGNING_ALLOWED=NO
+      - name: Run API, app, and UI tests on iPhone 13 Pro
+        run: >-
+          xcodebuild test-without-building
+          -project apps/ios/Woorisai.xcodeproj
+          -scheme Woorisai
+          -configuration Debug
+          -destination 'platform=iOS Simulator,id=${{ steps.simulators.outputs.iphone13 }}'
+          -derivedDataPath .local/ios-ci-debug
+          -clonedSourcePackagesDirPath .local/ios-source-packages
+          -parallel-testing-enabled NO
+          -test-timeouts-enabled YES
+          -default-test-execution-time-allowance 120
+          -maximum-test-execution-time-allowance 600
+          -enableCodeCoverage NO
+          -onlyUsePackageVersionsFromResolvedFile
+          -skipPackagePluginValidation
+          CODE_SIGNING_ALLOWED=NO
+      - name: Remove supported-screen simulators
+        if: always() && steps.simulators.outcome == 'success'
+        shell: bash
+        run: |
+          xcrun simctl delete '${{ steps.simulators.outputs.iphone15 }}' || true
+          xcrun simctl delete '${{ steps.simulators.outputs.iphone13 }}' || true
+      - name: Build the Release simulator artifact
+        run: >-
+          xcodebuild build
+          -project apps/ios/Woorisai.xcodeproj
+          -scheme Woorisai
+          -configuration Release
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath .local/ios-ci-release
+          -clonedSourcePackagesDirPath .local/ios-source-packages
+          -onlyUsePackageVersionsFromResolvedFile
+          -skipPackagePluginValidation
+          CODE_SIGNING_ALLOWED=NO

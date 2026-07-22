@@ -1,0 +1,4 @@
+interface:
+  display_name: "Coordinate Spring Modulith Change"
+  short_description: "교차 모듈 변경의 설계·구현 관심사 통합 조정"
+  default_prompt: "Use $coordinate-spring-modulith-change to coordinate this cross-cutting Spring Modulith change before editing."
