@@ -81,6 +81,10 @@ For Railway production:
    invalid protected request returning `401` with `Cache-Control: no-store`.
 5. Never use a production PIN, private response, data write, migration, or provider side effect in
    the generic smoke.
+6. A source-connect or configuration-driven deployment may not create a GitHub `deployment_status`
+   event. After confirming the exact protected `main` SHA reached terminal success, dispatch
+   `Backend production smoke` manually from `main`. Record this as fallback proof; the next normal
+   `main` push must still prove Railway's native post-deploy event path.
 
 For iOS delivery:
 
