@@ -11,6 +11,7 @@ final class WoorisaiAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
     try? ProtectedTemporaryMediaPreview.purgeStaleFiles()
+    try? ProtectedTemporaryMediaUpload.purgeStaleFiles()
     UNUserNotificationCenter.current().delegate = self
     if pushCoordinator.configureIfAvailable() == .configured {
       pushCoordinator.registerForRemoteNotifications(using: application)
@@ -26,14 +27,17 @@ final class WoorisaiAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
 
   func applicationWillResignActive(_ application: UIApplication) {
     snapshotPrivacyShield.show(in: application.visiblePrivacyShieldWindows)
+    AppPrivacyAccessibilityController.setContentHidden(true)
   }
 
   func applicationDidEnterBackground(_ application: UIApplication) {
     snapshotPrivacyShield.show(in: application.visiblePrivacyShieldWindows)
+    AppPrivacyAccessibilityController.setContentHidden(true)
   }
 
   func applicationDidBecomeActive(_ application: UIApplication) {
     snapshotPrivacyShield.hide()
+    AppPrivacyAccessibilityController.setContentHidden(false)
     pushCoordinator.applicationDidBecomeActive(using: application)
   }
 

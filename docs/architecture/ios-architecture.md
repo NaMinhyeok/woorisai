@@ -50,7 +50,9 @@ Authorization: Basic base64("<slot>:<4-digit PIN>")
 - 401은 local credential을 제거하고 PIN 재입력을 요구한다. Server login/logout call은 없다.
 - Credential은 process memory에만 둔다. 지속 보존 요구가 생기면 password credential로
   분류해 device-only, non-synchronizing Keychain 정책을 별도 결정한다.
-- Local sign-out은 credential, private cache와 navigation state를 지우는 client 동작이다.
+- Local session lock은 credential, private cache와 navigation state를 지우는 client 동작이다.
+  이 동작은 반복 사용 중 실수로 누르기 쉬운 feature navigation bar가 아니라 Settings의 보안
+  section에서 확인 dialog를 거쳐 제공한다. Server logout endpoint를 의미하지 않는다.
 
 Memory-only credential은 device 저장소 노출 범위를 줄이는 대신 app을 다시 실행할 때마다 PIN을
 재입력하게 한다. 현재 두 명이 사용하는 private app에서는 이 불편을 수용한다.
@@ -91,6 +93,71 @@ purge한다. Scene이 inactive 또는 background가 되면 neutral privacy cover
 state를 먼저 비우고 새 preview load를 막은 뒤 진행 중 작업, cache와 전용 directory를 모두
 정리한다.
 
+저장된 사진과 업로드 preview는 같은 gallery geometry를 사용한다. 한 장은 4:3, 두 장 이상은
+정사각 mosaic, video는 16:9 tile을 기본으로 하며 inline tile에서는 `aspectFill`과 clipping으로
+박스와 이미지 사이 빈 영역을 만들지 않는다. 원본 비율 확인이 필요한 full-screen viewer에서는
+`aspectFit`으로 portrait, landscape와 panorama 전체를 보존하고 pinch, pan, double tap과
+VoiceOver adjustable action으로 확대한다. 회전과 확대 배율 변경 때 pan offset을 다시 제한해
+사진이 화면 밖에 남지 않게 한다. 이 presentation 선택은 wire 계약이나 attachment cardinality를
+바꾸지 않는다. Video는 feed traversal 중 자동 download하지 않고 사용자가 16:9 tile을 누를 때만
+준비한다. 준비된 파일은 공유 action이나 temporary filename을 노출하는 system preview 대신 앱이
+소유한 `AVPlayer`/`AVPlayerLayer` full-screen viewer에서 원본 비율로 재생한다. 재생·일시 정지,
+현재/전체 길이를 말하는 VoiceOver 진행값과 명시적인 닫기 action만 제공하며 공유 action은 두지
+않는다. 진행 상태 갱신은 재생 중에만 수행하고 Scene이 active가 아니면 즉시 멈춰 privacy cover
+아래에 유지한다. Decoder가 파일을 열지 못하면 검은 화면에 머물지 않고 오류와 닫기, 파일 다시
+받기를 제공한다. 다시 받기는 손상된 session cache lease의 discard가 끝난 뒤 새 download를
+시작해 같은 파일을 재사용하는 경합을 막는다.
+
+Photos picker의 image와 video는 provider file metadata에서 regular file, symbolic link 여부와
+byte size를 먼저 검증한다. Image는 10MB 상한보다 큰 파일을 읽기 전에 거절하고 제한된 byte
+reader로만 `Data`를 만든다. HEIF 변환은 main actor 밖에서 ImageIO downsample을 사용해 decode
+축과 JPEG output 크기를 제한한다. 최대 100MB인 video는 app 전용 protected temporary file로
+복사하고 file-backed URLSession upload를 사용한다. 이 파일과 directory는 backup 대상에서
+제외하며 upload 성공, 취소, session lock 또는 selection 폐기 시 정확히 한 번 지운다. 실패 뒤
+명시적 retry가 가능한 동안에는 파일을 유지하고, 이전 process가 남긴 upload file은 다음 launch의
+scoped purge로 정리한다.
+
+## Presentation과 navigation
+
+Relationship 첫 화면은 현재 양방향 점수와 최근 기록을 짧게 훑는 dashboard다. 점수 변경의
+slider, 이유와 첨부는 item-driven sheet에서 편집하고 저장 action은 safe area에 고정한다. 이
+구조는 작성 form 때문에 dashboard scroll이 길어지는 문제를 피한다. Dashboard에는 최근 기록
+세 개만 두고 전체 timeline과 pagination은 별도 archive 화면에서 제공한다. 작성 중인 sheet는
+명시적으로 저장하거나 버리기 전에는 interactive dismissal을 막아 draft 유실을 방지한다.
+
+Diary 첫 화면은 최근 기록을 polaroid형 feed로 보여 주고 작성·편집·댓글 action은 keyboard와
+겹치지 않는 safe-area composer에 둔다. Relationship와 Diary의 대화는 server 순서대로 평평한
+시간순 목록이며 reply nesting을 만들지 않는다. Navigation path와 sheet destination은 stable ID로
+표현하고, role에 따른 작성자 전용 edit/delete 권한은 화면을 다시 그릴 때도 domain model의
+`isMine` 의미를 따른다.
+
+Refresh는 이미 표시된 dashboard, feed와 detail을 비우거나 scroll 위치를 강제로 옮기지 않고
+최신 snapshot으로 교체한다. 새로 도착한 상대 댓글도 읽던 위치를 빼앗지 않으며 사용자가 직접
+최신 댓글로 이동한다. 자신이 방금 보낸 댓글만 commit 확인 후 입력을 비우고 최신 위치로 이동한다.
+
+Score, diary와 comment create/update/delete는 idempotency key가 없는 write이므로 transport 단절
+뒤 자동 재전송하지 않는다. Response를 받지 못해 commit 여부가 불명확하면 같은 mutation과 다른
+write를 잠그고 draft와 제출한 media ownership을 유지한다. 사용자는 해당 score, entry 또는
+comment를 포함하는 동일 mutation context를 성공적으로 다시 읽은 뒤 `이미 저장됨` 또는
+`저장 안 됨`을 명시적으로 고른다. Entry/comment update editor는 이 확인이 끝날 때까지 화면에
+남아 draft를 보존하며, 관계없는 list/detail refresh는 확인 근거로 쓰지 않는다. 전자는 draft를
+정리하고 media를 소비하며, 후자는 제출 ownership만 풀어 같은 draft를 직접 재시도하게 한다.
+Conflict와 server가 commit하지 않았음을 확정할 수 있는 validation/authorization 실패는 이
+불명확 결과 경로와 구분한다.
+
+Update reconciliation의 `제출 상태`는 전송을 시작할 때 normalized content와 attachment ID를
+immutable snapshot으로 고정한다. Transport failure 뒤 editor에서 내용을 더 고쳐도 이 snapshot을
+바꾸지 않는다. `저장 안 됨`을 확인해 재시도를 허용한 뒤에는 draft-protection lease를 별도로
+유지한다. 이 lease는 실제 재제출의 in-flight fence로 끊김 없이 넘기거나 사용자가 초안을 명시적으로
+버릴 때만 해제하므로, 그 사이 도착한 push가 navigation path를 바꿔 editor와 READY media를
+정리하지 못한다.
+
+Entry update의 최신 상태 비교는 본문만이 아니라 retained attachment ID와 제출한 READY upload
+ID의 집합까지 확인한다. 최신 server 상태가 제출 상태와 정확히 같을 때만 `이미 저장됨`, 수정 전
+상태와 정확히 같을 때만 `저장 안 됨`을 허용하고, 제3의 상태이면 두 선택을 모두 잠가 stale
+snapshot 위 재전송이나 media 중복 연결을 막는다. Relationship archive pagination은 별도
+loading/error/retry 상태를 표시해 긴 기록을 더 불러오는 실패가 무응답처럼 보이지 않게 한다.
+
 ## Push와 navigation
 
 Firebase Installation ID는 인증된 participant로 register한다. APNs token 도착과 FID callback은
@@ -103,7 +170,9 @@ APNs 등록 실패와 Settings 복귀는 provider/권한 상태를 다시 확인
 Push payload는 generic alert와 `eventType`/`resourceId`만 포함한다. App은 resource ID로 보호
 API를 다시 읽고 권한과 존재 여부를 확인한다. Notification body는 source of truth가 아니다.
 Foreground 수신은 banner만 표시하고 tap/launch response에서만 navigation intent를 만든다.
-Parent write 중 intent는 write 완료 뒤 처리하고 sign-out/재인증 중 intent는 폐기한다.
+실제 write 제출 중이거나 결과 불명확 상태가 해소되지 않은 동안의 intent는 화면 전환으로 복구
+context를 잃지 않도록 보류하고, write 완료 또는 명시적 결과 확인 뒤 처리한다. Sign-out/재인증
+중 intent는 폐기한다.
 
 ## Appearance와 text input
 
@@ -114,10 +183,12 @@ semantic palette로 유지한다. Text, surface, control border, status와 accen
 semantic color를 덮어쓰지 않는다.
 
 모든 text input은 `FocusState`로 화면 lifecycle과 제출·취소 시점을 통제한다. Number pad와
-multiline editor를 포함한 keyboard에는 명시적인 `완료` 동작을 제공하고, scroll container는
-interactive dismissal을 지원한다. Multiline field의 return key는 줄바꿈에 남겨 두므로 keyboard
-toolbar가 dismissal의 일관된 경계다. Light/dark system appearance 전파와 number-pad dismissal은
-simulator UI test로 검증하고, 색상 token의 text/control 대비는 deterministic test로 검증한다.
+multiline editor에는 입력 control 옆의 icon-only keyboard dismissal을 제공하고, scroll
+container는 interactive dismissal을 지원한다. Keyboard 위 우측에 textual `완료` toolbar를
+반복해서 올리지 않으며 multiline field의 return key는 줄바꿈에 남겨 둔다. Dismiss icon은 최소
+44pt target, VoiceOver label과 입력 유지 hint를 가진다. Light/dark system appearance 전파와
+number-pad dismissal은 simulator UI test로 검증하고, 색상 token의 text/control 대비는
+deterministic test로 검증한다.
 
 ## Local data와 privacy
 
@@ -133,7 +204,8 @@ simulator UI test로 검증하고, 색상 token의 text/control 대비는 determ
 
 - API adapter: Mapping, Basic injection, redirect/host 정책과 status/error 변환
 - Feature model: Success, failure, retry, cancellation과 stale response suppression
-- UI: Loading/error/content, Dynamic Type, VoiceOver, keyboard와 privacy cover
+- UI: 두 participant role의 loading/error/content/conflict/empty/dirty state, Dynamic Type,
+  VoiceOver, keyboard, portrait/landscape/panorama media와 privacy cover
 - Integration: Approved HTTPS host, Basic API, R2 upload/complete/download와 FID route
 - Release: Signed device에서 read/write/media/push/background E2E
 

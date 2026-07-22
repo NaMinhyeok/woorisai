@@ -80,6 +80,9 @@ final class NotificationModel {
   private var registrationTask: Task<Void, Never>?
 
   @ObservationIgnored
+  private var foregroundPermissionTask: Task<Void, Never>?
+
+  @ObservationIgnored
   private var currentRegistrationAttempt: UInt?
 
   @ObservationIgnored
@@ -138,8 +141,10 @@ final class NotificationModel {
     switch state {
     case .permissionDenied, .unavailable, .failed:
       refreshRegistration()
-    case .idle, .checkingPermission, .registering, .registered:
-      break
+    case .registered:
+      refreshForegroundPermission()
+    case .idle, .checkingPermission, .registering:
+      refreshRegistration()
     }
   }
 
@@ -173,6 +178,8 @@ final class NotificationModel {
     authenticatedSessionIsActive = false
     sessionGeneration &+= 1
     registrationRefreshPending = false
+    foregroundPermissionTask?.cancel()
+    foregroundPermissionTask = nil
 
     let pendingRegistration = registrationTask
     let pendingAttempt = currentRegistrationAttempt
@@ -419,6 +426,24 @@ final class NotificationModel {
         }
         self.state = .failed
         self.finishRegistrationAttempt(generation: generation, attempt: attempt)
+      }
+    }
+  }
+
+  private func refreshForegroundPermission() {
+    guard foregroundPermissionTask == nil else { return }
+    let generation = sessionGeneration
+    let permissions = permissions
+    foregroundPermissionTask = Task { @MainActor [weak self] in
+      let permission = await permissions.currentStatus()
+      guard let self else { return }
+      self.foregroundPermissionTask = nil
+      guard !Task.isCancelled,
+        self.sessionGeneration == generation,
+        self.authenticatedSessionIsActive
+      else { return }
+      if !permission.permitsRegistration {
+        self.state = .permissionDenied
       }
     }
   }

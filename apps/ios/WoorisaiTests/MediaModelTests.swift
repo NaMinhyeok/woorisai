@@ -239,6 +239,141 @@ struct MediaModelTests {
   }
 
   @Test
+  func fileBackedVideoUsesFileUploadAndRemovesItsOwnedFileAfterReady() async throws {
+    let service = MediaServiceFake()
+    let uploader = RecordingMediaUploader()
+    let model = MediaUploadModel(
+      service: service,
+      uploader: uploader,
+      now: { MediaModelFixtures.now }
+    )
+    let fixture = try MediaModelFixtures.fileSelection()
+    defer { fixture.file.removeIfNeeded() }
+
+    model.start(fixture.selection)
+    await mediaExpectEventually {
+      if case .ready = model.state { return true }
+      return false
+    }
+
+    #expect(await uploader.putCount == 0)
+    #expect(await uploader.filePutCount == 1)
+    #expect(await uploader.uploadedFileURLs == [fixture.file.url])
+    #expect(!FileManager.default.fileExists(atPath: fixture.file.url.path))
+    #expect(fixture.file.removalCount == 1)
+
+    _ = model.consumeReadyUpload()
+    model.clear()
+    #expect(fixture.file.removalCount == 1)
+  }
+
+  @Test
+  func fileBackedVideoRetainsItsOwnedFileForAPutRetry() async throws {
+    let service = MediaServiceFake()
+    let uploader = RecordingMediaUploader(failFirstPut: true)
+    let model = MediaUploadModel(
+      service: service,
+      uploader: uploader,
+      now: { MediaModelFixtures.now }
+    )
+    let fixture = try MediaModelFixtures.fileSelection()
+    defer { fixture.file.removeIfNeeded() }
+
+    model.start(fixture.selection)
+    await mediaExpectEventually { model.state == .failed(.uploadFailed) }
+
+    #expect(FileManager.default.fileExists(atPath: fixture.file.url.path))
+    #expect(fixture.file.removalCount == 0)
+    #expect(await uploader.filePutCount == 1)
+
+    model.retry()
+    await mediaExpectEventually {
+      if case .ready = model.state { return true }
+      return false
+    }
+
+    #expect(await service.initiateCount == 1)
+    #expect(await uploader.filePutCount == 2)
+    #expect(!FileManager.default.fileExists(atPath: fixture.file.url.path))
+    #expect(fixture.file.removalCount == 1)
+  }
+
+  @Test
+  func cancellingAFileUploadRemovesItsOwnedFileExactlyOnce() async throws {
+    let service = MediaServiceFake()
+    let uploader = SuspendedMediaUploader()
+    let model = MediaUploadModel(
+      service: service,
+      uploader: uploader,
+      now: { MediaModelFixtures.now }
+    )
+    let fixture = try MediaModelFixtures.fileSelection()
+    defer { fixture.file.removeIfNeeded() }
+
+    model.start(fixture.selection)
+    await mediaExpectEventually { await uploader.hasStarted }
+    model.cancel()
+    await mediaExpectEventually { await service.discardedIDs.count == 1 }
+
+    #expect(model.state == .cancelled)
+    #expect(!FileManager.default.fileExists(atPath: fixture.file.url.path))
+    #expect(fixture.file.removalCount == 1)
+
+    model.clear()
+    #expect(fixture.file.removalCount == 1)
+  }
+
+  @Test
+  func clearingAFileUploadRemovesItsOwnedFileExactlyOnce() async throws {
+    let service = MediaServiceFake()
+    let uploader = SuspendedMediaUploader()
+    let model = MediaUploadModel(
+      service: service,
+      uploader: uploader,
+      now: { MediaModelFixtures.now }
+    )
+    let fixture = try MediaModelFixtures.fileSelection()
+    defer { fixture.file.removeIfNeeded() }
+
+    model.start(fixture.selection)
+    await mediaExpectEventually { await uploader.hasStarted }
+    model.clear()
+    await mediaExpectEventually { await service.discardedIDs.count == 1 }
+
+    #expect(model.state == .idle)
+    #expect(!FileManager.default.fileExists(atPath: fixture.file.url.path))
+    #expect(fixture.file.removalCount == 1)
+
+    model.clear()
+    #expect(fixture.file.removalCount == 1)
+  }
+
+  @Test
+  func credentialRemovalClearsAFileBeforeAwaitingServerDiscard() async throws {
+    let service = MediaServiceFake()
+    let uploader = SuspendedMediaUploader()
+    let model = MediaUploadModel(
+      service: service,
+      uploader: uploader,
+      now: { MediaModelFixtures.now }
+    )
+    let fixture = try MediaModelFixtures.fileSelection()
+    defer { fixture.file.removeIfNeeded() }
+
+    model.start(fixture.selection)
+    await mediaExpectEventually { await uploader.hasStarted }
+    let discardTask = try #require(model.clearForCredentialRemoval())
+
+    #expect(!FileManager.default.fileExists(atPath: fixture.file.url.path))
+    #expect(fixture.file.removalCount == 1)
+    await discardTask.value
+    #expect(await service.discardedIDs == [MediaModelFixtures.firstUploadID])
+
+    _ = model.clearForCredentialRemoval()
+    #expect(fixture.file.removalCount == 1)
+  }
+
+  @Test
   func downloadRetryReplacesFailureWithFreshPrivateGrant() async {
     let service = MediaServiceFake(failFirstDownload: true)
     let model = MediaDownloadModel(service: service)
@@ -265,6 +400,7 @@ private actor MediaServiceFake: MediaServing {
   private var conflictFirstComplete: Bool
   private var failFirstDownload: Bool
   private var returnInitiateGrantAfterCancellation: Bool
+  private var drafts: [UUID: MediaUploadDraft] = [:]
 
   init(
     failFirstComplete: Bool = false,
@@ -292,7 +428,8 @@ private actor MediaServiceFake: MediaServing {
       initiateCount == 1
       ? MediaModelFixtures.firstUploadID
       : MediaModelFixtures.secondUploadID
-    return try MediaModelFixtures.grant(id: uploadID)
+    drafts[uploadID] = draft
+    return try MediaModelFixtures.grant(id: uploadID, contentType: draft.contentType)
   }
 
   func completeUpload(id: UUID) async throws -> CompletedMediaUpload {
@@ -305,7 +442,14 @@ private actor MediaServiceFake: MediaServing {
       conflictFirstComplete = false
       throw WoorisaiAPIError.conflict
     }
-    return try MediaModelFixtures.completed(id: id)
+    guard let draft = drafts[id] else { throw WoorisaiAPIError.schemaDrift }
+    return try CompletedMediaUpload(
+      id: id,
+      kind: draft.kind,
+      fileName: draft.fileName,
+      contentType: draft.contentType,
+      byteSize: draft.byteSize
+    )
   }
 
   func discardUpload(id: UUID) async throws {
@@ -328,6 +472,8 @@ private actor MediaServiceFake: MediaServing {
 
 private actor RecordingMediaUploader: PresignedMediaUploading {
   private(set) var putCount = 0
+  private(set) var filePutCount = 0
+  private(set) var uploadedFileURLs: [URL] = []
   private(set) var observedProgress: [Double] = []
   private var failFirstPut: Bool
 
@@ -351,6 +497,25 @@ private actor RecordingMediaUploader: PresignedMediaUploading {
       await Task.yield()
     }
   }
+
+  func put(
+    fileAt fileURL: URL,
+    byteSize: Int64,
+    using grant: MediaUploadGrant,
+    progress: @escaping @Sendable (Double) -> Void
+  ) async throws {
+    filePutCount += 1
+    uploadedFileURLs.append(fileURL)
+    if failFirstPut {
+      failFirstPut = false
+      throw PresignedMediaUploadError.transport
+    }
+    for value in [0.25, 0.75, 1.0] {
+      observedProgress.append(value)
+      progress(value)
+      await Task.yield()
+    }
+  }
 }
 
 private actor SuspendedMediaUploader: PresignedMediaUploading {
@@ -358,6 +523,16 @@ private actor SuspendedMediaUploader: PresignedMediaUploading {
 
   func put(
     _ data: Data,
+    using grant: MediaUploadGrant,
+    progress: @escaping @Sendable (Double) -> Void
+  ) async throws {
+    hasStarted = true
+    try await Task.sleep(for: .seconds(60))
+  }
+
+  func put(
+    fileAt fileURL: URL,
+    byteSize: Int64,
     using grant: MediaUploadGrant,
     progress: @escaping @Sendable (Double) -> Void
   ) async throws {
@@ -385,12 +560,32 @@ private enum MediaModelFixtures {
     )
   }
 
-  static func grant(id: UUID) throws -> MediaUploadGrant {
+  static func fileSelection() throws -> (
+    selection: MediaUploadSelection,
+    file: OwnedTemporaryMediaUploadFile
+  ) {
+    let data = Data([0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70])
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "media-upload-model-test-\(UUID().uuidString).mov"
+    )
+    try data.write(to: url)
+    let file = OwnedTemporaryMediaUploadFile(url: url, byteSize: Int64(data.count))
+    let draft = try MediaUploadDraft(
+      purpose: .diaryEntry,
+      kind: .video,
+      fileName: "memory.mov",
+      contentType: "video/quicktime",
+      byteSize: Int64(data.count)
+    )
+    return (try MediaUploadSelection(draft: draft, file: file), file)
+  }
+
+  static func grant(id: UUID, contentType: String = "image/png") throws -> MediaUploadGrant {
     try MediaUploadGrant(
       uploadID: id,
       uploadURL: URL(string: "https://media.example.test/upload?signature=private")!,
       requiredHeaders: MediaUploadRequiredHeaders(
-        contentType: "image/png",
+        contentType: contentType,
         cacheControl: "private, no-store, max-age=0"
       ),
       expiresAt: now.addingTimeInterval(600),
@@ -412,11 +607,14 @@ private enum MediaModelFixtures {
 @MainActor
 private func mediaExpectEventually(
   _ predicate: @escaping @MainActor @Sendable () async -> Bool,
-  iterations: Int = 500
+  timeout: Duration = .seconds(3)
 ) async {
-  for _ in 0..<iterations {
+  let clock = ContinuousClock()
+  let deadline = clock.now.advanced(by: timeout)
+
+  while clock.now < deadline {
     if await predicate() { return }
-    await Task.yield()
+    try? await Task.sleep(for: .milliseconds(10))
   }
   Issue.record("Timed out waiting for media state")
 }

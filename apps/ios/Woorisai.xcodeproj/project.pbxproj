@@ -14,12 +14,17 @@
 		08BA050338A7087392F35FA5 /* WoorisaiMediaAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE95E8D90CD2C5CE8E6D059 /* WoorisaiMediaAPI.swift */; };
 		0CD093B4BC667804EF42EA0A /* WoorisaiNotificationAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7DF92B71ECF71DB02663BEB /* WoorisaiNotificationAPITests.swift */; };
 		0E453322DB5433D050CA53DF /* WoorisaiDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E977F9625B38730AA0754F6E /* WoorisaiDesignSystem.swift */; };
+		18332D71FADB81EC4FD4EBA0 /* RelationshipScoreComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8249C3565178262DFEAA88F9 /* RelationshipScoreComposer.swift */; };
 		1B310268E530569EB0538E6A /* openapi.yaml in Resources */ = {isa = PBXBuildFile; fileRef = A8914F28C22B6C25363853A4 /* openapi.yaml */; };
 		1C307F126A78B6B4DBD8F0F8 /* WoorisaiAPIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F76F28C7930A95A511B832 /* WoorisaiAPIClientTests.swift */; };
 		2A3F2B0051E1E63844B0DC56 /* OpenAPIURLSession in Frameworks */ = {isa = PBXBuildFile; productRef = 944CAB6ED8CA020A36DFBACC /* OpenAPIURLSession */; };
 		374C922C2523DBF1A64E33CC /* WoorisaiAPI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2E7D04D016E81AC8374C19ED /* WoorisaiAPI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		37718E5D45C5CB0AB112AF7A /* NotificationModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3443E4C7DC63337254603F5A /* NotificationModelTests.swift */; };
+		4336E517475FE2B53CE85A7F /* DiaryEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C69F2AE9BECCB22CE5D5C5 /* DiaryEditors.swift */; };
 		497E4D28995BAE601AF137CC /* LoginOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C329B0E13F53B6313F8F9D6 /* LoginOptionsView.swift */; };
+		513AD85746B630A14AC0A009 /* RelationshipHistoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE9DEE88305DA1E8F733DEC /* RelationshipHistoryViews.swift */; };
+		545618ACD244E2B1D21AB71B /* DiaryFeedViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E590834B3F6E7F12F3AF0FE /* DiaryFeedViews.swift */; };
+		54AB4AAC4FAA284A616B2835 /* RelationshipThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84CB8EBDA198FBAEEA5F5D61 /* RelationshipThreadView.swift */; };
 		596C9564C98DE058F3ABE59B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 48EA39B38C8BA4876BED02D2 /* PrivacyInfo.xcprivacy */; };
 		59A69753C46836A9AD276F62 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E58C85C20DC0DA675659BA7C /* FirebaseCore */; };
 		65269832E3991CF2F7DF0F03 /* MediaDownloadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1DBC2440F658F77E4B504BA /* MediaDownloadModel.swift */; };
@@ -64,6 +69,7 @@
 		D1D95A8BC17651DFCB7670CB /* WoorisaiCredentialValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A66EEABE8FDC71D9BB39BAF /* WoorisaiCredentialValidationTests.swift */; };
 		D3B2B8A961223C8AD38B310F /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 1A5A1CFBDB7A8D9F9A2BCAD9 /* OpenAPIRuntime */; };
 		D50556CAC20DC147278D7A42 /* RuntimeConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFA757BF6C16BF15B169D9B1 /* RuntimeConfiguration.swift */; };
+		D6371D9798A1830F00FA4403 /* DiaryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CACBA0C5943550718A9CF316 /* DiaryDetailView.swift */; };
 		D8B4730C8BA91CF333F019D0 /* WoorisaiRelationshipAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3EEC8E27EAEF654BDECD80C /* WoorisaiRelationshipAPITests.swift */; };
 		E042F0468444338E88506079 /* RuntimeConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264A194A52EFFBD3C21047E2 /* RuntimeConfigurationTests.swift */; };
 		E2C8CC58B5E743000926D78A /* WoorisaiAPIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91DA4EA9B105368B6D4D7081 /* WoorisaiAPIError.swift */; };
@@ -76,6 +82,7 @@
 		F66E3D2597290EFF9676C73B /* openapi-generator-config.yaml in Resources */ = {isa = PBXBuildFile; fileRef = 923A25E82263682B2BCE9048 /* openapi-generator-config.yaml */; };
 		FCC8824ED4E560F327139EFB /* RelationshipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 628BB76BCF7198B6FEA2497B /* RelationshipView.swift */; };
 		FD28C142591CC14E35746D15 /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 40825299BDEB62D8836BE111 /* OpenAPIRuntime */; };
+		FDED57F6C88EA128B3EACAA4 /* MediaGallery.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB4220607E2A6EF277F9E469 /* MediaGallery.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -182,8 +189,12 @@
 		70A1DD2A52AA5C72AD141605 /* FirebaseNotificationBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirebaseNotificationBridge.swift; sourceTree = "<group>"; };
 		70CC22C8885B027430F25295 /* WoorisaiAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAppDelegate.swift; sourceTree = "<group>"; };
 		7F4CC053300CA7A376951318 /* WoorisaiDiaryAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiDiaryAPI.swift; sourceTree = "<group>"; };
+		8249C3565178262DFEAA88F9 /* RelationshipScoreComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelationshipScoreComposer.swift; sourceTree = "<group>"; };
+		84CB8EBDA198FBAEEA5F5D61 /* RelationshipThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelationshipThreadView.swift; sourceTree = "<group>"; };
 		86476FE905B2A2A98945F8E9 /* MediaAttachmentComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaAttachmentComposer.swift; sourceTree = "<group>"; };
 		8BBD3654D73EBD197778D442 /* NotificationRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationRouting.swift; sourceTree = "<group>"; };
+		8CE9DEE88305DA1E8F733DEC /* RelationshipHistoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelationshipHistoryViews.swift; sourceTree = "<group>"; };
+		8E590834B3F6E7F12F3AF0FE /* DiaryFeedViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryFeedViews.swift; sourceTree = "<group>"; };
 		91DA4EA9B105368B6D4D7081 /* WoorisaiAPIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAPIError.swift; sourceTree = "<group>"; };
 		923A25E82263682B2BCE9048 /* openapi-generator-config.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = "openapi-generator-config.yaml"; sourceTree = "<group>"; };
 		9838A7619AE4DB6AA9775BC6 /* WoorisaiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiApp.swift; sourceTree = "<group>"; };
@@ -198,6 +209,7 @@
 		C4ED17D71DD28BBEEA415A55 /* MediaAttachmentComposerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaAttachmentComposerTests.swift; sourceTree = "<group>"; };
 		C5A3395049A85CADD678AF17 /* DiaryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryModel.swift; sourceTree = "<group>"; };
 		C86D512CC8D5C8D27F2924FF /* MediaUploadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaUploadModel.swift; sourceTree = "<group>"; };
+		CACBA0C5943550718A9CF316 /* DiaryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryDetailView.swift; sourceTree = "<group>"; };
 		CDB0308C06FF4A6EC28E2A81 /* WoorisaiCredentialValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiCredentialValidation.swift; sourceTree = "<group>"; };
 		CF8AE3E17CE3F4522F76D04B /* AuthenticationModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationModel.swift; sourceTree = "<group>"; };
 		CFA757BF6C16BF15B169D9B1 /* RuntimeConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeConfiguration.swift; sourceTree = "<group>"; };
@@ -206,6 +218,8 @@
 		E662786A1559E2619E0A1727 /* WoorisaiLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiLaunchTests.swift; sourceTree = "<group>"; };
 		E7DF92B71ECF71DB02663BEB /* WoorisaiNotificationAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiNotificationAPITests.swift; sourceTree = "<group>"; };
 		E977F9625B38730AA0754F6E /* WoorisaiDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiDesignSystem.swift; sourceTree = "<group>"; };
+		F2C69F2AE9BECCB22CE5D5C5 /* DiaryEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryEditors.swift; sourceTree = "<group>"; };
+		FB4220607E2A6EF277F9E469 /* MediaGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaGallery.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -263,6 +277,7 @@
 			children = (
 				86476FE905B2A2A98945F8E9 /* MediaAttachmentComposer.swift */,
 				A1DBC2440F658F77E4B504BA /* MediaDownloadModel.swift */,
+				FB4220607E2A6EF277F9E469 /* MediaGallery.swift */,
 				C86D512CC8D5C8D27F2924FF /* MediaUploadModel.swift */,
 			);
 			path = Media;
@@ -300,7 +315,10 @@
 		5959C3C17EC9EA35DB2BAB53 /* Relationship */ = {
 			isa = PBXGroup;
 			children = (
+				8CE9DEE88305DA1E8F733DEC /* RelationshipHistoryViews.swift */,
 				3023E181908B31C4D4E22E89 /* RelationshipModel.swift */,
+				8249C3565178262DFEAA88F9 /* RelationshipScoreComposer.swift */,
+				84CB8EBDA198FBAEEA5F5D61 /* RelationshipThreadView.swift */,
 				628BB76BCF7198B6FEA2497B /* RelationshipView.swift */,
 			);
 			path = Relationship;
@@ -415,6 +433,9 @@
 		D970346640A021E12F047592 /* Diary */ = {
 			isa = PBXGroup;
 			children = (
+				CACBA0C5943550718A9CF316 /* DiaryDetailView.swift */,
+				F2C69F2AE9BECCB22CE5D5C5 /* DiaryEditors.swift */,
+				8E590834B3F6E7F12F3AF0FE /* DiaryFeedViews.swift */,
 				C5A3395049A85CADD678AF17 /* DiaryModel.swift */,
 				99F4E9B5B613A1DDF402DAA8 /* DiaryView.swift */,
 			);
@@ -707,6 +728,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				9C4A3FD346D98BEED93C7820 /* AuthenticationModel.swift in Sources */,
+				D6371D9798A1830F00FA4403 /* DiaryDetailView.swift in Sources */,
+				4336E517475FE2B53CE85A7F /* DiaryEditors.swift in Sources */,
+				545618ACD244E2B1D21AB71B /* DiaryFeedViews.swift in Sources */,
 				A0DA23F13C46DA54945DB366 /* DiaryModel.swift in Sources */,
 				7F3EE5DEFD7D60F5B493DFD1 /* DiaryView.swift in Sources */,
 				EDEE9D2F5829F56A4612AAC7 /* FirebaseNotificationBridge.swift in Sources */,
@@ -714,10 +738,14 @@
 				497E4D28995BAE601AF137CC /* LoginOptionsView.swift in Sources */,
 				C155A3741F573F119AFD2B0F /* MediaAttachmentComposer.swift in Sources */,
 				65269832E3991CF2F7DF0F03 /* MediaDownloadModel.swift in Sources */,
+				FDED57F6C88EA128B3EACAA4 /* MediaGallery.swift in Sources */,
 				9B51D7F2A1F9A926FF0CD4DB /* MediaUploadModel.swift in Sources */,
 				A8B089BD20E57081A7CA47D6 /* NotificationModel.swift in Sources */,
 				8A4498C35707B1E5BF8BBB01 /* NotificationRouting.swift in Sources */,
+				513AD85746B630A14AC0A009 /* RelationshipHistoryViews.swift in Sources */,
 				0875AD092BBE5A7332AC2CD0 /* RelationshipModel.swift in Sources */,
+				18332D71FADB81EC4FD4EBA0 /* RelationshipScoreComposer.swift in Sources */,
+				54AB4AAC4FAA284A616B2835 /* RelationshipThreadView.swift in Sources */,
 				FCC8824ED4E560F327139EFB /* RelationshipView.swift in Sources */,
 				D50556CAC20DC147278D7A42 /* RuntimeConfiguration.swift in Sources */,
 				EA0AF0C3B7628520CC9B0B88 /* WoorisaiApp.swift in Sources */,

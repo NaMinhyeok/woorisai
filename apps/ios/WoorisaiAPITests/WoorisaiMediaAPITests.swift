@@ -136,6 +136,7 @@ struct WoorisaiMediaAPITests {
     )
 
     let request = try URLSessionPresignedMediaUploader.makeRequest(using: grant)
+    let configuration = URLSessionPresignedMediaUploader.makeConfiguration()
 
     #expect(request.httpMethod == "PUT")
     #expect(request.value(forHTTPHeaderField: "Content-Type") == "image/png")
@@ -146,6 +147,12 @@ struct WoorisaiMediaAPITests {
     #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
     #expect(request.value(forHTTPHeaderField: "Cookie") == nil)
     #expect(request.httpShouldHandleCookies == false)
+    #expect(configuration.identifier == nil)
+    #expect(configuration.urlCache == nil)
+    #expect(configuration.httpCookieStorage == nil)
+    #expect(configuration.urlCredentialStorage == nil)
+    #expect(configuration.httpShouldSetCookies == false)
+    #expect(configuration.requestCachePolicy == .reloadIgnoringLocalAndRemoteCacheData)
   }
 }
 

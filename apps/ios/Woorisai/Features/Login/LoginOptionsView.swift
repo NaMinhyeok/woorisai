@@ -7,6 +7,8 @@ struct LoginOptionsView: View {
   @State private var model: LoginOptionsModel
   @State private var authenticationModel: AuthenticationModel
   @FocusState private var isPINFocused: Bool
+  @AccessibilityFocusState private var isLoginFailureFocused: Bool
+  @AccessibilityFocusState private var isAuthenticationFailureFocused: Bool
 
   @MainActor
   init(model: LoginOptionsModel, authenticationModel: AuthenticationModel) {
@@ -27,6 +29,11 @@ struct LoginOptionsView: View {
         .frame(maxWidth: .infinity)
       }
       .scrollDismissesKeyboard(.interactively)
+    }
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      if authenticationModel.selectedOption != nil {
+        loginActionBar
+      }
     }
     .overlay {
       #if DEBUG
@@ -53,24 +60,39 @@ struct LoginOptionsView: View {
     }
     .onDisappear {
       isPINFocused = false
+      isLoginFailureFocused = false
+      isAuthenticationFailureFocused = false
       model.cancel()
     }
-    .onChange(of: authenticationModel.state) { _, state in
+    .onChange(of: model.state, initial: true) { _, state in
+      switch state {
+      case .unavailable, .failed:
+        Task { @MainActor in
+          await Task.yield()
+          isLoginFailureFocused = true
+        }
+      case .idle, .loading, .loaded:
+        isLoginFailureFocused = false
+      }
+    }
+    .onChange(of: authenticationModel.state, initial: true) { _, state in
       switch state {
       case .enteringPIN:
+        isAuthenticationFailureFocused = false
         isPINFocused = true
-      case .choosingParticipant, .validating, .credentialRejected, .unavailable, .failed,
-        .authenticated:
+      case .credentialRejected, .unavailable, .failed:
+        isPINFocused = false
+        Task { @MainActor in
+          await Task.yield()
+          isAuthenticationFailureFocused = true
+        }
+      case .choosingParticipant, .validating, .authenticated:
+        isAuthenticationFailureFocused = false
         isPINFocused = false
       }
     }
     .onChange(of: authenticationModel.pin) { _, pin in
       if pin.count == 4 {
-        isPINFocused = false
-      }
-    }
-    .toolbar {
-      KeyboardDismissToolbar {
         isPINFocused = false
       }
     }
@@ -86,47 +108,43 @@ struct LoginOptionsView: View {
 
   private var brandHeader: some View {
     VStack(spacing: dynamicTypeSize.isAccessibilitySize ? 8 : 10) {
-      ZStack {
-        RoundedRectangle(cornerRadius: 24, style: .continuous)
-          .fill(WoorisaiPalette.surface)
-          .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-              .stroke(WoorisaiPalette.coral.opacity(0.16), lineWidth: 1)
-          }
-          .shadow(color: WoorisaiPalette.shadow.opacity(0.12), radius: 12, y: 6)
+      if !dynamicTypeSize.isAccessibilitySize {
+        ZStack {
+          RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .fill(WoorisaiPalette.surface)
+            .overlay {
+              RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(WoorisaiPalette.coral.opacity(0.16), lineWidth: 1)
+            }
+            .shadow(color: WoorisaiPalette.shadow.opacity(0.12), radius: 12, y: 6)
 
-        Image(systemName: "heart.fill")
-          .font(
-            .system(
-              size: dynamicTypeSize.isAccessibilitySize ? 24 : 32,
-              weight: .semibold
-            )
-          )
-          .foregroundStyle(WoorisaiPalette.coral)
-          .rotationEffect(.degrees(4))
+          Image(systemName: "heart.fill")
+            .font(.system(size: 32, weight: .semibold))
+            .foregroundStyle(WoorisaiPalette.coral)
+            .rotationEffect(.degrees(4))
+        }
+        .frame(width: 72, height: 72)
+        .rotationEffect(.degrees(-4))
+        .accessibilityHidden(true)
+
+        Eyebrow("JUST BETWEEN US")
       }
-      .frame(
-        width: dynamicTypeSize.isAccessibilitySize ? 52 : 72,
-        height: dynamicTypeSize.isAccessibilitySize ? 52 : 72
-      )
-      .rotationEffect(.degrees(-4))
-      .accessibilityHidden(true)
-
-      Eyebrow("JUST BETWEEN US")
 
       Text("우리 둘만의 작은 마음 기록")
-        .font(dynamicTypeSize.isAccessibilitySize ? .title.bold() : .largeTitle.bold())
+        .font(dynamicTypeSize.isAccessibilitySize ? .title2.bold() : .largeTitle.bold())
         .foregroundStyle(WoorisaiPalette.ink)
         .multilineTextAlignment(.center)
         .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? 440 : 300)
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityAddTraits(.isHeader)
 
-      Text("서로를 생각하는 마음을 차곡차곡 쌓아 보세요.")
-        .font(.body)
-        .foregroundStyle(WoorisaiPalette.muted)
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? 440 : 320)
+      if !dynamicTypeSize.isAccessibilitySize {
+        Text("서로를 생각하는 마음을 차곡차곡 쌓아 보세요.")
+          .font(.body)
+          .foregroundStyle(WoorisaiPalette.muted)
+          .multilineTextAlignment(.center)
+          .frame(maxWidth: 320)
+      }
     }
   }
 
@@ -274,47 +292,58 @@ struct LoginOptionsView: View {
         Text("PIN이 맞지 않아요. 네 자리 PIN을 다시 입력해 주세요.")
           .font(.callout)
           .foregroundStyle(WoorisaiPalette.coralDark)
+          .accessibilityFocused($isAuthenticationFailureFocused)
           .accessibilityIdentifier("authentication.rejected")
       } else if case .unavailable = authenticationModel.state {
         Text("인증 서비스를 잠시 사용할 수 없어요. 잠시 후 다시 시도해 주세요.")
           .font(.callout)
           .foregroundStyle(WoorisaiPalette.muted)
+          .accessibilityFocused($isAuthenticationFailureFocused)
           .accessibilityIdentifier("authentication.unavailable")
       } else if case .failed = authenticationModel.state {
         Text("인증 결과를 확인하지 못했어요. 자동으로 다시 보내지 않았습니다.")
           .font(.callout)
           .foregroundStyle(WoorisaiPalette.muted)
+          .accessibilityFocused($isAuthenticationFailureFocused)
           .accessibilityIdentifier("authentication.failed")
       }
 
-      SecureField(
-        "네 자리 PIN",
-        text: Binding(
-          get: { authenticationModel.pin },
-          set: { authenticationModel.updatePIN($0) }
+      HStack(spacing: WoorisaiSpacing.small) {
+        SecureField(
+          "네 자리 PIN",
+          text: Binding(
+            get: { authenticationModel.pin },
+            set: { authenticationModel.updatePIN($0) }
+          )
         )
-      )
-      .keyboardType(.numberPad)
-      .textContentType(.password)
-      .font(.title3.weight(.bold))
-      .foregroundStyle(WoorisaiPalette.ink)
-      .tint(WoorisaiPalette.coralDark)
-      .padding(.horizontal, 16)
-      .frame(minHeight: 54)
-      .background(
-        WoorisaiPalette.field,
-        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-      )
-      .overlay {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-          .stroke(WoorisaiPalette.line, lineWidth: 1)
+        .keyboardType(.numberPad)
+        .textContentType(.password)
+        .font(.title3.weight(.bold))
+        .foregroundStyle(WoorisaiPalette.ink)
+        .tint(WoorisaiPalette.coralDark)
+        .padding(.horizontal, WoorisaiSpacing.regular)
+        .frame(minHeight: 54)
+        .background(
+          WoorisaiPalette.field,
+          in: RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
+        )
+        .overlay {
+          RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
+            .stroke(WoorisaiPalette.line, lineWidth: 1)
+        }
+        .privacySensitive()
+        .disabled(authenticationModel.isValidating)
+        .focused($isPINFocused)
+        .accessibilityLabel("네 자리 PIN")
+        .accessibilityHint("숫자 네 자리를 입력하세요")
+        .accessibilityIdentifier("authentication.pin")
+
+        if isPINFocused {
+          KeyboardDismissButton {
+            isPINFocused = false
+          }
+        }
       }
-      .privacySensitive()
-      .disabled(authenticationModel.isValidating)
-      .focused($isPINFocused)
-      .accessibilityLabel("네 자리 PIN")
-      .accessibilityHint("숫자 네 자리를 입력하세요")
-      .accessibilityIdentifier("authentication.pin")
 
       Text("숫자 네 자리를 입력해 주세요.")
         .font(.footnote)
@@ -331,7 +360,6 @@ struct LoginOptionsView: View {
         .accessibilityIdentifier("authentication.validating")
       }
 
-      pinActions
     }
     .padding(16)
     .background(
@@ -343,18 +371,30 @@ struct LoginOptionsView: View {
   }
 
   @ViewBuilder
-  private var pinActions: some View {
-    if dynamicTypeSize.isAccessibilitySize {
-      VStack(spacing: 12) {
-        cancelPINButton(expandsHorizontally: true)
-        authenticationActionButton
-      }
-    } else {
-      HStack(spacing: 12) {
-        cancelPINButton(expandsHorizontally: false)
-        authenticationActionButton
+  private var loginActionBar: some View {
+    Group {
+      if dynamicTypeSize.isAccessibilitySize {
+        VStack(spacing: WoorisaiSpacing.small) {
+          cancelPINButton(expandsHorizontally: true)
+          authenticationActionButton
+        }
+      } else {
+        HStack(spacing: WoorisaiSpacing.medium) {
+          cancelPINButton(expandsHorizontally: false)
+          authenticationActionButton
+        }
       }
     }
+    .frame(maxWidth: 520)
+    .padding(.horizontal, WoorisaiSpacing.screenGutter)
+    .padding(.vertical, WoorisaiSpacing.small)
+    .frame(maxWidth: .infinity)
+    .background(.ultraThinMaterial)
+    .overlay(alignment: .top) {
+      Divider().opacity(0.5)
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("authentication.actionBar")
   }
 
   private func cancelPINButton(expandsHorizontally: Bool) -> some View {
@@ -418,6 +458,7 @@ struct LoginOptionsView: View {
         Text(message)
           .foregroundStyle(WoorisaiPalette.ink)
           .multilineTextAlignment(.center)
+          .accessibilityFocused($isLoginFailureFocused)
 
         PrimaryHeartButton("다시 시도") {
           model.retry()

@@ -89,7 +89,85 @@ struct RelationshipModelTests {
     try? await Task.sleep(for: .milliseconds(30))
 
     #expect(await service.scoreCreateCount == 1)
-    #expect(model.notice?.contains("자동으로 다시 보내지 않았습니다") == true)
+    #expect(model.scoreOutcomeRequiresConfirmation)
+    #expect(model.notice?.contains("재전송을 잠갔어요") == true)
+
+    #expect(!model.createScoreChange(targetScore: 75, reason: "확인 전 재시도"))
+    #expect(await service.scoreCreateCount == 1)
+    #expect(!model.confirmUnknownScoreOutcomeForRetry())
+
+    model.inspectUnknownScoreOutcome()
+    await relationshipExpectEventually {
+      model.scoreOutcomeInspectionState == .loaded
+    }
+    #expect(model.canRetryUnknownScoreOutcome)
+    #expect(model.confirmUnknownScoreOutcomeForRetry())
+    #expect(model.hasProtectedManualRetryDraft)
+    #expect(model.createScoreChange(targetScore: 75, reason: "확인 후 재시도"))
+    #expect(!model.hasProtectedManualRetryDraft)
+    await relationshipExpectEventually { await service.scoreCreateCount == 2 }
+  }
+
+  @Test
+  func scoreUnknownOutcomeRequiresExactSubmittedHistoryBeforeResolvingAsCommitted() async {
+    let service = RelationshipServiceFake(
+      scoreWrite: .transport,
+      scoreOutcomeRead: .committed
+    )
+    let model = RelationshipModel(service: service)
+    model.loadIfNeeded()
+    await relationshipExpectEventually { model.loadState == .loaded }
+
+    #expect(model.createScoreChange(targetScore: 75, reason: "새 점수"))
+    await relationshipExpectEventually { model.scoreOutcomeRequiresConfirmation }
+    model.inspectUnknownScoreOutcome()
+    await relationshipExpectEventually { model.scoreOutcomeInspectionState == .loaded }
+
+    #expect(model.scoreOutcomeInspectionResult == .committed)
+    #expect(model.canResolveUnknownScoreOutcomeAsCommitted)
+    #expect(!model.canRetryUnknownScoreOutcome)
+    #expect(!model.confirmUnknownScoreOutcomeForRetry())
+    #expect(model.resolveUnknownScoreOutcomeAsCommitted())
+    #expect(await service.scoreCreateCount == 1)
+  }
+
+  @Test
+  func interveningScoreWriteNeverEnablesBlindRetry() async {
+    let service = RelationshipServiceFake(
+      scoreWrite: .transport,
+      scoreOutcomeRead: .intervening
+    )
+    let model = RelationshipModel(service: service)
+    model.loadIfNeeded()
+    await relationshipExpectEventually { model.loadState == .loaded }
+
+    #expect(model.createScoreChange(targetScore: 75, reason: "새 점수"))
+    await relationshipExpectEventually { model.scoreOutcomeRequiresConfirmation }
+    model.inspectUnknownScoreOutcome()
+    await relationshipExpectEventually { model.scoreOutcomeInspectionState == .loaded }
+
+    #expect(model.scoreOutcomeInspectionResult == .inconclusive)
+    #expect(!model.canResolveUnknownScoreOutcomeAsCommitted)
+    #expect(!model.canRetryUnknownScoreOutcome)
+    #expect(!model.confirmUnknownScoreOutcomeForRetry())
+    #expect(model.abandonInconclusiveUnknownScoreOutcome())
+    #expect(await service.scoreCreateCount == 1)
+  }
+
+  @Test
+  func scoreCancellationIsTreatedAsAmbiguousInsteadOfLeavingSubmissionStuck() async {
+    let service = RelationshipServiceFake(scoreWrite: .cancellation)
+    let model = RelationshipModel(service: service)
+    model.loadIfNeeded()
+    await relationshipExpectEventually { model.loadState == .loaded }
+
+    #expect(model.createScoreChange(targetScore: 75, reason: "응답이 중단된 점수"))
+    await relationshipExpectEventually { model.scoreSubmissionState == .failed }
+
+    #expect(await service.scoreCreateCount == 1)
+    #expect(model.scoreOutcomeRequiresConfirmation)
+    #expect(model.scoreOutcomeInspectionState == .idle)
+    #expect(model.notice?.contains("재전송을 잠갔어요") == true)
   }
 
   @Test
@@ -155,8 +233,8 @@ struct RelationshipModelTests {
     commentModel.dismissConflict()
 
     #expect(commentModel.conflict == nil)
-    #expect(commentModel.selectedThread == nil)
-    #expect(commentModel.threadState == .loading)
+    #expect(commentModel.selectedThread == RelationshipFixtures.thread)
+    #expect(commentModel.threadState == .loaded)
     await relationshipExpectEventually {
       await commentService.threadLoadCount == 2 && commentModel.threadState == .loaded
     }
@@ -176,9 +254,175 @@ struct RelationshipModelTests {
     try? await Task.sleep(for: .milliseconds(30))
 
     #expect(await service.commentCreateCount == 1)
+    #expect(model.commentOutcomeRequiresConfirmation)
+    #expect(
+      !model.createComment(
+        scoreChangeID: RelationshipFixtures.change.id,
+        content: "확인 없는 중복 댓글"
+      )
+    )
+    #expect(await service.commentCreateCount == 1)
     #expect(
       model.commentNotice(for: RelationshipFixtures.change.id)?
-        .contains("자동 재시도하지 않았습니다") == true
+        .contains("재전송을 잠갔어요") == true
+    )
+
+    model.inspectUnknownCommentOutcome(scoreChangeID: RelationshipFixtures.change.id)
+    await relationshipExpectEventually {
+      model.commentOutcomeInspectionState == .loaded
+        && model.threadState == .loaded
+    }
+    #expect(
+      model.confirmUnknownCommentOutcomeForRetry(scoreChangeID: RelationshipFixtures.change.id))
+    #expect(model.hasProtectedManualRetryDraft)
+    #expect(
+      model.createComment(
+        scoreChangeID: RelationshipFixtures.change.id,
+        content: "확인 후 재시도"
+      )
+    )
+    #expect(!model.hasProtectedManualRetryDraft)
+    await relationshipExpectEventually { await service.commentCreateCount == 2 }
+  }
+
+  @Test
+  func commentUnknownOutcomeMatchesImmutableContentAndNewCommentIdentity() async {
+    let service = RelationshipServiceFake(
+      commentWrite: .transport,
+      commentOutcomeRead: .committed
+    )
+    let model = RelationshipModel(service: service)
+    model.loadIfNeeded()
+    await relationshipExpectEventually { model.loadState == .loaded }
+    model.loadThread(scoreChangeID: RelationshipFixtures.change.id)
+    await relationshipExpectEventually { model.threadState == .loaded }
+
+    #expect(
+      model.createComment(
+        scoreChangeID: RelationshipFixtures.change.id,
+        content: "  새 댓글  "
+      )
+    )
+    await relationshipExpectEventually { model.commentOutcomeRequiresConfirmation }
+    model.inspectUnknownCommentOutcome(scoreChangeID: RelationshipFixtures.change.id)
+    await relationshipExpectEventually { model.commentOutcomeInspectionState == .loaded }
+
+    #expect(model.commentOutcomeInspectionResult == .committed)
+    #expect(
+      model.canResolveUnknownCommentOutcomeAsCommitted(
+        for: RelationshipFixtures.change.id
+      )
+    )
+    #expect(!model.canRetryUnknownCommentOutcome(for: RelationshipFixtures.change.id))
+    #expect(
+      model.resolveUnknownCommentOutcomeAsCommitted(
+        scoreChangeID: RelationshipFixtures.change.id
+      )
+    )
+    #expect(await service.commentCreateCount == 1)
+  }
+
+  @Test
+  func inconsistentCommentSnapshotCannotBeRetriedAndCanOnlyBeAbandoned() async {
+    let service = RelationshipServiceFake(
+      commentWrite: .transport,
+      commentOutcomeRead: .intervening
+    )
+    let model = RelationshipModel(service: service)
+    model.loadIfNeeded()
+    await relationshipExpectEventually { model.loadState == .loaded }
+    model.loadThread(scoreChangeID: RelationshipFixtures.change.id)
+    await relationshipExpectEventually { model.threadState == .loaded }
+
+    #expect(
+      model.createComment(
+        scoreChangeID: RelationshipFixtures.change.id,
+        content: "새 댓글"
+      )
+    )
+    await relationshipExpectEventually { model.commentOutcomeRequiresConfirmation }
+    model.inspectUnknownCommentOutcome(scoreChangeID: RelationshipFixtures.change.id)
+    await relationshipExpectEventually { model.commentOutcomeInspectionState == .loaded }
+
+    #expect(model.commentOutcomeInspectionResult == .inconclusive)
+    #expect(!model.canRetryUnknownCommentOutcome(for: RelationshipFixtures.change.id))
+    #expect(
+      !model.resolveUnknownCommentOutcomeAsCommitted(
+        scoreChangeID: RelationshipFixtures.change.id
+      )
+    )
+    #expect(
+      model.abandonInconclusiveUnknownCommentOutcome(
+        scoreChangeID: RelationshipFixtures.change.id
+      )
+    )
+    #expect(await service.commentCreateCount == 1)
+  }
+
+  @Test
+  func normalReloadSupersedingScoreInspectionLeavesRecoveryRetryable() async {
+    let service = RelationshipInspectionSupersedeService(delayedRead: .score)
+    let model = RelationshipModel(service: service)
+    model.loadIfNeeded()
+    await relationshipExpectEventually { model.loadState == .loaded }
+
+    model.createScoreChange(targetScore: 75, reason: "결과 불명")
+    await relationshipExpectEventually { model.scoreOutcomeRequiresConfirmation }
+    model.inspectUnknownScoreOutcome()
+    await relationshipExpectEventually {
+      await service.scoreLoadCount == 2 && model.scoreOutcomeInspectionState == .loading
+    }
+
+    model.reload(preservingVisibleContent: true)
+    await relationshipExpectEventually {
+      await service.scoreLoadCount == 3 && model.loadState == .loaded
+    }
+
+    #expect(model.scoreOutcomeInspectionState == .failed)
+    #expect(!model.confirmUnknownScoreOutcomeForRetry())
+
+    model.inspectUnknownScoreOutcome()
+    await relationshipExpectEventually { model.scoreOutcomeInspectionState == .loaded }
+    #expect(model.confirmUnknownScoreOutcomeForRetry())
+  }
+
+  @Test
+  func normalThreadReloadSupersedingCommentInspectionLeavesRecoveryRetryable() async {
+    let service = RelationshipInspectionSupersedeService(delayedRead: .comment)
+    let model = RelationshipModel(service: service)
+    model.loadIfNeeded()
+    await relationshipExpectEventually { model.loadState == .loaded }
+    model.loadThread(scoreChangeID: RelationshipFixtures.change.id)
+    await relationshipExpectEventually { model.threadState == .loaded }
+
+    model.createComment(scoreChangeID: RelationshipFixtures.change.id, content: "결과 불명")
+    await relationshipExpectEventually { model.commentOutcomeRequiresConfirmation }
+    model.inspectUnknownCommentOutcome(scoreChangeID: RelationshipFixtures.change.id)
+    await relationshipExpectEventually {
+      await service.threadLoadCount == 2 && model.commentOutcomeInspectionState == .loading
+    }
+
+    model.loadThread(
+      scoreChangeID: RelationshipFixtures.change.id,
+      preservingVisibleContent: true
+    )
+    await relationshipExpectEventually {
+      await service.threadLoadCount == 3 && model.threadState == .loaded
+    }
+
+    #expect(model.commentOutcomeInspectionState == .failed)
+    #expect(
+      !model.resolveUnknownCommentOutcomeAsCommitted(
+        scoreChangeID: RelationshipFixtures.change.id
+      )
+    )
+
+    model.inspectUnknownCommentOutcome(scoreChangeID: RelationshipFixtures.change.id)
+    await relationshipExpectEventually { model.commentOutcomeInspectionState == .loaded }
+    #expect(
+      model.confirmUnknownCommentOutcomeForRetry(
+        scoreChangeID: RelationshipFixtures.change.id
+      )
     )
   }
 
@@ -223,23 +467,53 @@ struct RelationshipModelTests {
 
     model.loadNextPage()
     await relationshipExpectEventually { await service.pageTwoRequestCount == 1 }
+    #expect(model.pagingState == .loading)
 
     model.reload()
     await relationshipExpectEventually {
       let firstPageCount = await service.firstPageRequestCount
       return model.loadState == .loaded && firstPageCount == 2
     }
+    #expect(model.pagingState == .idle)
 
     model.loadNextPage()
     await relationshipExpectEventually { await service.pageTwoRequestCount == 2 }
     await service.succeedPageTwo(request: 1)
     await relationshipExpectEventually { model.currentPage == 2 }
+    #expect(model.pagingState == .idle)
 
     // Let the canceled, stale request finish last; its generation must not replace the new page.
     await service.succeedPageTwo(request: 0)
     await Task.yield()
     #expect(model.currentPage == 2)
     #expect(model.changes.map(\.id) == [101, 102])
+  }
+
+  @Test
+  func failedPaginationExposesRetryStateAndClearsItAfterSuccess() async {
+    let service = ControlledPaginationService()
+    let model = RelationshipModel(service: service)
+    model.loadIfNeeded()
+    await relationshipExpectEventually { model.loadState == .loaded }
+
+    model.loadNextPage()
+    await relationshipExpectEventually { await service.pageTwoRequestCount == 1 }
+    await service.failPageTwo(request: 0)
+    await relationshipExpectEventually { model.pagingState == .failed }
+
+    #expect(model.archiveNotice == "다음 기록을 불러오지 못했어요. 다시 시도해 주세요.")
+    #expect(model.notice == nil)
+
+    model.loadNextPage()
+    await relationshipExpectEventually { await service.pageTwoRequestCount == 2 }
+    #expect(model.pagingState == .loading)
+    #expect(model.archiveNotice == nil)
+    await service.succeedPageTwo(request: 1)
+    await relationshipExpectEventually { model.currentPage == 2 }
+
+    #expect(model.pagingState == .idle)
+    #expect(model.archiveNotice == nil)
+    #expect(model.notice == nil)
   }
 
   @Test
@@ -370,11 +644,31 @@ struct RelationshipModelTests {
       model.changes.first(where: { $0.id == RelationshipFixtures.change.id })?.commentCount == 1
     )
     #expect(model.lastSuccessfulCommentScoreChangeID == nil)
+    #expect(model.commentOutcomeRequiresConfirmation)
+    #expect(model.commentOutcomeScoreChangeID == RelationshipFixtures.change.id)
+    #expect(
+      !model.createComment(
+        scoreChangeID: RelationshipFixtures.createdChange.id,
+        content: "다른 대화의 중복 위험 댓글"
+      )
+    )
     #expect(
       model.commentNotice(for: RelationshipFixtures.change.id)?
-        .contains("자동 재시도하지 않았습니다") == true
+        .contains("재전송을 잠갔어요") == true
     )
     #expect(model.commentNotice(for: RelationshipFixtures.createdChange.id) == nil)
+
+    model.inspectUnknownCommentOutcome(scoreChangeID: RelationshipFixtures.change.id)
+    await relationshipExpectEventually {
+      model.commentOutcomeInspectionState == .loaded
+        && model.selectedThread?.change.id == RelationshipFixtures.change.id
+    }
+    #expect(
+      model.confirmUnknownCommentOutcomeForRetry(
+        scoreChangeID: RelationshipFixtures.change.id
+      )
+    )
+    #expect(!model.commentOutcomeRequiresConfirmation)
   }
 
   @Test
@@ -514,9 +808,10 @@ struct RelationshipModelTests {
     await relationshipExpectEventually { model.loadState == .loaded }
 
     #expect(await service.commentRequestCount == 1)
+    #expect(model.commentOutcomeRequiresConfirmation)
     #expect(
       model.commentNotice(for: RelationshipFixtures.change.id)?
-        .contains("자동 재시도하지 않았습니다") == true
+        .contains("재전송을 잠갔어요") == true
     )
   }
 
@@ -664,31 +959,56 @@ struct RelationshipModelTests {
 
 private actor RelationshipServiceFake: RelationshipServing {
   enum Read: Sendable { case credentialRejected, success }
-  enum Write: Sendable { case conflict, success, transport }
+  enum Write: Sendable { case cancellation, conflict, success, transport }
+  enum OutcomeRead: Sendable { case committed, intervening, original }
 
   private let read: Read
   private let scoreWrite: Write
   private let commentWrite: Write
+  private let scoreOutcomeRead: OutcomeRead
+  private let commentOutcomeRead: OutcomeRead
   private(set) var scoreLoadCount = 0
   private(set) var historyLoadCount = 0
   private(set) var scoreCreateCount = 0
   private(set) var threadLoadCount = 0
   private(set) var commentCreateCount = 0
 
-  init(read: Read = .success, scoreWrite: Write = .success, commentWrite: Write = .success) {
+  init(
+    read: Read = .success,
+    scoreWrite: Write = .success,
+    commentWrite: Write = .success,
+    scoreOutcomeRead: OutcomeRead = .original,
+    commentOutcomeRead: OutcomeRead = .original
+  ) {
     self.read = read
     self.scoreWrite = scoreWrite
     self.commentWrite = commentWrite
+    self.scoreOutcomeRead = scoreOutcomeRead
+    self.commentOutcomeRead = commentOutcomeRead
   }
 
   func loadRelationshipScores() async throws -> RelationshipScores {
     scoreLoadCount += 1
     if read == .credentialRejected { throw WoorisaiAPIError.credentialRejected }
+    if scoreLoadCount > 1 {
+      switch scoreOutcomeRead {
+      case .committed: return RelationshipFixtures.createdScores
+      case .intervening: return RelationshipFixtures.interveningScores
+      case .original: break
+      }
+    }
     return RelationshipFixtures.scores
   }
 
   func loadScoreChanges(pageNumber: Int) async throws -> RelationshipScoreChangePage {
     historyLoadCount += 1
+    if historyLoadCount > 1 {
+      switch scoreOutcomeRead {
+      case .committed: return RelationshipFixtures.pageWithSecondChange
+      case .intervening: return RelationshipFixtures.pageWithInterveningChange
+      case .original: break
+      }
+    }
     return RelationshipFixtures.page
   }
 
@@ -697,6 +1017,7 @@ private actor RelationshipServiceFake: RelationshipServing {
   ) async throws -> RelationshipScoreChangeCreated {
     scoreCreateCount += 1
     switch scoreWrite {
+    case .cancellation: throw CancellationError()
     case .conflict: throw WoorisaiAPIError.conflict
     case .transport: throw WoorisaiAPIError.transport
     case .success: return RelationshipFixtures.created
@@ -705,6 +1026,13 @@ private actor RelationshipServiceFake: RelationshipServing {
 
   func loadScoreChange(id: Int64) async throws -> RelationshipScoreThread {
     threadLoadCount += 1
+    if threadLoadCount > 1 {
+      switch commentOutcomeRead {
+      case .committed: return RelationshipFixtures.threadWithCreatedComment
+      case .intervening: return RelationshipFixtures.inconclusiveThread
+      case .original: break
+      }
+    }
     return RelationshipFixtures.thread
   }
 
@@ -714,10 +1042,59 @@ private actor RelationshipServiceFake: RelationshipServing {
   ) async throws -> RelationshipScoreComment {
     commentCreateCount += 1
     switch commentWrite {
+    case .cancellation: throw CancellationError()
     case .conflict: throw WoorisaiAPIError.conflict
     case .transport: throw WoorisaiAPIError.transport
     case .success: return RelationshipFixtures.createdComment
     }
+  }
+}
+
+private actor RelationshipInspectionSupersedeService: RelationshipServing {
+  enum DelayedRead: Equatable, Sendable {
+    case score
+    case comment
+  }
+
+  private let delayedRead: DelayedRead
+  private(set) var scoreLoadCount = 0
+  private(set) var threadLoadCount = 0
+
+  init(delayedRead: DelayedRead) {
+    self.delayedRead = delayedRead
+  }
+
+  func loadRelationshipScores() async throws -> RelationshipScores {
+    scoreLoadCount += 1
+    if delayedRead == .score, scoreLoadCount == 2 {
+      try await Task.sleep(for: .seconds(60))
+    }
+    return RelationshipFixtures.scores
+  }
+
+  func loadScoreChanges(pageNumber: Int) -> RelationshipScoreChangePage {
+    RelationshipFixtures.page
+  }
+
+  func createScoreChange(
+    _ draft: RelationshipScoreChangeDraft
+  ) throws -> RelationshipScoreChangeCreated {
+    throw WoorisaiAPIError.transport
+  }
+
+  func loadScoreChange(id: Int64) async throws -> RelationshipScoreThread {
+    threadLoadCount += 1
+    if delayedRead == .comment, threadLoadCount == 2 {
+      try await Task.sleep(for: .seconds(60))
+    }
+    return RelationshipFixtures.thread
+  }
+
+  func createScoreChangeComment(
+    scoreChangeID: Int64,
+    draft: RelationshipScoreCommentDraft
+  ) throws -> RelationshipScoreComment {
+    throw WoorisaiAPIError.transport
   }
 }
 
@@ -761,6 +1138,12 @@ private actor ControlledPaginationService: RelationshipServing {
         hasNext: false,
         totalCount: 2
       )
+    )
+  }
+
+  func failPageTwo(request: Int) {
+    pageTwoContinuations.removeValue(forKey: request)?.resume(
+      throwing: WoorisaiAPIError.serviceUnavailable
     )
   }
 
@@ -967,6 +1350,22 @@ private enum RelationshipFixtures {
     outgoingUpdatedAt: timestamp,
     incomingUpdatedAt: timestamp.addingTimeInterval(1)
   )
+  static let createdScores = RelationshipScores(
+    currentParticipant: current,
+    partner: partner,
+    outgoingScore: 75,
+    incomingScore: 82,
+    outgoingUpdatedAt: timestamp.addingTimeInterval(2),
+    incomingUpdatedAt: timestamp.addingTimeInterval(1)
+  )
+  static let interveningScores = RelationshipScores(
+    currentParticipant: current,
+    partner: partner,
+    outgoingScore: 80,
+    incomingScore: 82,
+    outgoingUpdatedAt: timestamp.addingTimeInterval(4),
+    incomingUpdatedAt: timestamp.addingTimeInterval(1)
+  )
   static let change = RelationshipScoreChange(
     id: 101,
     sourceParticipant: current,
@@ -1011,6 +1410,24 @@ private enum RelationshipFixtures {
     hasNext: false,
     totalCount: 2
   )
+  static let interveningChange = RelationshipScoreChange(
+    id: 103,
+    sourceParticipant: current,
+    targetParticipant: partner,
+    changedBy: current,
+    delta: 10,
+    resultingScore: 80,
+    reason: "다른 기기 변경",
+    createdAt: timestamp.addingTimeInterval(4),
+    commentCount: 0,
+    attachments: []
+  )
+  static let pageWithInterveningChange = RelationshipScoreChangePage(
+    changes: [interveningChange, change],
+    pageNumber: 1,
+    hasNext: false,
+    totalCount: 2
+  )
   static let changeWithAcknowledgedComment = RelationshipScoreChange(
     id: change.id,
     sourceParticipant: change.sourceParticipant,
@@ -1045,6 +1462,14 @@ private enum RelationshipFixtures {
     content: "새 댓글",
     createdAt: timestamp.addingTimeInterval(3),
     attachments: []
+  )
+  static let threadWithCreatedComment = RelationshipScoreThread(
+    change: changeWithAcknowledgedComment,
+    comments: [comment, createdComment]
+  )
+  static let inconclusiveThread = RelationshipScoreThread(
+    change: change,
+    comments: []
   )
 }
 

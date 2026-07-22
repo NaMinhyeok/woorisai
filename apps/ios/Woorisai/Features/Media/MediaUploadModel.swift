@@ -2,16 +2,71 @@ import Foundation
 import Observation
 import WoorisaiAPI
 
-struct MediaUploadSelection: Equatable, Sendable {
+final class OwnedTemporaryMediaUploadFile: @unchecked Sendable {
+  let url: URL
+  let byteSize: Int64
+
+  private let lock = NSLock()
+  private var hasRemovedFile = false
+  private var removalCountStorage = 0
+
+  init(url: URL, byteSize: Int64) {
+    self.url = url
+    self.byteSize = byteSize
+  }
+
+  var isRemoved: Bool {
+    lock.withLock { hasRemovedFile }
+  }
+
+  var removalCount: Int {
+    lock.withLock { removalCountStorage }
+  }
+
+  func removeIfNeeded() {
+    let shouldRemove = lock.withLock {
+      guard !hasRemovedFile else { return false }
+      hasRemovedFile = true
+      removalCountStorage += 1
+      return true
+    }
+    guard shouldRemove else { return }
+    try? FileManager.default.removeItem(at: url)
+  }
+
+  deinit {
+    removeIfNeeded()
+  }
+}
+
+struct MediaUploadSelection: Sendable {
+  enum Payload: Sendable {
+    case data(Data)
+    case file(OwnedTemporaryMediaUploadFile)
+  }
+
   let draft: MediaUploadDraft
-  let data: Data
+  let payload: Payload
 
   init(draft: MediaUploadDraft, data: Data) throws {
     guard !data.isEmpty, Int64(data.count) == draft.byteSize else {
       throw MediaValidationError.invalidByteSize
     }
     self.draft = draft
-    self.data = data
+    payload = .data(data)
+  }
+
+  init(draft: MediaUploadDraft, file: OwnedTemporaryMediaUploadFile) throws {
+    guard !file.isRemoved, file.byteSize == draft.byteSize else {
+      throw MediaValidationError.invalidByteSize
+    }
+    self.draft = draft
+    payload = .file(file)
+  }
+
+  func removeOwnedFileIfNeeded() {
+    guard case .file(let file) = payload else { return }
+    file.removeIfNeeded()
   }
 }
 
@@ -92,6 +147,7 @@ final class MediaUploadModel {
 
   func start(_ selection: MediaUploadSelection) {
     invalidateCurrentUpload(discard: true)
+    self.selection?.removeOwnedFileIfNeeded()
     self.selection = selection
     grant = nil
     resumePoint = .initiate
@@ -114,6 +170,8 @@ final class MediaUploadModel {
     task?.cancel()
     task = nil
     if let grant { discardBestEffort(grant.uploadID) }
+    selection?.removeOwnedFileIfNeeded()
+    selection = nil
     grant = nil
     resumePoint = .initiate
     state = .cancelled
@@ -132,6 +190,7 @@ final class MediaUploadModel {
     task?.cancel()
     task = nil
     let uploadID = grant?.uploadID
+    selection?.removeOwnedFileIfNeeded()
     selection = nil
     grant = nil
     resumePoint = .initiate
@@ -153,6 +212,7 @@ final class MediaUploadModel {
     generation &+= 1
     task?.cancel()
     task = nil
+    selection?.removeOwnedFileIfNeeded()
     selection = nil
     grant = nil
     resumePoint = .initiate
@@ -197,11 +257,23 @@ final class MediaUploadModel {
             throw PresignedMediaUploadError.expiredGrant
           }
           self.state = .uploading(progress: 0)
-          try await uploader.put(selection.data, using: currentGrant) { [weak self] progress in
+          let reportProgress: @Sendable (Double) -> Void = { [weak self] progress in
             Task { @MainActor [weak self] in
               guard let self, self.generation == generation else { return }
               self.state = .uploading(progress: min(1, max(0, progress)))
             }
+          }
+          switch selection.payload {
+          case .data(let data):
+            try await uploader.put(data, using: currentGrant, progress: reportProgress)
+          case .file(let file):
+            guard !file.isRemoved else { throw PresignedMediaUploadError.invalidGrant }
+            try await uploader.put(
+              fileAt: file.url,
+              byteSize: file.byteSize,
+              using: currentGrant,
+              progress: reportProgress
+            )
           }
           try Task.checkCancellation()
           guard self.generation == generation else { return }
@@ -220,6 +292,8 @@ final class MediaUploadModel {
         else {
           throw WoorisaiAPIError.schemaDrift
         }
+        selection.removeOwnedFileIfNeeded()
+        self.selection = nil
         self.task = nil
         self.state = .ready(completed)
       } catch is CancellationError {
