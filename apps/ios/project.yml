@@ -112,6 +112,14 @@ targets:
         ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
         CODE_SIGN_ENTITLEMENTS: Woorisai/Resources/Woorisai.entitlements
         TARGETED_DEVICE_FAMILY: 1
+      configs:
+        Debug:
+          CODE_SIGN_STYLE: Automatic
+          "CODE_SIGN_IDENTITY[sdk=iphoneos*]": Apple Development
+        Release:
+          "CODE_SIGN_IDENTITY[sdk=iphoneos*]": Apple Distribution
+          "CODE_SIGN_STYLE[sdk=iphoneos*]": Manual
+          "PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]": Woorisai App Store Reusable 2026
     postBuildScripts:
       - name: Inject Firebase Apple client configuration
         basedOnDependencyAnalysis: false

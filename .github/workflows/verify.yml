@@ -133,6 +133,8 @@ jobs:
             --kind production \
             --example-only \
             apps/ios/.env.production.example
+      - name: Verify privacy-safe release evidence
+        run: apps/ios/scripts/test-release-evidence.zsh
       - name: Resolve pinned Swift packages
         run: >-
           xcodebuild -resolvePackageDependencies

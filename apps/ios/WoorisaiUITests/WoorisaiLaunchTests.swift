@@ -407,6 +407,7 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertTrue(conflict.waitForExistence(timeout: 5))
     let reload = conflict.buttons.firstMatch
     XCTAssertTrue(reload.waitForExistence(timeout: 5))
+    XCTAssertTrue(waitForHittable(reload, timeout: 5))
     reload.tap()
     XCTAssertTrue(conflict.waitForNonExistence(timeout: 5))
     XCTAssertTrue(element("relationship.composer", in: app).exists)
@@ -912,6 +913,7 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertTrue(conflict.waitForExistence(timeout: 5))
     let reload = conflict.buttons.firstMatch
     XCTAssertTrue(reload.waitForExistence(timeout: 5))
+    XCTAssertTrue(waitForHittable(reload, timeout: 5))
     reload.tap()
     XCTAssertTrue(conflict.waitForNonExistence(timeout: 5))
     XCTAssertTrue(content.waitForExistence(timeout: 10))
@@ -1311,6 +1313,14 @@ final class WoorisaiLaunchTests: XCTestCase {
   private func waitForEnabled(_ target: XCUIElement, timeout: TimeInterval = 10) -> Bool {
     let expectation = XCTNSPredicateExpectation(
       predicate: NSPredicate(format: "enabled == true"),
+      object: target
+    )
+    return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+  }
+
+  private func waitForHittable(_ target: XCUIElement, timeout: TimeInterval = 10) -> Bool {
+    let expectation = XCTNSPredicateExpectation(
+      predicate: NSPredicate(format: "hittable == true"),
       object: target
     )
     return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed

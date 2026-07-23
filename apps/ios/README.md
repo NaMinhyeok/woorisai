@@ -71,12 +71,17 @@ apps/ios/scripts/validate-env.zsh --kind production apps/ios/.env.production
 apps/ios/scripts/release-testflight.zsh \
   --env-file apps/ios/.env.production \
   --build-number 6 \
+  --distribution-p12 "$PWD/.private/ios-signing/woorisai-distribution.p12" \
+  --distribution-p12-password-file \
+    "$PWD/.private/ios-signing/woorisai-distribution-p12.password" \
+  --provisioning-profile \
+    "$PWD/.private/ios-signing/Woorisai_App_Store_Reusable_2026.mobileprovision" \
   --no-upload
 ```
 
 실제 TestFlight upload는 검증된 `main`에서 GitHub의 `iOS TestFlight` workflow를 수동 실행한다.
-Production API host, App Store Connect key와 Firebase plist는 repository file이 아니라 GitHub
-secret에서 runner 임시 파일로 복원한다.
+Production API host, App Store Connect key, Apple Distribution PKCS#12/password/profile과 Firebase
+plist는 repository file이 아니라 GitHub environment secret에서 runner 임시 파일로 복원한다.
 
 ## Build와 test
 
