@@ -1927,7 +1927,7 @@ struct MediaAttachmentPreview: View {
       .accessibilityIdentifier("media.tile.\(attachmentID.uuidString).surface")
     }
     .buttonStyle(.plain)
-    .disabled(model.state == .loading)
+    .disabled(model.state == .loading && !isImage)
     .accessibilityLabel(previewAccessibilityLabel)
     .accessibilityValue(previewAccessibilityValue)
     .accessibilityHint("비공개 파일을 앱 안에서 안전하게 미리 봅니다.")
@@ -2091,8 +2091,12 @@ struct MediaAttachmentPreview: View {
       } else {
         isVideoViewerPresented = true
       }
+    } else if isImage {
+      opensImageViewerAfterLoading = true
+      if model.state != .loading {
+        model.load(using: previewLoader)
+      }
     } else {
-      opensImageViewerAfterLoading = isImage
       model.load(using: previewLoader)
     }
   }

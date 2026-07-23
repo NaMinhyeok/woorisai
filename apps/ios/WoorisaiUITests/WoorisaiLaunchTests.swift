@@ -1381,8 +1381,8 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertTrue(dismissKeyboard.waitForExistence(timeout: 5))
     XCTAssertTrue(waitForHittable(dismissKeyboard, timeout: 5))
     dismissKeyboard.tap()
-    XCTAssertTrue(dismissKeyboard.waitForNonExistence(timeout: 5))
     XCTAssertTrue(keyboard.waitForNonExistence(timeout: 10))
+    XCTAssertFalse(element("keyboard.dismiss", in: app).exists)
   }
 
   private func scrollToVisible(
