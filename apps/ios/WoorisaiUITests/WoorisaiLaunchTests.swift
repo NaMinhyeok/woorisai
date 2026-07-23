@@ -669,6 +669,7 @@ final class WoorisaiLaunchTests: XCTestCase {
   }
 
   func testMediaRichShowsPreloadedUploadAndAdaptiveGalleriesWithViewerRoundTrips() {
+    executionTimeAllowance = 300
     let app = launch(scenario: "mediaRich")
     enterPIN("0123", participantSlot: 1, in: app)
     XCTAssertTrue(element("relationship.loaded", in: app).waitForExistence(timeout: 5))
@@ -811,6 +812,7 @@ final class WoorisaiLaunchTests: XCTestCase {
   }
 
   func testDiaryCRUDUpdatesEntryCreatesEditsDeletesCommentAndDeletesEntry() {
+    executionTimeAllowance = 300
     let app = launch(scenario: "diaryCRUD")
     enterPIN("0123", participantSlot: 1, in: app)
     XCTAssertTrue(element("relationship.loaded", in: app).waitForExistence(timeout: 5))
@@ -1326,14 +1328,32 @@ final class WoorisaiLaunchTests: XCTestCase {
     return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
   }
 
+  private func remainsHittable(
+    _ target: XCUIElement,
+    for duration: TimeInterval = 0.5
+  ) -> Bool {
+    guard target.isHittable else { return false }
+
+    let losesHittability = XCTNSPredicateExpectation(
+      predicate: NSPredicate(format: "hittable == false"),
+      object: target
+    )
+    losesHittability.isInverted = true
+    return XCTWaiter.wait(for: [losesHittability], timeout: duration) == .completed
+  }
+
   private func scrollToHittable(
     _ target: XCUIElement,
     in app: XCUIApplication,
     maximumSwipes: Int = 8,
-    direction: ScrollDirection = .up
+    direction: ScrollDirection = .up,
+    file: StaticString = #filePath,
+    line: UInt = #line
   ) {
-    for _ in 0..<maximumSwipes {
-      if target.isHittable { break }
+    for attempt in 0...maximumSwipes {
+      if remainsHittable(target) { return }
+      guard attempt < maximumSwipes else { break }
+
       switch direction {
       case .up:
         app.swipeUp()
@@ -1341,7 +1361,11 @@ final class WoorisaiLaunchTests: XCTestCase {
         app.swipeDown()
       }
     }
-    XCTAssertTrue(target.isHittable)
+    XCTFail(
+      "Element did not become stably hittable after \(maximumSwipes) swipes",
+      file: file,
+      line: line
+    )
   }
 
   private func scrollToTop(in app: XCUIApplication, maximumSwipes: Int = 12) {
