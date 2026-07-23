@@ -13,6 +13,8 @@ RUN cd backend \
 
 FROM eclipse-temurin:25-jre-jammy@sha256:b8ba5fca9d88b6ecc3a46c8e75b744f84aca9a9d08587901b5ab480baf641ab5 AS runtime
 
+LABEL org.opencontainers.image.source="https://github.com/NaMinhyeok/woorisai"
+
 WORKDIR /app
 
 COPY --from=build --chown=10001:10001 /workspace/woorisai.jar /app/woorisai.jar
