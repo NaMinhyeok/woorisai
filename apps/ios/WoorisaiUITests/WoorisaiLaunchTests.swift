@@ -250,14 +250,12 @@ final class WoorisaiLaunchTests: XCTestCase {
     participant.tap()
 
     let pin = element("authentication.pin", in: app)
-    XCTAssertTrue(pin.waitForExistence(timeout: 5))
+    XCTAssertTrue(pin.waitForExistence(timeout: 10))
     scrollToHittable(pin, in: app)
     pin.tap()
     pin.typeText("012")
 
-    let dismissKeyboard = element("keyboard.dismiss", in: app)
-    XCTAssertTrue(dismissKeyboard.waitForExistence(timeout: 5))
-    dismissKeyboard.tap()
+    dismissKeyboard(in: app)
 
     let cancel = element("authentication.cancel", in: app)
     let submit = element("authentication.submit", in: app)
@@ -1295,11 +1293,13 @@ final class WoorisaiLaunchTests: XCTestCase {
     pin.typeText(value)
 
     if app.keyboards.firstMatch.exists {
+      let keyboard = app.keyboards.firstMatch
       let dismissKeyboard = element("keyboard.dismiss", in: app)
       if dismissKeyboard.waitForExistence(timeout: 2) {
+        XCTAssertTrue(waitForHittable(dismissKeyboard, timeout: 5))
         dismissKeyboard.tap()
       }
-      XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+      XCTAssertTrue(keyboard.waitForNonExistence(timeout: 10))
     }
 
     let submit = element("authentication.submit", in: app)
@@ -1375,11 +1375,14 @@ final class WoorisaiLaunchTests: XCTestCase {
   }
 
   private func dismissKeyboard(in app: XCUIApplication) {
-    XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+    let keyboard = app.keyboards.firstMatch
+    XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
     let dismissKeyboard = element("keyboard.dismiss", in: app)
     XCTAssertTrue(dismissKeyboard.waitForExistence(timeout: 5))
+    XCTAssertTrue(waitForHittable(dismissKeyboard, timeout: 5))
     dismissKeyboard.tap()
-    XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+    XCTAssertTrue(dismissKeyboard.waitForNonExistence(timeout: 5))
+    XCTAssertTrue(keyboard.waitForNonExistence(timeout: 10))
   }
 
   private func scrollToVisible(

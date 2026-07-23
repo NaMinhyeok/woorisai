@@ -1849,6 +1849,7 @@ struct MediaAttachmentPreview: View {
   @State private var model: PrivateMediaPreviewModel
   @State private var isImageViewerPresented = false
   @State private var isVideoViewerPresented = false
+  @State private var opensImageViewerAfterLoading = false
   @State private var shouldReloadVideoAfterDismiss = false
   @State private var isMounted = false
 
@@ -1939,12 +1940,18 @@ struct MediaAttachmentPreview: View {
     .onChange(of: model.state) { _, state in
       switch state {
       case .loaded:
-        if !isImage {
+        if isImage, opensImageViewerAfterLoading, model.localURL != nil {
+          opensImageViewerAfterLoading = false
+          isImageViewerPresented = true
+        } else if !isImage {
           isVideoViewerPresented = model.localURL != nil
         }
       case .authenticationRequired:
+        opensImageViewerAfterLoading = false
         onAuthenticationRequired()
-      case .idle, .loading, .notFound, .unavailable, .invalidContent, .failed:
+      case .idle, .notFound, .unavailable, .invalidContent, .failed:
+        opensImageViewerAfterLoading = false
+      case .loading:
         break
       }
     }
@@ -2010,6 +2017,7 @@ struct MediaAttachmentPreview: View {
     }
     .onDisappear {
       isMounted = false
+      opensImageViewerAfterLoading = false
       shouldReloadVideoAfterDismiss = false
       isImageViewerPresented = false
       isVideoViewerPresented = false
@@ -2084,6 +2092,7 @@ struct MediaAttachmentPreview: View {
         isVideoViewerPresented = true
       }
     } else {
+      opensImageViewerAfterLoading = isImage
       model.load(using: previewLoader)
     }
   }

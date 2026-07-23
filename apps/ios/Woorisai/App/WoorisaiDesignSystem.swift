@@ -279,7 +279,15 @@ struct KeyboardDismissButton: View {
   let action: () -> Void
 
   var body: some View {
-    Button(action: action) {
+    Button {
+      action()
+      UIApplication.shared.sendAction(
+        #selector(UIResponder.resignFirstResponder),
+        to: nil,
+        from: nil,
+        for: nil
+      )
+    } label: {
       Image(systemName: "keyboard.chevron.compact.down")
         .font(.body.weight(.semibold))
         .foregroundStyle(WoorisaiPalette.coralDark)
