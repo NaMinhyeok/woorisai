@@ -1,8 +1,10 @@
+import AVFoundation
+import Combine
+import CoreTransferable
 import Foundation
 import ImageIO
 import Observation
 import PhotosUI
-import QuickLook
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -19,6 +21,283 @@ private actor MediaSessionCleanupDeadlineGate {
     guard let continuation else { return }
     self.continuation = nil
     continuation.resume()
+  }
+}
+
+enum PickerFileTransferError: Error, Equatable, Sendable {
+  case unreadableSelection
+  case fileTooLarge(kind: MediaKind)
+}
+
+enum PickerPreparationError: Error, Equatable, Sendable {
+  case unreadableSelection
+  case unsupportedType
+  case imageConversionFailed
+}
+
+private enum BoundedPickerFileMetadata {
+  static func byteSize(
+    at url: URL,
+    maximumByteSize: Int64,
+    kind: MediaKind
+  ) throws -> Int {
+    guard url.isFileURL else {
+      throw PickerFileTransferError.unreadableSelection
+    }
+    let values: URLResourceValues
+    do {
+      values = try url.resourceValues(
+        forKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey]
+      )
+    } catch {
+      throw PickerFileTransferError.unreadableSelection
+    }
+
+    guard values.isRegularFile == true,
+      values.isSymbolicLink != true,
+      let fileSize = values.fileSize,
+      fileSize > 0
+    else {
+      throw PickerFileTransferError.unreadableSelection
+    }
+    guard Int64(fileSize) <= maximumByteSize else {
+      throw PickerFileTransferError.fileTooLarge(kind: kind)
+    }
+    return fileSize
+  }
+}
+
+struct BoundedPickerImageTransfer: Transferable, Sendable {
+  let data: Data
+  let typeIdentifier: String?
+
+  static var transferRepresentation: some TransferRepresentation {
+    FileRepresentation(
+      importedContentType: .image,
+      shouldAttemptToOpenInPlace: true
+    ) { receivedFile in
+      try importingFile(at: receivedFile.file)
+    }
+  }
+
+  static func importingFile(at url: URL) throws -> Self {
+    let fileSize = try BoundedPickerFileMetadata.byteSize(
+      at: url,
+      maximumByteSize: MediaUploadDraft.maximumImageByteSize,
+      kind: .image
+    )
+
+    do {
+      let handle = try FileHandle(forReadingFrom: url)
+      defer { try? handle.close() }
+      let maximumReadCount = Int(MediaUploadDraft.maximumImageByteSize) + 1
+      var data = Data()
+      while data.count < maximumReadCount {
+        let nextReadCount = min(64 * 1_024, maximumReadCount - data.count)
+        guard let chunk = try handle.read(upToCount: nextReadCount), !chunk.isEmpty else {
+          break
+        }
+        data.append(chunk)
+      }
+      guard Int64(data.count) <= MediaUploadDraft.maximumImageByteSize else {
+        throw PickerFileTransferError.fileTooLarge(kind: .image)
+      }
+      guard !data.isEmpty, data.count == fileSize else {
+        throw PickerFileTransferError.unreadableSelection
+      }
+      let trailingData = try handle.read(upToCount: 1)
+      guard trailingData?.isEmpty != false else {
+        throw PickerFileTransferError.fileTooLarge(kind: .image)
+      }
+      let typeIdentifier = try? url.resourceValues(forKeys: [.contentTypeKey])
+        .contentType?.identifier
+      return Self(data: data, typeIdentifier: typeIdentifier)
+    } catch let error as PickerFileTransferError {
+      throw error
+    } catch {
+      throw PickerFileTransferError.unreadableSelection
+    }
+  }
+}
+
+enum ProtectedTemporaryMediaUpload {
+  private static let directoryName = "woorisai-private-uploads"
+
+  static func directoryURL(in temporaryDirectory: URL) -> URL {
+    temporaryDirectory.appendingPathComponent(directoryName, isDirectory: true)
+  }
+
+  static func purgeStaleFiles(
+    fileManager: FileManager = .default,
+    temporaryDirectory: URL? = nil
+  ) throws {
+    let root = temporaryDirectory ?? fileManager.temporaryDirectory
+    let directory = directoryURL(in: root)
+    guard fileManager.fileExists(atPath: directory.path) else { return }
+    try fileManager.removeItem(at: directory)
+  }
+}
+
+struct BoundedPickerVideoTransfer: Transferable, Sendable {
+  let file: OwnedTemporaryMediaUploadFile
+  let typeIdentifier: String?
+
+  static var transferRepresentation: some TransferRepresentation {
+    FileRepresentation(
+      importedContentType: .movie,
+      shouldAttemptToOpenInPlace: true
+    ) { receivedFile in
+      try importingFile(at: receivedFile.file)
+    }
+  }
+
+  static func importingFile(at url: URL) throws -> Self {
+    try importingFile(
+      at: url,
+      fileManager: .default,
+      temporaryDirectory: FileManager.default.temporaryDirectory
+    )
+  }
+
+  static func importingFile(
+    at url: URL,
+    fileManager: FileManager,
+    temporaryDirectory: URL
+  ) throws -> Self {
+    guard temporaryDirectory.isFileURL else {
+      throw PickerFileTransferError.unreadableSelection
+    }
+    let fileSize = try BoundedPickerFileMetadata.byteSize(
+      at: url,
+      maximumByteSize: MediaUploadDraft.maximumVideoByteSize,
+      kind: .video
+    )
+    let typeIdentifier = try? url.resourceValues(forKeys: [.contentTypeKey])
+      .contentType?.identifier
+
+    let ownedDirectory = ProtectedTemporaryMediaUpload.directoryURL(in: temporaryDirectory)
+    let ownedURL =
+      ownedDirectory
+      .appendingPathComponent(UUID().uuidString.lowercased())
+      .appendingPathExtension("upload")
+    do {
+      try fileManager.createDirectory(
+        at: ownedDirectory,
+        withIntermediateDirectories: true,
+        attributes: [
+          .protectionKey: FileProtectionType.complete,
+          .posixPermissions: 0o700,
+        ]
+      )
+      try fileManager.setAttributes(
+        [
+          .protectionKey: FileProtectionType.complete,
+          .posixPermissions: 0o700,
+        ],
+        ofItemAtPath: ownedDirectory.path
+      )
+      var directoryValues = URLResourceValues()
+      directoryValues.isExcludedFromBackup = true
+      var mutableOwnedDirectory = ownedDirectory
+      try mutableOwnedDirectory.setResourceValues(directoryValues)
+      try fileManager.copyItem(at: url, to: ownedURL)
+      try fileManager.setAttributes(
+        [
+          .protectionKey: FileProtectionType.complete,
+          .posixPermissions: 0o600,
+        ],
+        ofItemAtPath: ownedURL.path
+      )
+      var ownedValues = URLResourceValues()
+      ownedValues.isExcludedFromBackup = true
+      var mutableOwnedURL = ownedURL
+      try mutableOwnedURL.setResourceValues(ownedValues)
+
+      let copiedValues = try ownedURL.resourceValues(
+        forKeys: [.fileSizeKey, .isRegularFileKey]
+      )
+      guard copiedValues.isRegularFile == true,
+        copiedValues.fileSize == fileSize
+      else {
+        try? fileManager.removeItem(at: ownedURL)
+        throw PickerFileTransferError.unreadableSelection
+      }
+
+      return Self(
+        file: OwnedTemporaryMediaUploadFile(url: ownedURL, byteSize: Int64(fileSize)),
+        typeIdentifier: typeIdentifier
+      )
+    } catch let error as PickerFileTransferError {
+      throw error
+    } catch {
+      try? fileManager.removeItem(at: ownedURL)
+      throw PickerFileTransferError.unreadableSelection
+    }
+  }
+}
+
+enum BoundedPickerHEIFConverter {
+  static let maximumDecodedPixelSize = 4_096
+
+  static func convertToJPEG(
+    _ sourceData: Data,
+    maximumPixelSize: Int = maximumDecodedPixelSize,
+    maximumByteSize: Int64 = MediaUploadDraft.maximumImageByteSize
+  ) -> Data? {
+    guard !sourceData.isEmpty,
+      Int64(sourceData.count) <= MediaUploadDraft.maximumImageByteSize,
+      maximumPixelSize > 0,
+      maximumByteSize > 0
+    else {
+      return nil
+    }
+    let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+    guard let source = CGImageSourceCreateWithData(sourceData as CFData, sourceOptions) else {
+      return nil
+    }
+
+    let minimumPixelSize = min(1_200, maximumPixelSize)
+    var candidatePixelSize = maximumPixelSize
+    while candidatePixelSize >= minimumPixelSize {
+      let thumbnailOptions =
+        [
+          kCGImageSourceCreateThumbnailFromImageAlways: true,
+          kCGImageSourceCreateThumbnailWithTransform: true,
+          kCGImageSourceThumbnailMaxPixelSize: candidatePixelSize,
+          kCGImageSourceShouldCacheImmediately: true,
+        ] as CFDictionary
+      guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else {
+        return nil
+      }
+
+      for quality in [0.9, 0.75, 0.6, 0.45] as [CGFloat] {
+        let encoded = NSMutableData()
+        guard
+          let destination = CGImageDestinationCreateWithData(
+            encoded,
+            UTType.jpeg.identifier as CFString,
+            1,
+            nil
+          )
+        else {
+          return nil
+        }
+        CGImageDestinationAddImage(
+          destination,
+          image,
+          [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary
+        )
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        let data = encoded as Data
+        if !data.isEmpty, Int64(data.count) <= maximumByteSize {
+          return data
+        }
+      }
+
+      guard candidatePixelSize > minimumPixelSize else { break }
+      candidatePixelSize = max(minimumPixelSize, candidatePixelSize * 3 / 4)
+    }
+    return nil
   }
 }
 
@@ -171,20 +450,32 @@ final class MediaAttachmentComposerModel {
       guard let self else { return }
       for pickerItem in pickerItems {
         guard !Task.isCancelled, self.importGeneration == generation else { return }
+        var preparedKind: MediaKind?
         do {
           let prepared = try await Self.preparePickerItem(pickerItem)
+          preparedKind = prepared.kind
           guard !Task.isCancelled, self.importGeneration == generation else { return }
-          try self.addPreparedAttachment(
-            kind: prepared.kind,
-            fileName: prepared.fileName,
-            contentType: prepared.contentType,
-            data: prepared.data,
-            previewImage: prepared.previewCGImage.map(UIImage.init(cgImage:))
-          )
+          switch prepared.payload {
+          case .data(let data):
+            try self.addPreparedAttachment(
+              kind: prepared.kind,
+              fileName: prepared.fileName,
+              contentType: prepared.contentType,
+              data: data,
+              previewImage: prepared.previewCGImage.map(UIImage.init(cgImage:))
+            )
+          case .file(let file):
+            try self.addPreparedAttachment(
+              kind: prepared.kind,
+              fileName: prepared.fileName,
+              contentType: prepared.contentType,
+              file: file
+            )
+          }
         } catch is CancellationError {
           return
         } catch {
-          self.importFailure = Self.mapImportFailure(error)
+          self.importFailure = Self.mapImportFailure(error, kind: preparedKind)
         }
       }
 
@@ -247,9 +538,50 @@ final class MediaAttachmentComposerModel {
           upload: upload
         )
       )
-      importFailure = nil
       upload.start(selection)
     } catch {
+      importFailure = Self.mapImportFailure(error, kind: kind)
+      throw error
+    }
+  }
+
+  private func addPreparedAttachment(
+    kind: MediaKind,
+    fileName: String,
+    contentType: String,
+    file: OwnedTemporaryMediaUploadFile
+  ) throws {
+    do {
+      try policy.validate(existingKinds: allKinds, adding: kind)
+    } catch let violation as MediaAttachmentRuleViolation {
+      importFailure = .rule(violation)
+      file.removeIfNeeded()
+      throw violation
+    }
+
+    do {
+      let draft = try MediaUploadDraft(
+        purpose: policy.purpose,
+        kind: kind,
+        fileName: fileName,
+        contentType: contentType,
+        byteSize: file.byteSize
+      )
+      let selection = try MediaUploadSelection(draft: draft, file: file)
+      let upload = MediaUploadModel(service: service, uploader: uploader)
+      uploads.append(
+        UploadItem(
+          id: UUID(),
+          kind: kind,
+          fileName: draft.fileName,
+          byteSize: draft.byteSize,
+          previewImage: nil,
+          upload: upload
+        )
+      )
+      upload.start(selection)
+    } catch {
+      file.removeIfNeeded()
       importFailure = Self.mapImportFailure(error, kind: kind)
       throw error
     }
@@ -297,11 +629,19 @@ final class MediaAttachmentComposerModel {
   /// No discard request is sent for consumed uploads.
   @discardableResult
   func consumeReadyUploads() -> [CompletedMediaUpload] {
-    guard isReadyForSubmission else { return [] }
-    let completed = uploads.compactMap { $0.upload.consumeReadyUpload() }
-    uploads.removeAll()
+    guard !submittedReadyUploadIDs.isEmpty else { return [] }
+    var completed: [CompletedMediaUpload] = []
+    uploads.removeAll { item in
+      guard let uploadID = item.upload.readyUpload?.id,
+        submittedReadyUploadIDs.contains(uploadID)
+      else { return false }
+      if let upload = item.upload.consumeReadyUpload() {
+        completed.append(upload)
+      }
+      return true
+    }
     submittedReadyUploadIDs.removeAll()
-    importFailure = nil
+    if uploads.isEmpty { importFailure = nil }
     return completed
   }
 
@@ -350,10 +690,15 @@ final class MediaAttachmentComposerModel {
   }
 
   private struct PreparedPickerItem: Sendable {
+    enum Payload: Sendable {
+      case data(Data)
+      case file(OwnedTemporaryMediaUploadFile)
+    }
+
     let kind: MediaKind
     let fileName: String
     let contentType: String
-    let data: Data
+    let payload: Payload
     let previewCGImage: CGImage?
   }
 
@@ -361,60 +706,64 @@ final class MediaAttachmentComposerModel {
     existingKinds + uploads.map(\.kind)
   }
 
-  private enum PickerPreparationError: Error {
-    case unreadableSelection
-    case unsupportedType
-    case imageConversionFailed
-  }
-
   private static func preparePickerItem(_ item: PhotosPickerItem) async throws
     -> PreparedPickerItem
   {
     let supportedTypes = item.supportedContentTypes
 
-    if let type = supportedTypes.first(where: {
-      guard let contentType = $0.preferredMIMEType?.lowercased() else { return false }
-      return allowedImageMIMETypes.contains(contentType)
-    }) {
-      let data = try await loadData(from: item)
-      let contentType = type.preferredMIMEType!.lowercased()
+    if let advertisedType = supportedTypes.first(where: isSupportedPickerImageType) {
+      let transfer = try await loadBoundedImage(from: item)
+      let type = try resolvedPickerType(
+        actualIdentifier: transfer.typeIdentifier,
+        advertisedType: advertisedType,
+        isAllowed: isSupportedPickerImageType
+      )
+
+      if isHEIFType(type) {
+        guard let converted = await convertHEIFToJPEG(transfer.data) else {
+          throw PickerPreparationError.imageConversionFailed
+        }
+        return PreparedPickerItem(
+          kind: .image,
+          fileName: generatedFileName(kind: .image, type: .jpeg, contentType: "image/jpeg"),
+          contentType: "image/jpeg",
+          payload: .data(converted.data),
+          previewCGImage: converted.previewCGImage
+        )
+      }
+
+      guard let contentType = type.preferredMIMEType?.lowercased(),
+        allowedImageMIMETypes.contains(contentType)
+      else {
+        throw PickerPreparationError.unsupportedType
+      }
       return PreparedPickerItem(
         kind: .image,
         fileName: generatedFileName(kind: .image, type: type, contentType: contentType),
         contentType: contentType,
-        data: data,
-        previewCGImage: MediaImagePreview.thumbnailCGImage(from: data)
+        payload: .data(transfer.data),
+        previewCGImage: await thumbnailCGImage(from: transfer.data)
       )
     }
 
-    if supportedTypes.contains(where: isHEIFType) {
-      let sourceData = try await loadData(from: item)
-      guard let image = UIImage(data: sourceData),
-        let jpegData = image.jpegData(compressionQuality: 0.9),
-        !jpegData.isEmpty
-      else {
-        throw PickerPreparationError.imageConversionFailed
-      }
-      return PreparedPickerItem(
-        kind: .image,
-        fileName: generatedFileName(kind: .image, type: .jpeg, contentType: "image/jpeg"),
-        contentType: "image/jpeg",
-        data: jpegData,
-        previewCGImage: MediaImagePreview.thumbnailCGImage(from: jpegData)
-      )
-    }
-
-    if let type = supportedTypes.first(where: {
+    if let advertisedType = supportedTypes.first(where: {
       guard let contentType = $0.preferredMIMEType?.lowercased() else { return false }
       return allowedVideoMIMETypes.contains(contentType)
     }) {
-      let data = try await loadData(from: item)
-      let contentType = type.preferredMIMEType!.lowercased()
+      let transfer = try await loadBoundedVideo(from: item)
+      let type = try resolvedPickerType(
+        actualIdentifier: transfer.typeIdentifier,
+        advertisedType: advertisedType,
+        isAllowed: isSupportedPickerVideoType
+      )
+      guard let contentType = type.preferredMIMEType?.lowercased() else {
+        throw PickerPreparationError.unsupportedType
+      }
       return PreparedPickerItem(
         kind: .video,
         fileName: generatedFileName(kind: .video, type: type, contentType: contentType),
         contentType: contentType,
-        data: data,
+        payload: .file(transfer.file),
         previewCGImage: nil
       )
     }
@@ -422,18 +771,57 @@ final class MediaAttachmentComposerModel {
     throw PickerPreparationError.unsupportedType
   }
 
-  private static func loadData(from item: PhotosPickerItem) async throws -> Data {
+  private static func thumbnailCGImage(from data: Data) async -> CGImage? {
+    await Task.detached(priority: .userInitiated) {
+      MediaImagePreview.thumbnailCGImage(from: data)
+    }.value
+  }
+
+  private static func convertHEIFToJPEG(_ sourceData: Data) async
+    -> (data: Data, previewCGImage: CGImage?)?
+  {
+    await Task.detached(priority: .userInitiated) {
+      guard let jpegData = BoundedPickerHEIFConverter.convertToJPEG(sourceData) else { return nil }
+      return (
+        data: jpegData,
+        previewCGImage: MediaImagePreview.thumbnailCGImage(from: jpegData)
+      )
+    }.value
+  }
+
+  private static func loadBoundedImage(from item: PhotosPickerItem) async throws
+    -> BoundedPickerImageTransfer
+  {
     do {
-      guard let data = try await item.loadTransferable(type: Data.self), !data.isEmpty else {
-        throw PickerPreparationError.unreadableSelection
+      guard let transfer = try await item.loadTransferable(type: BoundedPickerImageTransfer.self)
+      else {
+        throw PickerFileTransferError.unreadableSelection
       }
-      return data
+      return transfer
     } catch is CancellationError {
       throw CancellationError()
-    } catch let error as PickerPreparationError {
+    } catch let error as PickerFileTransferError {
       throw error
     } catch {
-      throw PickerPreparationError.unreadableSelection
+      throw PickerFileTransferError.unreadableSelection
+    }
+  }
+
+  private static func loadBoundedVideo(from item: PhotosPickerItem) async throws
+    -> BoundedPickerVideoTransfer
+  {
+    do {
+      guard let transfer = try await item.loadTransferable(type: BoundedPickerVideoTransfer.self)
+      else {
+        throw PickerFileTransferError.unreadableSelection
+      }
+      return transfer
+    } catch is CancellationError {
+      throw CancellationError()
+    } catch let error as PickerFileTransferError {
+      throw error
+    } catch {
+      throw PickerFileTransferError.unreadableSelection
     }
   }
 
@@ -455,7 +843,30 @@ final class MediaAttachmentComposerModel {
       || type.preferredMIMEType?.lowercased() == "image/heif"
   }
 
-  private static func generatedFileName(
+  private static func isSupportedPickerImageType(_ type: UTType) -> Bool {
+    if isHEIFType(type) { return true }
+    guard let contentType = type.preferredMIMEType?.lowercased() else { return false }
+    return allowedImageMIMETypes.contains(contentType)
+  }
+
+  private static func isSupportedPickerVideoType(_ type: UTType) -> Bool {
+    guard let contentType = type.preferredMIMEType?.lowercased() else { return false }
+    return allowedVideoMIMETypes.contains(contentType)
+  }
+
+  static func resolvedPickerType(
+    actualIdentifier: String?,
+    advertisedType: UTType,
+    isAllowed: (UTType) -> Bool
+  ) throws -> UTType {
+    guard let actualIdentifier else { return advertisedType }
+    guard let actualType = UTType(actualIdentifier), isAllowed(actualType) else {
+      throw PickerPreparationError.unsupportedType
+    }
+    return actualType
+  }
+
+  static func generatedFileName(
     kind: MediaKind,
     type: UTType,
     contentType: String
@@ -475,7 +886,7 @@ final class MediaAttachmentComposerModel {
     return "\(prefix)-\(UUID().uuidString.lowercased()).\(fileExtension.lowercased())"
   }
 
-  private static func mapImportFailure(
+  static func mapImportFailure(
     _ error: any Error,
     kind: MediaKind? = nil
   ) -> ImportFailure {
@@ -484,6 +895,12 @@ final class MediaAttachmentComposerModel {
       case .unreadableSelection: return .unreadableSelection
       case .unsupportedType: return .unsupportedType
       case .imageConversionFailed: return .imageConversionFailed
+      }
+    }
+    if let transferError = error as? PickerFileTransferError {
+      switch transferError {
+      case .unreadableSelection: return .unreadableSelection
+      case .fileTooLarge(let kind): return .fileTooLarge(kind: kind)
       }
     }
     if let violation = error as? MediaAttachmentRuleViolation {
@@ -508,6 +925,7 @@ final class MediaAttachmentComposerModel {
 final class TopLevelMediaSessionCoordinator {
   let relationshipScoreComposer: MediaAttachmentComposerModel
   let diaryEntryComposer: MediaAttachmentComposerModel
+  private var transientComposers: [ObjectIdentifier: MediaAttachmentComposerModel] = [:]
 
   init(
     service: any MediaServing,
@@ -525,6 +943,14 @@ final class TopLevelMediaSessionCoordinator {
     )
   }
 
+  func registerTransient(_ composer: MediaAttachmentComposerModel) {
+    transientComposers[ObjectIdentifier(composer)] = composer
+  }
+
+  func unregisterTransient(_ composer: MediaAttachmentComposerModel) {
+    transientComposers.removeValue(forKey: ObjectIdentifier(composer))
+  }
+
   func prepareForCredentialRemoval(
     releaseRejectedScoreSubmission: Bool,
     releaseRejectedDiarySubmission: Bool,
@@ -536,9 +962,10 @@ final class TopLevelMediaSessionCoordinator {
     if releaseRejectedDiarySubmission {
       diaryEntryComposer.releaseSubmittedUploadOwnership()
     }
-    let discardTasks =
-      relationshipScoreComposer.clearForCredentialRemoval()
-      + diaryEntryComposer.clearForCredentialRemoval()
+    let sessionComposers =
+      [relationshipScoreComposer, diaryEntryComposer] + Array(transientComposers.values)
+    let discardTasks = sessionComposers.flatMap { $0.clearForCredentialRemoval() }
+    transientComposers.removeAll()
     await waitForDiscardTasks(discardTasks, timeout: timeout)
   }
 
@@ -583,6 +1010,7 @@ struct MediaAttachmentComposer: View {
           preferredItemEncoding: .current
         ) {
           Label(pickerLabel, systemImage: "paperclip")
+            .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
         }
         .disabled(!model.canSelectMore)
         .accessibilityLabel(pickerLabel)
@@ -613,13 +1041,25 @@ struct MediaAttachmentComposer: View {
             model.dismissImportFailure()
           }
           .font(.footnote)
+          .frame(
+            minWidth: WoorisaiControlMetric.minimumTapTarget,
+            minHeight: WoorisaiControlMetric.minimumTapTarget
+          )
           .accessibilityLabel("첨부 오류 닫기")
         }
         .accessibilityIdentifier("media.importError")
       }
 
-      ForEach(model.uploads) { item in
-        uploadRow(item)
+      if !model.uploads.isEmpty {
+        MediaAttachmentGallery(items: model.uploads, kind: \.kind) { item, _ in
+          uploadTile(item)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("media.group")
+
+        ForEach(model.uploads) { item in
+          uploadDetails(item)
+        }
       }
     }
     .onChange(of: pickerItems) { _, selectedItems in
@@ -643,28 +1083,52 @@ struct MediaAttachmentComposer: View {
     "첨부 \(model.uploads.count)개"
   }
 
-  @ViewBuilder
-  private func uploadRow(_ item: MediaAttachmentComposerModel.UploadItem) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      if let previewImage = item.previewImage {
-        MediaAspectFitImageSurface(image: previewImage)
-          .frame(maxWidth: .infinity)
-          .frame(height: 132)
-          .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-          .accessibilityLabel("선택한 사진 미리보기")
-      } else if item.kind == .video {
-        ZStack {
+  private func uploadTile(_ item: MediaAttachmentComposerModel.UploadItem) -> some View {
+    MediaTileSurface {
+      ZStack {
+        if let previewImage = item.previewImage {
+          MediaFillImageSurface(image: previewImage)
+        } else {
           WoorisaiPalette.sageSoft
-          Image(systemName: "play.circle.fill")
-            .font(.system(size: 38))
-            .foregroundStyle(WoorisaiPalette.sage)
+          VStack(spacing: WoorisaiSpacing.small) {
+            Image(systemName: item.kind == .video ? "play.circle.fill" : "photo.fill")
+              .font(.system(size: 36))
+              .foregroundStyle(item.kind == .video ? WoorisaiPalette.sage : WoorisaiPalette.coral)
+            Text(item.kind == .video ? "동영상" : "사진")
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(WoorisaiPalette.muted)
+          }
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 112)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .accessibilityLabel("선택한 동영상")
-      }
 
+        uploadTileStatus(item)
+      }
+      .overlay(alignment: .topTrailing) {
+        Button {
+          model.remove(item.id)
+        } label: {
+          Image(systemName: "xmark")
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.white)
+            .frame(
+              width: WoorisaiControlMetric.minimumTapTarget,
+              height: WoorisaiControlMetric.minimumTapTarget
+            )
+            .background(.black.opacity(0.54), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(WoorisaiSpacing.xSmall)
+        .accessibilityLabel("\(item.fileName) 첨부 제거")
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel(
+      item.kind == .image ? "선택한 사진 \(item.fileName)" : "선택한 동영상 \(item.fileName)"
+    )
+    .accessibilityIdentifier("media.tile.\(item.id.uuidString)")
+  }
+
+  private func uploadDetails(_ item: MediaAttachmentComposerModel.UploadItem) -> some View {
+    VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
       HStack(alignment: .firstTextBaseline) {
         Label(item.fileName, systemImage: item.kind == .image ? "photo" : "video")
           .font(.subheadline)
@@ -682,30 +1146,66 @@ struct MediaAttachmentComposer: View {
           Button("재시도") {
             model.retry(item.id)
           }
+          .frame(
+            minWidth: WoorisaiControlMetric.minimumTapTarget,
+            minHeight: WoorisaiControlMetric.minimumTapTarget
+          )
           .accessibilityLabel("\(item.fileName) 업로드 재시도")
         } else if item.upload.state.isActiveUpload {
           Button("취소", role: .cancel) {
             model.cancel(item.id)
           }
+          .frame(
+            minWidth: WoorisaiControlMetric.minimumTapTarget,
+            minHeight: WoorisaiControlMetric.minimumTapTarget
+          )
           .accessibilityLabel("\(item.fileName) 업로드 취소")
         }
 
-        Spacer()
-
-        Button("제거", role: .destructive) {
-          model.remove(item.id)
-        }
-        .accessibilityLabel("\(item.fileName) 첨부 제거")
+        Spacer(minLength: 0)
       }
       .font(.footnote)
     }
-    .padding(10)
+    .padding(WoorisaiSpacing.medium)
     .background(
       WoorisaiPalette.creamDeep.opacity(0.72),
-      in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+      in: RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
     )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("media.upload.\(item.id.uuidString)")
+  }
+
+  @ViewBuilder
+  private func uploadTileStatus(_ item: MediaAttachmentComposerModel.UploadItem) -> some View {
+    switch item.upload.state {
+    case .idle, .initiating, .uploading, .completing:
+      ProgressView()
+        .tint(.white)
+        .padding(WoorisaiSpacing.medium)
+        .background(.black.opacity(0.44), in: Circle())
+        .accessibilityHidden(true)
+    case .ready:
+      Image(systemName: "checkmark.circle.fill")
+        .font(.title2)
+        .foregroundStyle(.white, WoorisaiPalette.success)
+        .padding(WoorisaiSpacing.small)
+        .background(.black.opacity(0.36), in: Circle())
+        .accessibilityHidden(true)
+    case .failed:
+      Image(systemName: "exclamationmark.circle.fill")
+        .font(.title2)
+        .foregroundStyle(.white, WoorisaiPalette.error)
+        .padding(WoorisaiSpacing.small)
+        .background(.black.opacity(0.36), in: Circle())
+        .accessibilityHidden(true)
+    case .cancelled:
+      Image(systemName: "xmark.circle.fill")
+        .font(.title2)
+        .foregroundStyle(.white)
+        .padding(WoorisaiSpacing.small)
+        .background(.black.opacity(0.44), in: Circle())
+        .accessibilityHidden(true)
+    }
   }
 
   @ViewBuilder
@@ -794,17 +1294,37 @@ extension MediaUploadModel.State {
   }
 }
 
-/// Keeps the complete image visible inside a fixed preview frame, including unusually tall or
-/// wide photos. The surrounding neutral surface makes any letterboxing intentional rather than
-/// stretching or cropping private media.
+/// Keeps the complete image visible in the full-screen viewer. Inline tiles intentionally crop to
+/// their shared geometry; this surface is the place where portrait and panorama originals remain
+/// fully visible.
 struct MediaAspectFitImageSurface: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   let image: UIImage
+  let accessibilityName: String
+  @State private var scale: CGFloat = 1
+  @State private var committedScale: CGFloat = 1
+  @State private var offset: CGSize = .zero
+  @State private var committedOffset: CGSize = .zero
+  @State private var fittedImageSize: CGSize = .zero
+  @State private var viewerSize: CGSize = .zero
+
+  init(image: UIImage, accessibilityName: String = "전체 사진") {
+    self.image = image
+    self.accessibilityName = accessibilityName
+  }
 
   var body: some View {
     GeometryReader { proxy in
       let imageSize = Self.fittedSize(
         imageSize: image.size,
         containerSize: proxy.size
+      )
+      let viewerFrame = proxy.frame(in: .global)
+      let accessibilityFrame = Self.accessibilityFrame(
+        fittedImageSize: imageSize,
+        containerFrame: viewerFrame,
+        scale: scale,
+        offset: offset
       )
 
       ZStack {
@@ -813,8 +1333,57 @@ struct MediaAspectFitImageSurface: View {
         Image(uiImage: image)
           .resizable()
           .frame(width: imageSize.width, height: imageSize.height)
+          .scaleEffect(scale)
+          .offset(offset)
+          .accessibilityHidden(true)
+
+        Rectangle()
+          .fill(.clear)
+          .frame(width: accessibilityFrame.width, height: accessibilityFrame.height)
+          .position(
+            x: accessibilityFrame.midX - viewerFrame.minX,
+            y: accessibilityFrame.midY - viewerFrame.minY
+          )
+          .allowsHitTesting(false)
+          .accessibilityElement()
+          .accessibilityLabel(accessibilityName)
+          .accessibilityValue("확대 \(Int((scale * 100).rounded()))퍼센트")
+          .accessibilityHint("두 번 탭하거나 위아래로 조절해 확대할 수 있어요.")
+          .accessibilityAdjustableAction { direction in
+            adjustZoom(direction)
+          }
       }
       .frame(width: proxy.size.width, height: proxy.size.height)
+      .clipped()
+      .contentShape(Rectangle())
+      .onAppear {
+        fittedImageSize = imageSize
+        viewerSize = proxy.size
+      }
+      .onChange(of: proxy.size) { _, size in
+        let fittedSize = Self.fittedSize(imageSize: image.size, containerSize: size)
+        fittedImageSize = fittedSize
+        viewerSize = size
+        offset = Self.clampedOffset(
+          offset,
+          imageSize: fittedSize,
+          containerSize: size,
+          scale: scale
+        )
+        committedOffset = offset
+      }
+      .gesture(magnifyGesture(imageSize: imageSize, containerSize: proxy.size))
+      .simultaneousGesture(dragGesture(imageSize: imageSize, containerSize: proxy.size))
+      .onTapGesture(count: 2) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+          if scale > 1 {
+            resetZoom()
+          } else {
+            scale = 2.5
+            committedScale = 2.5
+          }
+        }
+      }
     }
   }
 
@@ -832,6 +1401,127 @@ struct MediaAspectFitImageSurface: View {
       containerSize.height / imageSize.height
     )
     return CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+  }
+
+  static func accessibilityFrame(
+    fittedImageSize: CGSize,
+    containerFrame: CGRect,
+    scale: CGFloat,
+    offset: CGSize
+  ) -> CGRect {
+    guard fittedImageSize.width.isFinite, fittedImageSize.height.isFinite,
+      containerFrame.origin.x.isFinite, containerFrame.origin.y.isFinite,
+      containerFrame.width.isFinite, containerFrame.height.isFinite,
+      scale.isFinite, offset.width.isFinite, offset.height.isFinite,
+      fittedImageSize.width > 0, fittedImageSize.height > 0,
+      containerFrame.width > 0, containerFrame.height > 0,
+      scale > 0
+    else {
+      return .zero
+    }
+
+    let scaledSize = CGSize(
+      width: fittedImageSize.width * scale,
+      height: fittedImageSize.height * scale
+    )
+    let transformedFrame = CGRect(
+      x: containerFrame.midX - scaledSize.width / 2 + offset.width,
+      y: containerFrame.midY - scaledSize.height / 2 + offset.height,
+      width: scaledSize.width,
+      height: scaledSize.height
+    )
+    return transformedFrame.intersection(containerFrame)
+  }
+
+  private func magnifyGesture(
+    imageSize: CGSize,
+    containerSize: CGSize
+  ) -> some Gesture {
+    MagnifyGesture()
+      .onChanged { value in
+        scale = min(5, max(1, committedScale * value.magnification))
+        offset = Self.clampedOffset(
+          offset,
+          imageSize: imageSize,
+          containerSize: containerSize,
+          scale: scale
+        )
+      }
+      .onEnded { _ in
+        committedScale = scale
+        if scale == 1 {
+          offset = .zero
+        }
+        committedOffset = offset
+      }
+  }
+
+  private func dragGesture(
+    imageSize: CGSize,
+    containerSize: CGSize
+  ) -> some Gesture {
+    DragGesture(minimumDistance: 4)
+      .onChanged { value in
+        guard scale > 1 else { return }
+        let candidate = CGSize(
+          width: committedOffset.width + value.translation.width,
+          height: committedOffset.height + value.translation.height
+        )
+        offset = Self.clampedOffset(
+          candidate,
+          imageSize: imageSize,
+          containerSize: containerSize,
+          scale: scale
+        )
+      }
+      .onEnded { _ in
+        committedOffset = offset
+      }
+  }
+
+  private func resetZoom() {
+    scale = 1
+    committedScale = 1
+    offset = .zero
+    committedOffset = .zero
+  }
+
+  private func adjustZoom(_ direction: AccessibilityAdjustmentDirection) {
+    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+      switch direction {
+      case .increment:
+        scale = min(5, scale + 0.5)
+      case .decrement:
+        scale = max(1, scale - 0.5)
+      @unknown default:
+        return
+      }
+      committedScale = scale
+      offset = Self.clampedOffset(
+        offset,
+        imageSize: fittedImageSize,
+        containerSize: viewerSize,
+        scale: scale
+      )
+      if scale == 1 {
+        offset = .zero
+      }
+      committedOffset = offset
+    }
+  }
+
+  static func clampedOffset(
+    _ offset: CGSize,
+    imageSize: CGSize,
+    containerSize: CGSize,
+    scale: CGFloat
+  ) -> CGSize {
+    let maximumX = max(0, (imageSize.width * scale - containerSize.width) / 2)
+    let maximumY = max(0, (imageSize.height * scale - containerSize.height) / 2)
+    return CGSize(
+      width: min(maximumX, max(-maximumX, offset.width)),
+      height: min(maximumY, max(-maximumY, offset.height))
+    )
   }
 }
 
@@ -1155,13 +1845,19 @@ enum ProtectedTemporaryMediaPreview {
 /// mounted; videos remain tap-to-load so feed traversal never fetches large files speculatively.
 struct MediaAttachmentPreview: View {
   @Environment(\.privateMediaPreviewLoader) private var previewLoader
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @State private var model: PrivateMediaPreviewModel
-  @State private var quickLookURL: URL?
+  @State private var isImageViewerPresented = false
+  @State private var isVideoViewerPresented = false
+  @State private var opensImageViewerAfterLoading = false
+  @State private var shouldReloadVideoAfterDismiss = false
+  @State private var isMounted = false
 
   let attachmentID: UUID
   let fileName: String
   let contentType: String
   let byteSize: Int64
+  let tileFormat: MediaInlineTileFormat
   let onAuthenticationRequired: @MainActor () -> Void
 
   @MainActor
@@ -1170,12 +1866,16 @@ struct MediaAttachmentPreview: View {
     fileName: String,
     contentType: String,
     byteSize: Int64,
+    tileFormat: MediaInlineTileFormat? = nil,
     onAuthenticationRequired: @escaping @MainActor () -> Void
   ) {
     self.attachmentID = attachmentID
     self.fileName = fileName
     self.contentType = contentType
     self.byteSize = byteSize
+    self.tileFormat =
+      tileFormat
+      ?? (contentType.lowercased().hasPrefix("image/") ? .singleImage : .video)
     _model = State(
       initialValue: PrivateMediaPreviewModel(
         descriptor: PrivateMediaPreviewDescriptor(
@@ -1190,38 +1890,48 @@ struct MediaAttachmentPreview: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Button(action: openOrLoad) {
+    Button(action: openOrLoad) {
+      MediaTileSurface {
         ZStack {
           previewBackground
 
           if model.state == .loading {
-            ProgressView(isImage ? "사진을 불러오는 중" : "동영상을 준비하는 중")
+            ProgressView()
               .tint(WoorisaiPalette.coralDark)
+              .padding(WoorisaiSpacing.small)
+              .background(.ultraThinMaterial, in: Circle())
+              .accessibilityHidden(true)
+          }
+
+          if failureMessage != nil {
+            VStack {
+              Spacer(minLength: 0)
+              HStack(spacing: WoorisaiSpacing.xSmall) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                if !dynamicTypeSize.isAccessibilitySize {
+                  Text("다시 시도")
+                }
+              }
+              .font(.caption.weight(.semibold))
               .foregroundStyle(WoorisaiPalette.ink)
-              .padding()
+              .frame(maxWidth: .infinity, alignment: .center)
+              .padding(WoorisaiSpacing.small)
+              .background(.regularMaterial)
+              .lineLimit(1)
+              .accessibilityHidden(true)
+            }
           }
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: isImage ? 190 : 132)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-          RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .stroke(WoorisaiPalette.line, lineWidth: 1)
-        }
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
       }
-      .buttonStyle(.plain)
-      .disabled(model.state == .loading)
-      .accessibilityLabel(previewAccessibilityLabel)
-      .accessibilityHint("비공개 파일을 앱 안에서 안전하게 미리 봅니다.")
-
-      if let failureMessage {
-        Text(failureMessage)
-          .font(.caption)
-          .foregroundStyle(WoorisaiPalette.muted)
-      }
+      .aspectRatio(tileFormat.aspectRatio, contentMode: .fit)
+      .accessibilityIdentifier("media.tile.\(attachmentID.uuidString).surface")
     }
+    .buttonStyle(.plain)
+    .disabled(model.state == .loading && !isImage)
+    .accessibilityLabel(previewAccessibilityLabel)
+    .accessibilityValue(previewAccessibilityValue)
+    .accessibilityHint("비공개 파일을 앱 안에서 안전하게 미리 봅니다.")
+    .accessibilityIdentifier("media.inline.\(attachmentID.uuidString)")
     .task(id: attachmentID) {
       if isImage, model.localURL == nil, model.state == .idle {
         model.load(using: previewLoader)
@@ -1230,28 +1940,96 @@ struct MediaAttachmentPreview: View {
     .onChange(of: model.state) { _, state in
       switch state {
       case .loaded:
-        if !isImage {
-          quickLookURL = model.localURL
+        if isImage, opensImageViewerAfterLoading, model.localURL != nil {
+          opensImageViewerAfterLoading = false
+          isImageViewerPresented = true
+        } else if !isImage {
+          isVideoViewerPresented = model.localURL != nil
         }
       case .authenticationRequired:
+        opensImageViewerAfterLoading = false
         onAuthenticationRequired()
-      case .idle, .loading, .notFound, .unavailable, .invalidContent, .failed:
+      case .idle, .notFound, .unavailable, .invalidContent, .failed:
+        opensImageViewerAfterLoading = false
+      case .loading:
         break
       }
     }
-    .quickLookPreview($quickLookURL)
+    .fullScreenCover(isPresented: $isImageViewerPresented) {
+      ZStack {
+        Color.black.ignoresSafeArea()
+
+        if let image = model.image {
+          MediaAspectFitImageSurface(
+            image: image,
+            accessibilityName: "첨부 사진 \(fileName) 전체 보기"
+          )
+          .padding(.vertical, WoorisaiSpacing.xLarge)
+          .accessibilityIdentifier("media.viewer")
+        }
+      }
+      .overlay(alignment: .topTrailing) {
+        Button {
+          isImageViewerPresented = false
+        } label: {
+          Image(systemName: "xmark")
+            .font(.body.weight(.bold))
+            .foregroundStyle(.white)
+            .frame(
+              width: WoorisaiControlMetric.minimumTapTarget,
+              height: WoorisaiControlMetric.minimumTapTarget
+            )
+            .background(.black.opacity(0.62), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(WoorisaiSpacing.regular)
+        .accessibilityLabel("사진 전체 보기 닫기")
+        .accessibilityIdentifier("media.viewer.close")
+      }
+    }
+    .fullScreenCover(
+      isPresented: $isVideoViewerPresented,
+      onDismiss: {
+        guard shouldReloadVideoAfterDismiss, isMounted else {
+          shouldReloadVideoAfterDismiss = false
+          return
+        }
+        shouldReloadVideoAfterDismiss = false
+        model.reloadDiscardingCurrentLease(using: previewLoader)
+      }
+    ) {
+      if let localURL = model.localURL {
+        PrivateVideoViewer(
+          url: localURL,
+          fileName: fileName,
+          onRetry: {
+            shouldReloadVideoAfterDismiss = true
+            isVideoViewerPresented = false
+          },
+          onClose: {
+            isVideoViewerPresented = false
+          }
+        )
+      }
+    }
+    .onAppear {
+      isMounted = true
+    }
     .onDisappear {
-      quickLookURL = nil
+      isMounted = false
+      opensImageViewerAfterLoading = false
+      shouldReloadVideoAfterDismiss = false
+      isImageViewerPresented = false
+      isVideoViewerPresented = false
       model.clear()
     }
     .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("media.inline.\(attachmentID.uuidString)")
   }
 
   @ViewBuilder
   private var previewBackground: some View {
     if let image = model.image {
-      MediaAspectFitImageSurface(image: image)
+      MediaFillImageSurface(image: image)
         .overlay(alignment: .bottomTrailing) {
           Image(systemName: "arrow.up.left.and.arrow.down.right")
             .font(.caption.weight(.bold))
@@ -1299,11 +2077,316 @@ struct MediaAttachmentPreview: View {
     }
   }
 
+  private var previewAccessibilityValue: String {
+    if model.state == .loading {
+      return isImage ? "사진을 불러오는 중" : "동영상을 준비하는 중"
+    }
+    return failureMessage ?? ""
+  }
+
   private func openOrLoad() {
-    if let localURL = model.localURL {
-      quickLookURL = localURL
+    if model.localURL != nil {
+      if isImage {
+        isImageViewerPresented = true
+      } else {
+        isVideoViewerPresented = true
+      }
+    } else if isImage {
+      opensImageViewerAfterLoading = true
+      if model.state != .loading {
+        model.load(using: previewLoader)
+      }
     } else {
       model.load(using: previewLoader)
     }
+  }
+}
+
+@MainActor
+private struct PrivateVideoViewer: View {
+  @Environment(\.scenePhase) private var scenePhase
+  @State private var player: AVPlayer
+  @State private var currentSeconds = 0.0
+  @State private var durationSeconds = 0.0
+  @State private var isPlaying = false
+  @State private var hasReachedEnd = false
+  @State private var playbackFailureMessage: String?
+
+  let fileName: String
+  let onRetry: () -> Void
+  let onClose: () -> Void
+
+  init(
+    url: URL,
+    fileName: String,
+    onRetry: @escaping () -> Void,
+    onClose: @escaping () -> Void
+  ) {
+    _player = State(initialValue: AVPlayer(url: url))
+    self.fileName = fileName
+    self.onRetry = onRetry
+    self.onClose = onClose
+  }
+
+  var body: some View {
+    ZStack {
+      Color.black.ignoresSafeArea()
+
+      PrivateVideoSurface(player: player)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("첨부 동영상 \(fileName) 전체 보기")
+        .accessibilityIdentifier("media.videoViewer.player")
+    }
+    .overlay(alignment: .bottom) {
+      Group {
+        if let playbackFailureMessage {
+          VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
+            Label("동영상을 재생할 수 없어요", systemImage: "exclamationmark.triangle.fill")
+              .font(.headline)
+              .foregroundStyle(.white)
+
+            Text(playbackFailureMessage)
+              .font(.subheadline)
+              .foregroundStyle(.white.opacity(0.88))
+
+            Button(action: onRetry) {
+              Label("파일 다시 받기", systemImage: "arrow.clockwise")
+                .font(.subheadline.weight(.bold))
+                .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(WoorisaiPalette.coralDark)
+            .foregroundStyle(.white)
+            .accessibilityIdentifier("media.videoViewer.retry")
+          }
+          .accessibilityElement(children: .contain)
+          .accessibilityIdentifier("media.videoViewer.failure")
+        } else {
+          VStack(spacing: WoorisaiSpacing.small) {
+            ProgressView(value: progressFraction)
+              .tint(WoorisaiPalette.coral)
+              .accessibilityLabel("동영상 재생 진행")
+              .accessibilityValue(progressAccessibilityValue)
+              .accessibilityIdentifier("media.videoViewer.progress")
+
+            HStack(spacing: WoorisaiSpacing.regular) {
+              Text("\(timeLabel(currentSeconds)) / \(timeLabel(durationSeconds))")
+                .font(.caption.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.white.opacity(0.88))
+                .accessibilityHidden(true)
+
+              Spacer(minLength: 0)
+
+              Button(action: togglePlayback) {
+                Label(
+                  isPlaying ? "일시 정지" : "재생",
+                  systemImage: isPlaying ? "pause.fill" : "play.fill"
+                )
+                .font(.subheadline.weight(.bold))
+                .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
+              }
+              .buttonStyle(.borderedProminent)
+              .tint(WoorisaiPalette.coralDark)
+              .foregroundStyle(.white)
+              .accessibilityLabel(isPlaying ? "동영상 일시 정지" : "동영상 재생")
+              .accessibilityIdentifier("media.videoViewer.playPause")
+            }
+          }
+        }
+      }
+      .padding(WoorisaiSpacing.regular)
+      .background(.black.opacity(0.68), in: RoundedRectangle(cornerRadius: 20))
+      .padding(WoorisaiSpacing.regular)
+    }
+    .overlay(alignment: .topTrailing) {
+      Button(action: onClose) {
+        Image(systemName: "xmark")
+          .font(.body.weight(.bold))
+          .foregroundStyle(.white)
+          .frame(
+            width: WoorisaiControlMetric.minimumTapTarget,
+            height: WoorisaiControlMetric.minimumTapTarget
+          )
+          .background(.black.opacity(0.62), in: Circle())
+      }
+      .buttonStyle(.plain)
+      .padding(WoorisaiSpacing.regular)
+      .accessibilityLabel("동영상 전체 보기 닫기")
+      .accessibilityIdentifier("media.videoViewer.close")
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("media.videoViewer")
+    .task {
+      await loadDuration()
+    }
+    .task(id: isPlaying) {
+      guard isPlaying else { return }
+      while !Task.isCancelled, isPlaying {
+        do {
+          try await Task.sleep(for: .milliseconds(100))
+        } catch {
+          return
+        }
+        guard !Task.isCancelled else { return }
+        refreshPlaybackState()
+      }
+    }
+    .onReceive(
+      NotificationCenter.default.publisher(
+        for: .AVPlayerItemDidPlayToEndTime,
+        object: player.currentItem
+      )
+      .receive(on: DispatchQueue.main)
+    ) { _ in
+      hasReachedEnd = true
+      isPlaying = false
+      if durationSeconds > 0 {
+        currentSeconds = durationSeconds
+      }
+    }
+    .onChange(of: scenePhase) { _, phase in
+      if phase != .active {
+        pausePlayback()
+      }
+    }
+    .onDisappear {
+      player.pause()
+      player.replaceCurrentItem(with: nil)
+    }
+  }
+
+  private func togglePlayback() {
+    if isPlaying {
+      pausePlayback()
+      return
+    }
+
+    if hasReachedEnd {
+      player.seek(to: .zero)
+      currentSeconds = 0
+      hasReachedEnd = false
+    }
+    player.play()
+    isPlaying = true
+  }
+
+  private func pausePlayback() {
+    player.pause()
+    refreshPlaybackState()
+    if isPlaying {
+      isPlaying = false
+    }
+  }
+
+  private func refreshPlaybackState() {
+    guard let item = player.currentItem else {
+      isPlaying = false
+      return
+    }
+    if item.status == .failed {
+      markPlaybackFailure()
+      return
+    }
+
+    let current = player.currentTime().seconds
+    if current.isFinite, abs(currentSeconds - current) > 0.001 {
+      currentSeconds = max(0, current)
+    }
+
+    let duration = item.duration.seconds
+    if duration.isFinite, duration > 0, abs(durationSeconds - duration) > 0.001 {
+      durationSeconds = duration
+    }
+
+  }
+
+  private func loadDuration() async {
+    guard let item = player.currentItem else { return }
+    do {
+      let duration = try await item.asset.load(.duration).seconds
+      guard !Task.isCancelled, player.currentItem === item else { return }
+      if duration.isFinite, duration > 0, abs(durationSeconds - duration) > 0.001 {
+        durationSeconds = duration
+      }
+      refreshPlaybackState()
+    } catch {
+      guard !Task.isCancelled, player.currentItem === item else { return }
+      refreshPlaybackState()
+    }
+  }
+
+  private func markPlaybackFailure() {
+    player.pause()
+    if isPlaying {
+      isPlaying = false
+    }
+    playbackFailureMessage = "파일을 다시 받아 보거나 전체 보기를 닫아 주세요."
+  }
+
+  private var progressFraction: Double {
+    guard durationSeconds > 0 else { return 0 }
+    return min(1, max(0, currentSeconds / durationSeconds))
+  }
+
+  private var progressAccessibilityValue: String {
+    let current = spokenTimeLabel(currentSeconds)
+    guard durationSeconds > 0 else {
+      return "현재 \(current), 전체 길이 확인 중"
+    }
+    return "현재 \(current), 전체 \(spokenTimeLabel(durationSeconds))"
+  }
+
+  private func timeLabel(_ seconds: Double) -> String {
+    guard seconds.isFinite, seconds > 0 else { return "0:00" }
+    if seconds < 1 {
+      return String(format: "%.1f초", seconds)
+    }
+    let rounded = Int(seconds.rounded(.down))
+    return String(format: "%d:%02d", rounded / 60, rounded % 60)
+  }
+
+  private func spokenTimeLabel(_ seconds: Double) -> String {
+    guard seconds.isFinite, seconds > 0 else { return "0초" }
+    if seconds < 1 {
+      return String(format: "%.1f초", seconds)
+    }
+    let rounded = Int(seconds.rounded(.down))
+    guard rounded >= 60 else { return "\(rounded)초" }
+    return "\(rounded / 60)분 \(rounded % 60)초"
+  }
+}
+
+@MainActor
+private final class PrivateVideoSurfaceView: UIView {
+  override class var layerClass: AnyClass {
+    AVPlayerLayer.self
+  }
+
+  var playerLayer: AVPlayerLayer {
+    layer as! AVPlayerLayer
+  }
+}
+
+@MainActor
+private struct PrivateVideoSurface: UIViewRepresentable {
+  let player: AVPlayer
+
+  func makeUIView(context: Context) -> PrivateVideoSurfaceView {
+    let view = PrivateVideoSurfaceView()
+    view.backgroundColor = .black
+    view.playerLayer.videoGravity = .resizeAspect
+    view.playerLayer.player = player
+    return view
+  }
+
+  func updateUIView(_ view: PrivateVideoSurfaceView, context: Context) {
+    if view.playerLayer.player !== player {
+      view.playerLayer.player = player
+    }
+  }
+
+  static func dismantleUIView(_ view: PrivateVideoSurfaceView, coordinator: Void) {
+    view.playerLayer.player = nil
   }
 }

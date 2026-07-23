@@ -70,6 +70,28 @@ struct NotificationModelTests {
   }
 
   @Test
+  func foregroundDetectsPermissionRevokedAfterRegistrationWithoutReregistering() async {
+    let permissions = NotificationPermissionStub(status: .authorized)
+    let provider = NotificationInstallationIDStub(values: [.success(fid)])
+    let service = NotificationFIDServiceStub()
+    let model = NotificationModel(
+      permissions: permissions,
+      installationIDs: provider,
+      service: service
+    )
+
+    model.authenticatedSessionDidStart()
+    await notificationExpectEventually { model.state == .registered }
+
+    await permissions.setCurrentStatus(.denied)
+    model.applicationDidBecomeActive()
+
+    await notificationExpectEventually { model.state == .permissionDenied }
+    #expect(await provider.requestCount == 1)
+    #expect(await service.registeredRawValues == [fid])
+  }
+
+  @Test
   func malformedProviderFIDNeverReachesAuthenticatedAPI() async {
     let provider = NotificationInstallationIDStub(values: [.success("not-a-fid")])
     let service = NotificationFIDServiceStub()

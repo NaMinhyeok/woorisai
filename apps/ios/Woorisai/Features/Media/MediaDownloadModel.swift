@@ -619,10 +619,26 @@ final class PrivateMediaPreviewModel {
   }
 
   func load(using loader: any PrivateMediaPreviewLoading) {
+    startLoad(using: loader, discardingCurrentLease: false)
+  }
+
+  /// Removes a locally cached file that could not be decoded before acquiring it again.
+  /// Discard must finish before the replacement load starts, otherwise the shared store can hand
+  /// the same corrupt cached file straight back to this model.
+  func reloadDiscardingCurrentLease(using loader: any PrivateMediaPreviewLoading) {
+    startLoad(using: loader, discardingCurrentLease: true)
+  }
+
+  private func startLoad(
+    using loader: any PrivateMediaPreviewLoading,
+    discardingCurrentLease: Bool
+  ) {
     generation &+= 1
     let generation = generation
     task?.cancel()
-    releaseCurrentLease()
+    let previousLease = lease
+    let previousLoader = self.loader
+    lease = nil
     self.loader = loader
     state = .loading
     localURL = nil
@@ -632,6 +648,15 @@ final class PrivateMediaPreviewModel {
     task = Task { @MainActor [weak self] in
       var acquiredLease: PrivateMediaPreviewLease?
       do {
+        if let previousLease, let previousLoader {
+          if discardingCurrentLease {
+            await previousLoader.discard(previousLease)
+          } else {
+            await previousLoader.release(previousLease)
+          }
+          try Task.checkCancellation()
+        }
+
         let newLease = try await loader.load(descriptor)
         acquiredLease = newLease
         try Task.checkCancellation()

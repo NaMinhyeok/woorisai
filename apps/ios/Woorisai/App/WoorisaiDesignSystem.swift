@@ -42,17 +42,34 @@ enum WoorisaiPalette {
   }
 }
 
-struct KeyboardDismissToolbar: ToolbarContent {
-  let action: () -> Void
+enum WoorisaiSpacing {
+  static let xSmall: CGFloat = 4
+  static let small: CGFloat = 8
+  static let medium: CGFloat = 12
+  static let regular: CGFloat = 16
+  static let large: CGFloat = 24
+  static let xLarge: CGFloat = 32
+  static let screenGutter: CGFloat = regular
+}
 
-  var body: some ToolbarContent {
-    ToolbarItemGroup(placement: .keyboard) {
-      Spacer()
-      Button("완료", action: action)
-        .fontWeight(.semibold)
-        .accessibilityLabel("키보드 닫기")
-        .accessibilityIdentifier("keyboard.dismiss")
-    }
+enum WoorisaiRadius {
+  static let small: CGFloat = 12
+  static let medium: CGFloat = 18
+  static let large: CGFloat = 24
+}
+
+enum WoorisaiControlMetric {
+  static let minimumTapTarget: CGFloat = 44
+  static let primaryHeight: CGFloat = 52
+  static let mediaGap: CGFloat = WoorisaiSpacing.small
+}
+
+enum SubmittedDraftEditingPolicy {
+  static func isLocked(
+    isSubmitting: Bool,
+    requiresOutcomeConfirmation: Bool
+  ) -> Bool {
+    isSubmitting || requiresOutcomeConfirmation
   }
 }
 
@@ -77,6 +94,29 @@ struct WarmBackground<Content: View>: View {
       .ignoresSafeArea()
       .allowsHitTesting(false)
 
+      Canvas { context, size in
+        let dots: [(CGPoint, CGFloat, Color)] = [
+          (CGPoint(x: size.width * 0.12, y: size.height * 0.16), 4, WoorisaiPalette.rose),
+          (CGPoint(x: size.width * 0.88, y: size.height * 0.28), 3, WoorisaiPalette.sage),
+          (CGPoint(x: size.width * 0.18, y: size.height * 0.78), 3, WoorisaiPalette.coral),
+        ]
+        for (point, radius, color) in dots {
+          context.fill(
+            Path(
+              ellipseIn: CGRect(
+                x: point.x - radius,
+                y: point.y - radius,
+                width: radius * 2,
+                height: radius * 2
+              )),
+            with: .color(color.opacity(0.22))
+          )
+        }
+      }
+      .ignoresSafeArea()
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
+
       RadialGradient(
         colors: [WoorisaiPalette.sageSoft.opacity(0.72), .clear],
         center: .bottomLeading,
@@ -96,7 +136,7 @@ struct WarmSurface<Content: View>: View {
   private let content: Content
 
   init(
-    cornerRadius: CGFloat = 22,
+    cornerRadius: CGFloat = WoorisaiRadius.medium,
     @ViewBuilder content: () -> Content
   ) {
     self.cornerRadius = cornerRadius
@@ -112,7 +152,7 @@ struct WarmSurface<Content: View>: View {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
               .stroke(WoorisaiPalette.line, lineWidth: 1)
           }
-          .shadow(color: WoorisaiPalette.shadow.opacity(0.12), radius: 18, y: 8)
+          .shadow(color: WoorisaiPalette.shadow.opacity(0.08), radius: 10, y: 4)
       }
   }
 }
@@ -130,6 +170,7 @@ struct Eyebrow: View {
       .tracking(2.1)
       .foregroundStyle(WoorisaiPalette.coralDark)
       .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+      .accessibilityHidden(true)
   }
 }
 
@@ -231,6 +272,111 @@ struct PrimaryHeartButton: View {
 
   private var buttonIsEnabled: Bool {
     environmentIsEnabled && isEnabled && !isLoading
+  }
+}
+
+struct KeyboardDismissButton: View {
+  let action: () -> Void
+
+  var body: some View {
+    Button {
+      action()
+      UIApplication.shared.sendAction(
+        #selector(UIResponder.resignFirstResponder),
+        to: nil,
+        from: nil,
+        for: nil
+      )
+    } label: {
+      Image(systemName: "keyboard.chevron.compact.down")
+        .font(.body.weight(.semibold))
+        .foregroundStyle(WoorisaiPalette.coralDark)
+        .frame(
+          width: WoorisaiControlMetric.minimumTapTarget,
+          height: WoorisaiControlMetric.minimumTapTarget
+        )
+        .background(WoorisaiPalette.field, in: Circle())
+        .overlay {
+          Circle().stroke(WoorisaiPalette.line, lineWidth: 1)
+        }
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("키보드 닫기")
+    .accessibilityHint("입력한 내용은 그대로 유지됩니다.")
+    .accessibilityIdentifier("keyboard.dismiss")
+  }
+}
+
+struct WoorisaiSectionHeading: View {
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+  let title: String
+  let detail: String?
+  let symbol: String
+
+  init(_ title: String, detail: String? = nil, symbol: String = "heart.fill") {
+    self.title = title
+    self.detail = detail
+    self.symbol = symbol
+  }
+
+  var body: some View {
+    if dynamicTypeSize.isAccessibilitySize {
+      VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
+        titleContent
+        if let detail {
+          detailContent(detail)
+        }
+      }
+    } else {
+      HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
+        titleContent
+        Spacer(minLength: WoorisaiSpacing.small)
+        if let detail {
+          detailContent(detail)
+        }
+      }
+    }
+  }
+
+  private var titleContent: some View {
+    HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
+      Image(systemName: symbol)
+        .foregroundStyle(WoorisaiPalette.coral)
+        .accessibilityHidden(true)
+      Text(title)
+        .font(.title3.weight(.bold))
+        .foregroundStyle(WoorisaiPalette.ink)
+        .accessibilityAddTraits(.isHeader)
+    }
+  }
+
+  private func detailContent(_ detail: String) -> some View {
+    Text(detail)
+      .font(.footnote.weight(.semibold))
+      .foregroundStyle(WoorisaiPalette.muted)
+      .fixedSize(horizontal: false, vertical: true)
+  }
+}
+
+struct WoorisaiIconButton: View {
+  let symbol: String
+  let accessibilityLabel: String
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      Image(systemName: symbol)
+        .font(.body.weight(.semibold))
+        .foregroundStyle(WoorisaiPalette.coralDark)
+        .frame(
+          width: WoorisaiControlMetric.minimumTapTarget,
+          height: WoorisaiControlMetric.minimumTapTarget
+        )
+        .background(WoorisaiPalette.coralSoft.opacity(0.72), in: Circle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(accessibilityLabel)
   }
 }
 

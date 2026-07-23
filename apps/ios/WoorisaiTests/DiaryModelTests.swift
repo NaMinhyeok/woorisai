@@ -7,6 +7,95 @@ import WoorisaiAPI
 @MainActor
 struct DiaryModelTests {
   @Test
+  func reconciliationRequiresBothContentAndAttachmentIdentityToMatch() {
+    let originalID = UUID(uuidString: "123E4567-E89B-12D3-A456-426614174101")!
+    let submittedID = UUID(uuidString: "123E4567-E89B-12D3-A456-426614174102")!
+
+    #expect(
+      DiaryReconciliationMatcher.entryMatches(
+        serverContent: "같은 본문",
+        serverAttachmentIDs: [submittedID],
+        expectedContent: "같은 본문",
+        expectedAttachmentIDs: [submittedID]
+      )
+    )
+    #expect(
+      !DiaryReconciliationMatcher.entryMatches(
+        serverContent: "같은 본문",
+        serverAttachmentIDs: [originalID],
+        expectedContent: "같은 본문",
+        expectedAttachmentIDs: [submittedID]
+      )
+    )
+    #expect(
+      !DiaryReconciliationMatcher.entryMatches(
+        serverContent: "다른 본문",
+        serverAttachmentIDs: [submittedID],
+        expectedContent: "같은 본문",
+        expectedAttachmentIDs: [submittedID]
+      )
+    )
+    #expect(
+      !DiaryReconciliationMatcher.entryMatches(
+        serverContent: "같은 본문",
+        serverAttachmentIDs: [submittedID, originalID],
+        expectedContent: "같은 본문",
+        expectedAttachmentIDs: [originalID, submittedID]
+      )
+    )
+  }
+
+  @Test
+  func unknownEditorOutcomeKeepsRecoveryMountedUntilExplicitResolution() {
+    #expect(
+      DiaryEditorDismissalPolicy.cancellationIsDisabled(
+        isSubmitting: false,
+        requiresRetryConfirmation: true,
+        canKeepDraft: false
+      )
+    )
+    #expect(
+      !DiaryEditorDismissalPolicy.cancellationIsDisabled(
+        isSubmitting: false,
+        requiresRetryConfirmation: true,
+        canKeepDraft: true
+      )
+    )
+    #expect(
+      !DiaryEditorDismissalPolicy.allowsDiscard(requiresRetryConfirmation: true)
+    )
+    #expect(DiaryEditorDismissalPolicy.allowsDiscard(requiresRetryConfirmation: false))
+  }
+
+  @Test
+  func commentArrivalPolicyOnlyTreatsChronologicalAppendAsNew() {
+    #expect(
+      DiaryCommentUpdatePolicy.newlyAppendedCommentID(
+        oldIDs: [1, 2],
+        newIDs: [1, 2, 3]
+      ) == 3
+    )
+    #expect(
+      DiaryCommentUpdatePolicy.newlyAppendedCommentID(
+        oldIDs: [1, 2, 3],
+        newIDs: [1, 2]
+      ) == nil
+    )
+    #expect(
+      DiaryCommentUpdatePolicy.newlyAppendedCommentID(
+        oldIDs: [1, 2],
+        newIDs: [1, 4]
+      ) == nil
+    )
+    #expect(
+      DiaryCommentUpdatePolicy.newlyAppendedCommentID(
+        oldIDs: [1, 3],
+        newIDs: [1, 2, 3]
+      ) == nil
+    )
+  }
+
+  @Test
   func loadsListAndDetailThenAppliesEntryAndCommentCRUDLocally() async {
     let service = DiaryServiceFake()
     let model = DiaryModel(service: service)
@@ -98,7 +187,7 @@ struct DiaryModelTests {
   }
 
   @Test
-  func conflictNeverRetriesAndReloadsOnlyAfterExplicitAction() async {
+  func conflictNeverRetriesAndReloadsWhilePreservingEditorDraft() async {
     let service = DiaryServiceFake(updateEntryFailure: .conflict)
     let model = DiaryModel(service: service)
     model.loadDetail(entryID: 41)
@@ -112,6 +201,9 @@ struct DiaryModelTests {
     #expect(await service.detailLoadCount == 1)
 
     model.reloadAfterConflict()
+    #expect(model.selectedDetail != nil)
+    #expect(model.detailState == .loaded)
+    #expect(model.editorReconciliationState == .loading)
     await diaryExpectEventually {
       await service.detailLoadCount == 2 && model.detailState == .loaded
     }
@@ -119,22 +211,23 @@ struct DiaryModelTests {
     #expect(await service.updateEntryCount == 1)
     #expect(model.conflict == nil)
     #expect(model.lastConflictEditorInvalidation == .entry(entryID: 41))
+    #expect(model.editorReconciliationState == .loaded)
     #expect(
       DiaryConflictEditorDisposition.resolve(
         conflict: model.lastConflictEditorInvalidation,
         visibleEntryID: 41
-      ) == .closeEntryEditor
+      ) == .preserveEntryEditor
     )
     #expect(
       DiaryConflictEditorDisposition.resolve(
         conflict: .comment(entryID: 41),
         visibleEntryID: 41
-      ) == .closeCommentEditor
+      ) == .preserveCommentEditor
     )
   }
 
   @Test
-  func dismissingConflictInvalidatesEditorsAndReloadsTheKnownStaleDetail() async {
+  func dismissingConflictReloadsTheKnownStaleDetailWithoutDiscardingEditorDraft() async {
     let entryService = DiaryServiceFake(updateEntryFailure: .conflict)
     let entryModel = DiaryModel(service: entryService)
     entryModel.loadDetail(entryID: 41)
@@ -146,7 +239,8 @@ struct DiaryModelTests {
 
     #expect(entryModel.conflict == nil)
     #expect(entryModel.lastConflictEditorInvalidation == .entry(entryID: 41))
-    #expect(entryModel.selectedDetail == nil)
+    #expect(entryModel.selectedDetail != nil)
+    #expect(entryModel.detailState == .loaded)
     await diaryExpectEventually {
       await entryService.detailLoadCount == 2 && entryModel.detailState == .loaded
     }
@@ -154,7 +248,7 @@ struct DiaryModelTests {
       DiaryConflictEditorDisposition.resolve(
         conflict: entryModel.lastConflictEditorInvalidation,
         visibleEntryID: 41
-      ) == .closeEntryEditor
+      ) == .preserveEntryEditor
     )
 
     let commentService = DiaryServiceFake(updateCommentFailure: .conflict)
@@ -168,7 +262,8 @@ struct DiaryModelTests {
 
     #expect(commentModel.conflict == nil)
     #expect(commentModel.lastConflictEditorInvalidation == .comment(entryID: 41))
-    #expect(commentModel.selectedDetail == nil)
+    #expect(commentModel.selectedDetail != nil)
+    #expect(commentModel.detailState == .loaded)
     await diaryExpectEventually {
       await commentService.detailLoadCount == 2 && commentModel.detailState == .loaded
     }
@@ -176,7 +271,7 @@ struct DiaryModelTests {
       DiaryConflictEditorDisposition.resolve(
         conflict: commentModel.lastConflictEditorInvalidation,
         visibleEntryID: 41
-      ) == .closeCommentEditor
+      ) == .preserveCommentEditor
     )
   }
 
@@ -217,7 +312,256 @@ struct DiaryModelTests {
     try? await Task.sleep(for: .milliseconds(30))
 
     #expect(await service.createEntryCount == 1)
-    #expect(model.mutationNotice?.contains("자동으로 다시 보내지 않았습니다") == true)
+    #expect(model.mutationOutcomeRequiresConfirmation)
+    #expect(model.unknownMutationContext == .createEntry)
+    #expect(model.mutationNotice?.contains("재전송을 잠갔습니다") == true)
+
+    #expect(!model.createEntry(content: "확인 전 재전송"))
+    #expect(await service.createEntryCount == 1)
+
+    #expect(!model.confirmManualRetryAfterUnknownOutcome(context: .createEntry))
+    #expect(model.mutationOutcomeRequiresConfirmation)
+
+    model.reconcileUnknownOutcome(entryID: 41)
+    #expect(model.editorReconciliationState == .idle)
+    #expect(model.inspectedUnknownMutationContext == nil)
+    #expect(await service.detailLoadCount == 0)
+
+    model.reconcileUnknownOutcomeList()
+    await diaryExpectEventually {
+      model.listState == .loaded && model.editorReconciliationState == .loaded
+    }
+    #expect(model.confirmManualRetryAfterUnknownOutcome(context: .createEntry))
+    #expect(!model.mutationOutcomeRequiresConfirmation)
+    #expect(model.unknownMutationContext == nil)
+    #expect(model.mutationState == .idle)
+    #expect(model.createEntry(content: "확인 후 수동 재전송"))
+    await diaryExpectEventually { await service.createEntryCount == 2 }
+  }
+
+  @Test
+  func ambiguousEditorFailureCanReconcileLatestContentWithoutUnmountingTheEditor() async {
+    let service = DiaryServiceFake(updateEntryFailure: .transport)
+    let model = DiaryModel(service: service)
+    model.loadDetail(entryID: 41)
+    await diaryExpectEventually { model.detailState == .loaded }
+
+    model.updateEntry(entryID: 41, content: "응답을 잃은 수정")
+    await diaryExpectEventually { model.mutationOutcomeRequiresConfirmation }
+    let visibleDetail = model.selectedDetail
+
+    model.reconcileUnknownOutcomeList()
+    #expect(model.editorReconciliationState == .idle)
+    #expect(model.inspectedUnknownMutationContext == nil)
+    #expect(await service.listLoadCount == 0)
+
+    model.reconcileUnknownOutcome(entryID: 41)
+
+    #expect(model.detailState == .loaded)
+    #expect(model.selectedDetail == visibleDetail)
+    #expect(model.editorReconciliationState == .loading)
+    await diaryExpectEventually {
+      await service.detailLoadCount == 2 && model.editorReconciliationState == .loaded
+    }
+    #expect(model.mutationOutcomeRequiresConfirmation)
+    #expect(model.selectedDetail != nil)
+    #expect(await service.updateEntryCount == 1)
+    #expect(model.unknownMutationContext == .updateEntry(entryID: 41))
+    #expect(
+      model.resolveUnknownOutcomeAsCommitted(context: .updateEntry(entryID: 41))
+    )
+    #expect(!model.mutationOutcomeRequiresConfirmation)
+    #expect(model.unknownMutationContext == nil)
+  }
+
+  @Test
+  func loadedUnknownEditorOutcomeCanBeAbandonedWithoutAnyRetransmission() async {
+    let service = DiaryServiceFake(updateEntryFailure: .transport)
+    let model = DiaryModel(service: service)
+    let context = DiaryModel.UnknownMutationContext.updateEntry(entryID: 41)
+    model.loadDetail(entryID: 41)
+    await diaryExpectEventually { model.detailState == .loaded }
+    model.updateLocalDraftProtection(context: context, isProtected: true)
+
+    model.updateEntry(entryID: 41, content: "판단할 수 없는 수정")
+    await diaryExpectEventually { model.mutationOutcomeRequiresConfirmation }
+    #expect(!model.abandonInconclusiveUnknownOutcome(context: context))
+
+    model.reconcileUnknownOutcome(entryID: 41)
+    await diaryExpectEventually { model.editorReconciliationState == .loaded }
+    #expect(model.abandonInconclusiveUnknownOutcome(context: context))
+
+    #expect(!model.mutationOutcomeRequiresConfirmation)
+    #expect(model.unknownMutationContext == nil)
+    #expect(model.submittedMutationSnapshot == nil)
+    #expect(!model.hasProtectedLocalDraft)
+    #expect(await service.updateEntryCount == 1)
+  }
+
+  @Test
+  func ambiguousEditorRetryKeepsImmutablePayloadAndNotificationFenceUntilDiscard() async {
+    let submittedAttachmentID = UUID(
+      uuidString: "123E4567-E89B-12D3-A456-426614174199"
+    )!
+    let entryService = DiaryServiceFake(updateEntryFailure: .transport)
+    let entryModel = DiaryModel(service: entryService)
+    entryModel.loadDetail(entryID: 41)
+    await diaryExpectEventually { entryModel.detailState == .loaded }
+
+    entryModel.updateEntry(
+      entryID: 41,
+      content: "  전송 당시 수정  ",
+      attachments: .replace([submittedAttachmentID])
+    )
+    await diaryExpectEventually { entryModel.mutationOutcomeRequiresConfirmation }
+
+    #expect(
+      entryModel.submittedMutationSnapshot
+        == .updateEntry(
+          entryID: 41,
+          content: "전송 당시 수정",
+          attachmentIDs: [submittedAttachmentID],
+          originalContent: DiaryFeatureFixtures.entry.content,
+          originalAttachmentIDs: DiaryFeatureFixtures.entry.attachments.map(\.id),
+          originalRevision: DiaryModel.MutationRevision(
+            createdAt: DiaryFeatureFixtures.entry.createdAt,
+            updatedAt: DiaryFeatureFixtures.entry.updatedAt
+          )
+        )
+    )
+
+    entryModel.reconcileUnknownOutcome(entryID: 41)
+    await diaryExpectEventually { entryModel.editorReconciliationState == .loaded }
+    #expect(
+      entryModel.confirmManualRetryAfterUnknownOutcome(context: .updateEntry(entryID: 41))
+    )
+    #expect(entryModel.hasProtectedManualRetryDraft)
+    #expect(entryModel.manualRetryDraftContext == .updateEntry(entryID: 41))
+    #expect(entryModel.submittedMutationSnapshot != nil)
+
+    entryModel.releaseManualRetryDraftProtection(context: .updateEntry(entryID: 41))
+    #expect(!entryModel.hasProtectedManualRetryDraft)
+    #expect(entryModel.submittedMutationSnapshot == nil)
+
+    let commentService = DiaryServiceFake(updateCommentFailure: .transport)
+    let commentModel = DiaryModel(service: commentService)
+    commentModel.loadDetail(entryID: 41)
+    await diaryExpectEventually { commentModel.detailState == .loaded }
+    commentModel.updateComment(entryID: 41, commentID: 51, content: "  전송 당시 댓글  ")
+    await diaryExpectEventually { commentModel.mutationOutcomeRequiresConfirmation }
+    #expect(
+      commentModel.submittedMutationSnapshot
+        == .updateComment(
+          entryID: 41,
+          commentID: 51,
+          content: "전송 당시 댓글",
+          originalContent: DiaryFeatureFixtures.comment.content,
+          originalRevision: DiaryModel.MutationRevision(
+            createdAt: DiaryFeatureFixtures.comment.createdAt,
+            updatedAt: DiaryFeatureFixtures.comment.updatedAt
+          )
+        )
+    )
+  }
+
+  @Test
+  func modelOwnedCommentDraftSurvivesReleasingAManualRetryScreenFence() async {
+    let service = DiaryServiceFake(createCommentFailure: .transport)
+    let model = DiaryModel(service: service)
+    let context = DiaryModel.UnknownMutationContext.createComment(entryID: 41)
+    model.loadDetail(entryID: 41)
+    await diaryExpectEventually { model.detailState == .loaded }
+    model.updateCommentDraft(entryID: 41, content: "화면을 나가도 남을 댓글")
+
+    model.createComment(entryID: 41, content: model.commentDraft(entryID: 41))
+    await diaryExpectEventually { model.mutationOutcomeRequiresConfirmation }
+    model.reconcileUnknownOutcome(entryID: 41)
+    await diaryExpectEventually { model.editorReconciliationState == .loaded }
+    #expect(model.confirmManualRetryAfterUnknownOutcome(context: context))
+    #expect(model.hasProtectedManualRetryDraft)
+
+    model.releaseManualRetryDraftProtection(context: context)
+
+    #expect(!model.hasProtectedManualRetryDraft)
+    #expect(model.commentDraft(entryID: 41) == "화면을 나가도 남을 댓글")
+    #expect(await service.createCommentCount == 1)
+  }
+
+  @Test
+  func normalListReloadSupersedingCreateInspectionLeavesRecoveryRetryable() async {
+    let service = DiaryInspectionSupersedeService(delayedRead: .list)
+    let model = DiaryModel(service: service)
+    model.loadIfNeeded()
+    await diaryExpectEventually { model.listState == .loaded }
+
+    model.createEntry(content: "결과 불명 일기")
+    await diaryExpectEventually { model.mutationOutcomeRequiresConfirmation }
+    model.reconcileUnknownOutcomeList()
+    await diaryExpectEventually {
+      await service.listLoadCount == 2 && model.editorReconciliationState == .loading
+    }
+
+    model.reload(preservingVisibleContent: true)
+    await diaryExpectEventually {
+      await service.listLoadCount == 3 && model.listState == .loaded
+    }
+
+    #expect(model.editorReconciliationState == .failed)
+    #expect(!model.confirmManualRetryAfterUnknownOutcome(context: .createEntry))
+
+    model.reconcileUnknownOutcomeList()
+    await diaryExpectEventually { model.editorReconciliationState == .loaded }
+    #expect(model.confirmManualRetryAfterUnknownOutcome(context: .createEntry))
+  }
+
+  @Test
+  func normalDetailRefreshSupersedingUpdateInspectionLeavesRecoveryRetryable() async {
+    let service = DiaryInspectionSupersedeService(delayedRead: .detail)
+    let model = DiaryModel(service: service)
+    model.loadDetail(entryID: 41)
+    await diaryExpectEventually { model.detailState == .loaded }
+
+    model.updateEntry(entryID: 41, content: "결과 불명 수정")
+    await diaryExpectEventually { model.mutationOutcomeRequiresConfirmation }
+    model.reconcileUnknownOutcome(entryID: 41)
+    await diaryExpectEventually {
+      await service.detailLoadCount == 2 && model.editorReconciliationState == .loading
+    }
+
+    await model.refreshDetail(entryID: 41)
+
+    #expect(await service.detailLoadCount == 3)
+    #expect(model.detailState == .loaded)
+    #expect(model.editorReconciliationState == .failed)
+    #expect(
+      !model.confirmManualRetryAfterUnknownOutcome(context: .updateEntry(entryID: 41))
+    )
+
+    model.reconcileUnknownOutcome(entryID: 41)
+    await diaryExpectEventually { model.editorReconciliationState == .loaded }
+    #expect(
+      model.confirmManualRetryAfterUnknownOutcome(context: .updateEntry(entryID: 41))
+    )
+  }
+
+  @Test
+  func commentDraftSurvivesDetailExitAndClearsAfterCommitOrSessionClear() async {
+    let service = DiaryServiceFake()
+    let model = DiaryModel(service: service)
+
+    model.updateCommentDraft(entryID: 41, content: "돌아와서 이어 쓸 댓글")
+    model.cancelDetailReadForScreenExit(entryID: 41)
+    #expect(model.commentDraft(entryID: 41) == "돌아와서 이어 쓸 댓글")
+
+    model.loadDetail(entryID: 41)
+    await diaryExpectEventually { model.detailState == .loaded }
+    model.createComment(entryID: 41, content: model.commentDraft(entryID: 41))
+    await diaryExpectEventually { model.mutationState == .idle }
+    #expect(model.commentDraft(entryID: 41).isEmpty)
+
+    model.updateCommentDraft(entryID: 41, content: "잠금 전에 버릴 댓글")
+    model.clear()
+    #expect(model.commentDraft(entryID: 41).isEmpty)
   }
 
   @Test
@@ -340,6 +684,7 @@ private actor DiaryServiceFake: DiaryServing {
   private let readFailure: Failure
   private let createEntryFailure: Failure
   private let updateEntryFailure: Failure
+  private let createCommentFailure: Failure
   private let updateCommentFailure: Failure
 
   private(set) var listLoadCount = 0
@@ -355,11 +700,13 @@ private actor DiaryServiceFake: DiaryServing {
     readFailure: Failure = .none,
     createEntryFailure: Failure = .none,
     updateEntryFailure: Failure = .none,
+    createCommentFailure: Failure = .none,
     updateCommentFailure: Failure = .none
   ) {
     self.readFailure = readFailure
     self.createEntryFailure = createEntryFailure
     self.updateEntryFailure = updateEntryFailure
+    self.createCommentFailure = createCommentFailure
     self.updateCommentFailure = updateCommentFailure
   }
 
@@ -391,8 +738,9 @@ private actor DiaryServiceFake: DiaryServing {
     deleteEntryCount += 1
   }
 
-  func createDiaryComment(entryID: Int64, draft: DiaryCommentDraft) -> DiaryComment {
+  func createDiaryComment(entryID: Int64, draft: DiaryCommentDraft) throws -> DiaryComment {
     createCommentCount += 1
+    try throwIfNeeded(createCommentFailure)
     return DiaryFeatureFixtures.createdComment
   }
 
@@ -414,6 +762,54 @@ private actor DiaryServiceFake: DiaryServing {
     case .credentialRejected: throw WoorisaiAPIError.credentialRejected
     }
   }
+}
+
+private actor DiaryInspectionSupersedeService: DiaryServing {
+  enum DelayedRead: Equatable, Sendable {
+    case list
+    case detail
+  }
+
+  private let delayedRead: DelayedRead
+  private(set) var listLoadCount = 0
+  private(set) var detailLoadCount = 0
+
+  init(delayedRead: DelayedRead) {
+    self.delayedRead = delayedRead
+  }
+
+  func loadDiaryEntries(pageNumber: Int) async throws -> DiaryEntryPage {
+    listLoadCount += 1
+    if delayedRead == .list, listLoadCount == 2 {
+      try await Task.sleep(for: .seconds(60))
+    }
+    return DiaryFeatureFixtures.page
+  }
+
+  func createDiaryEntry(_ draft: DiaryEntryCreateDraft) throws -> DiaryEntry {
+    throw WoorisaiAPIError.transport
+  }
+
+  func loadDiaryEntry(id: Int64) async throws -> DiaryEntryDetail {
+    detailLoadCount += 1
+    if delayedRead == .detail, detailLoadCount == 2 {
+      try await Task.sleep(for: .seconds(60))
+    }
+    return DiaryFeatureFixtures.detail
+  }
+
+  func updateDiaryEntry(id: Int64, draft: DiaryEntryUpdateDraft) throws -> DiaryEntry {
+    throw WoorisaiAPIError.transport
+  }
+
+  func deleteDiaryEntry(id: Int64) throws { throw UnexpectedDiaryCall() }
+  func createDiaryComment(entryID: Int64, draft: DiaryCommentDraft) throws -> DiaryComment {
+    throw UnexpectedDiaryCall()
+  }
+  func updateDiaryComment(id: Int64, draft: DiaryCommentDraft) throws -> DiaryComment {
+    throw UnexpectedDiaryCall()
+  }
+  func deleteDiaryComment(id: Int64) throws { throw UnexpectedDiaryCall() }
 }
 
 private actor ControlledDiaryDetailService: DiaryServing {

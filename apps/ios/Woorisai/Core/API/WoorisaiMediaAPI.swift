@@ -474,6 +474,13 @@ public protocol PresignedMediaUploading: Sendable {
     using grant: MediaUploadGrant,
     progress: @escaping @Sendable (Double) -> Void
   ) async throws
+
+  func put(
+    fileAt fileURL: URL,
+    byteSize: Int64,
+    using grant: MediaUploadGrant,
+    progress: @escaping @Sendable (Double) -> Void
+  ) async throws
 }
 
 public struct URLSessionPresignedMediaUploader: PresignedMediaUploading, Sendable {
@@ -488,25 +495,13 @@ public struct URLSessionPresignedMediaUploader: PresignedMediaUploading, Sendabl
     guard !grant.isExpired() else { throw PresignedMediaUploadError.expiredGrant }
     let request = try Self.makeRequest(using: grant)
     let delegate = PresignedUploadTaskDelegate(progress: progress)
-    let configuration = URLSessionConfiguration.ephemeral
-    configuration.httpCookieStorage = nil
-    configuration.httpShouldSetCookies = false
-    configuration.urlCache = nil
-    configuration.urlCredentialStorage = nil
-    configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-    let session = URLSession(configuration: configuration)
+    let session = URLSession(configuration: Self.makeConfiguration())
 
     do {
       progress(0)
       let (_, response) = try await session.upload(for: request, from: data, delegate: delegate)
+      try Self.validate(response: response)
       session.finishTasksAndInvalidate()
-      try Task.checkCancellation()
-      guard let response = response as? HTTPURLResponse else {
-        throw PresignedMediaUploadError.transport
-      }
-      guard (200...299).contains(response.statusCode) else {
-        throw PresignedMediaUploadError.rejected(statusCode: response.statusCode)
-      }
       progress(1)
     } catch is CancellationError {
       session.invalidateAndCancel()
@@ -517,6 +512,78 @@ public struct URLSessionPresignedMediaUploader: PresignedMediaUploading, Sendabl
     } catch {
       session.invalidateAndCancel()
       throw PresignedMediaUploadError.transport
+    }
+  }
+
+  public func put(
+    fileAt fileURL: URL,
+    byteSize: Int64,
+    using grant: MediaUploadGrant,
+    progress: @escaping @Sendable (Double) -> Void
+  ) async throws {
+    try Self.validateUploadFile(at: fileURL, expectedByteSize: byteSize)
+    guard !grant.isExpired() else { throw PresignedMediaUploadError.expiredGrant }
+    let request = try Self.makeRequest(using: grant)
+    let delegate = PresignedUploadTaskDelegate(progress: progress)
+    let session = URLSession(configuration: Self.makeConfiguration())
+
+    do {
+      progress(0)
+      let (_, response) = try await session.upload(
+        for: request,
+        fromFile: fileURL,
+        delegate: delegate
+      )
+      try Self.validate(response: response)
+      session.finishTasksAndInvalidate()
+      progress(1)
+    } catch is CancellationError {
+      session.invalidateAndCancel()
+      throw CancellationError()
+    } catch let error as PresignedMediaUploadError {
+      session.invalidateAndCancel()
+      throw error
+    } catch {
+      session.invalidateAndCancel()
+      throw PresignedMediaUploadError.transport
+    }
+  }
+
+  static func makeConfiguration() -> URLSessionConfiguration {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.httpCookieStorage = nil
+    configuration.httpShouldSetCookies = false
+    configuration.urlCache = nil
+    configuration.urlCredentialStorage = nil
+    configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+    return configuration
+  }
+
+  private static func validateUploadFile(at fileURL: URL, expectedByteSize: Int64) throws {
+    guard fileURL.isFileURL, expectedByteSize > 0 else {
+      throw PresignedMediaUploadError.invalidGrant
+    }
+    let values: URLResourceValues
+    do {
+      values = try fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+    } catch {
+      throw PresignedMediaUploadError.invalidGrant
+    }
+    guard values.isRegularFile == true,
+      let fileSize = values.fileSize,
+      Int64(fileSize) == expectedByteSize
+    else {
+      throw PresignedMediaUploadError.invalidGrant
+    }
+  }
+
+  private static func validate(response: URLResponse) throws {
+    try Task.checkCancellation()
+    guard let response = response as? HTTPURLResponse else {
+      throw PresignedMediaUploadError.transport
+    }
+    guard (200...299).contains(response.statusCode) else {
+      throw PresignedMediaUploadError.rejected(statusCode: response.statusCode)
     }
   }
 

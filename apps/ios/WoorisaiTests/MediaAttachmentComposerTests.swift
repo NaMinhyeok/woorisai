@@ -113,6 +113,284 @@ struct MediaAttachmentComposerTests {
   }
 
   @Test
+  func successfulAttachmentDoesNotHideAnEarlierSelectionFailure() throws {
+    let model = MediaAttachmentComposerModel(
+      purpose: .diaryEntry,
+      service: ComposerMediaServiceFake(),
+      uploader: ComposerSuspendedUploader()
+    )
+
+    #expect(
+      throws: MediaValidationError.unsupportedContentType,
+      performing: {
+        try model.addPreparedAttachment(
+          kind: .image,
+          fileName: "unsupported.gif",
+          contentType: "image/gif",
+          data: Data([0x47, 0x49, 0x46])
+        )
+      }
+    )
+    #expect(model.importFailure == .unsupportedType)
+
+    try model.addPreparedAttachment(
+      kind: .image,
+      fileName: "accepted.png",
+      contentType: "image/png",
+      data: Data([0x89, 0x50, 0x4E, 0x47])
+    )
+
+    #expect(model.uploads.count == 1)
+    #expect(model.importFailure == .unsupportedType)
+    model.clear()
+  }
+
+  @Test
+  func pickerImportKeepsThePreparedVideoKindWhenMappingItsSizeFailure() {
+    #expect(
+      MediaAttachmentComposerModel.mapImportFailure(
+        MediaValidationError.invalidByteSize,
+        kind: .video
+      ) == .fileTooLarge(kind: .video)
+    )
+  }
+
+  @Test
+  func pickerUsesTheActualImageTypeAndOnlyFallsBackWhenMetadataIsAbsent() throws {
+    let allowsImage: (UTType) -> Bool = { type in
+      guard let mimeType = type.preferredMIMEType?.lowercased() else { return false }
+      return ["image/jpeg", "image/png", "image/webp"].contains(mimeType)
+    }
+
+    let png = try MediaAttachmentComposerModel.resolvedPickerType(
+      actualIdentifier: UTType.png.identifier,
+      advertisedType: .jpeg,
+      isAllowed: allowsImage
+    )
+    #expect(png == .png)
+    #expect(png.preferredMIMEType == "image/png")
+    #expect(
+      MediaAttachmentComposerModel.generatedFileName(
+        kind: .image,
+        type: png,
+        contentType: "image/png"
+      ).hasSuffix(".png")
+    )
+
+    let fallback = try MediaAttachmentComposerModel.resolvedPickerType(
+      actualIdentifier: nil,
+      advertisedType: .jpeg,
+      isAllowed: allowsImage
+    )
+    #expect(fallback == .jpeg)
+
+    #expect(
+      throws: PickerPreparationError.unsupportedType,
+      performing: {
+        _ = try MediaAttachmentComposerModel.resolvedPickerType(
+          actualIdentifier: UTType.gif.identifier,
+          advertisedType: .jpeg,
+          isAllowed: allowsImage
+        )
+      }
+    )
+  }
+
+  @Test
+  func pickerUsesTheActualVideoTypeAndRejectsUnsupportedMetadata() throws {
+    let allowsVideo: (UTType) -> Bool = { type in
+      guard let mimeType = type.preferredMIMEType?.lowercased() else { return false }
+      return ["video/mp4", "video/quicktime", "video/webm"].contains(mimeType)
+    }
+
+    let quickTime = try MediaAttachmentComposerModel.resolvedPickerType(
+      actualIdentifier: UTType.quickTimeMovie.identifier,
+      advertisedType: .mpeg4Movie,
+      isAllowed: allowsVideo
+    )
+    #expect(quickTime == .quickTimeMovie)
+    #expect(quickTime.preferredMIMEType == "video/quicktime")
+
+    #expect(
+      throws: PickerPreparationError.unsupportedType,
+      performing: {
+        _ = try MediaAttachmentComposerModel.resolvedPickerType(
+          actualIdentifier: UTType.gif.identifier,
+          advertisedType: .mpeg4Movie,
+          isAllowed: allowsVideo
+        )
+      }
+    )
+  }
+
+  @Test
+  func pickerRejectsAnOversizedImageBeforeReadingItsBytes() throws {
+    let fileURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("oversized-picker-image-\(UUID().uuidString).jpg")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+
+    #expect(FileManager.default.createFile(atPath: fileURL.path, contents: Data([0])))
+    let handle = try FileHandle(forWritingTo: fileURL)
+    try handle.truncate(atOffset: UInt64(MediaUploadDraft.maximumImageByteSize + 1))
+    try handle.close()
+
+    #expect(
+      throws: PickerFileTransferError.fileTooLarge(kind: .image),
+      performing: {
+        _ = try BoundedPickerImageTransfer.importingFile(at: fileURL)
+      }
+    )
+    #expect(
+      MediaAttachmentComposerModel.mapImportFailure(
+        PickerFileTransferError.fileTooLarge(kind: .image)
+      ) == .fileTooLarge(kind: .image)
+    )
+  }
+
+  @Test
+  func pickerImageTransferAcceptsOnlyRegularNonSymlinkFiles() throws {
+    let fileManager = FileManager.default
+    let temporaryRoot = fileManager.temporaryDirectory.appendingPathComponent(
+      "picker-image-metadata-test-\(UUID().uuidString)",
+      isDirectory: true
+    )
+    let sourceURL = temporaryRoot.appendingPathComponent("provider.png")
+    let symlinkURL = temporaryRoot.appendingPathComponent("linked.png")
+    defer { try? fileManager.removeItem(at: temporaryRoot) }
+    try fileManager.createDirectory(at: temporaryRoot, withIntermediateDirectories: true)
+    let contents = Data([0x89, 0x50, 0x4E, 0x47])
+    try contents.write(to: sourceURL)
+    try fileManager.createSymbolicLink(at: symlinkURL, withDestinationURL: sourceURL)
+
+    let transfer = try BoundedPickerImageTransfer.importingFile(at: sourceURL)
+
+    #expect(transfer.data == contents)
+    #expect(
+      throws: PickerFileTransferError.unreadableSelection,
+      performing: {
+        _ = try BoundedPickerImageTransfer.importingFile(at: temporaryRoot)
+      }
+    )
+    #expect(
+      throws: PickerFileTransferError.unreadableSelection,
+      performing: {
+        _ = try BoundedPickerImageTransfer.importingFile(at: symlinkURL)
+      }
+    )
+  }
+
+  @Test
+  func heifConversionUsesBoundedImageIODecodeAndHonorsTheUploadByteLimit() throws {
+    let image = syntheticImage(size: CGSize(width: 1_600, height: 900))
+    let sourceImage = try #require(image.cgImage)
+    let encodedHEIF = NSMutableData()
+    let heifDestination = try #require(
+      CGImageDestinationCreateWithData(
+        encodedHEIF,
+        UTType.heic.identifier as CFString,
+        1,
+        nil
+      )
+    )
+    CGImageDestinationAddImage(
+      heifDestination,
+      sourceImage,
+      [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary
+    )
+    #expect(CGImageDestinationFinalize(heifDestination))
+    let sourceData = encodedHEIF as Data
+
+    let jpegData = try #require(
+      BoundedPickerHEIFConverter.convertToJPEG(
+        sourceData,
+        maximumPixelSize: 320
+      )
+    )
+    let source = try #require(CGImageSourceCreateWithData(jpegData as CFData, nil))
+    let properties = try #require(
+      CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+    )
+    let width = try #require(properties[kCGImagePropertyPixelWidth] as? Int)
+    let height = try #require(properties[kCGImagePropertyPixelHeight] as? Int)
+
+    #expect(max(width, height) <= 320)
+    #expect(Int64(jpegData.count) <= MediaUploadDraft.maximumImageByteSize)
+    #expect(
+      BoundedPickerHEIFConverter.convertToJPEG(
+        sourceData,
+        maximumPixelSize: 320,
+        maximumByteSize: 1
+      ) == nil
+    )
+  }
+
+  @Test
+  func pickerRejectsAnOversizedVideoBeforeLoadingItsBytes() throws {
+    let fileURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("oversized-picker-video-\(UUID().uuidString).mp4")
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+
+    #expect(FileManager.default.createFile(atPath: fileURL.path, contents: Data([0])))
+    let handle = try FileHandle(forWritingTo: fileURL)
+    try handle.truncate(atOffset: UInt64(MediaUploadDraft.maximumVideoByteSize + 1))
+    try handle.close()
+
+    #expect(
+      throws: PickerFileTransferError.fileTooLarge(kind: .video),
+      performing: {
+        _ = try BoundedPickerVideoTransfer.importingFile(at: fileURL)
+      }
+    )
+    #expect(
+      MediaAttachmentComposerModel.mapImportFailure(
+        PickerFileTransferError.fileTooLarge(kind: .video)
+      ) == .fileTooLarge(kind: .video)
+    )
+  }
+
+  @Test
+  func pickerCopiesAnAcceptedVideoIntoAnOwnedProtectedFile() throws {
+    let fileManager = FileManager.default
+    let temporaryRoot = fileManager.temporaryDirectory.appendingPathComponent(
+      "picker-video-transfer-test-\(UUID().uuidString)",
+      isDirectory: true
+    )
+    let sourceURL = temporaryRoot.appendingPathComponent("provider.mov")
+    defer { try? fileManager.removeItem(at: temporaryRoot) }
+    try fileManager.createDirectory(at: temporaryRoot, withIntermediateDirectories: true)
+    let contents = Data([0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70])
+    try contents.write(to: sourceURL)
+
+    let transfer = try BoundedPickerVideoTransfer.importingFile(
+      at: sourceURL,
+      fileManager: fileManager,
+      temporaryDirectory: temporaryRoot
+    )
+    let ownedFile = transfer.file
+
+    #expect(ownedFile.url != sourceURL)
+    #expect(transfer.typeIdentifier == UTType.quickTimeMovie.identifier)
+    #expect(
+      ownedFile.url.deletingLastPathComponent()
+        == ProtectedTemporaryMediaUpload.directoryURL(in: temporaryRoot)
+    )
+    #expect(ownedFile.byteSize == Int64(contents.count))
+    #expect(fileManager.fileExists(atPath: sourceURL.path))
+    #expect(fileManager.fileExists(atPath: ownedFile.url.path))
+    #expect(try Data(contentsOf: ownedFile.url) == contents)
+    #expect(
+      try ownedFile.url.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        .isExcludedFromBackup == true
+    )
+
+    ownedFile.removeIfNeeded()
+    ownedFile.removeIfNeeded()
+
+    #expect(!fileManager.fileExists(atPath: ownedFile.url.path))
+    #expect(ownedFile.removalCount == 1)
+  }
+
+  @Test
   func preparedImageThumbnailHasBoundedDecodedPixelDimensions() throws {
     let image = UIGraphicsImageRenderer(size: CGSize(width: 1_600, height: 900)).image { context in
       UIColor.systemPink.setFill()
@@ -129,7 +407,7 @@ struct MediaAttachmentComposerTests {
   }
 
   @Test
-  func aspectFitSurfaceKeepsPortraitInsideFixedFrame() {
+  func fullScreenAspectFitSurfaceKeepsPortraitInsideViewerFrame() {
     let image = syntheticImage(size: CGSize(width: 800, height: 1_200))
 
     let fittedSize = MediaAspectFitImageSurface.fittedSize(
@@ -141,7 +419,7 @@ struct MediaAttachmentComposerTests {
   }
 
   @Test
-  func aspectFitSurfaceKeepsLandscapeInsideFixedFrame() {
+  func fullScreenAspectFitSurfaceKeepsLandscapeInsideViewerFrame() {
     let image = syntheticImage(size: CGSize(width: 1_200, height: 800))
 
     let fittedSize = MediaAspectFitImageSurface.fittedSize(
@@ -153,7 +431,7 @@ struct MediaAttachmentComposerTests {
   }
 
   @Test
-  func aspectFitSurfaceKeepsPanoramaInsideFixedFrame() {
+  func fullScreenAspectFitSurfaceKeepsPanoramaInsideViewerFrame() {
     let image = syntheticImage(size: CGSize(width: 2_400, height: 600))
 
     let fittedSize = MediaAspectFitImageSurface.fittedSize(
@@ -162,6 +440,119 @@ struct MediaAttachmentComposerTests {
     )
 
     #expect(fittedSize == CGSize(width: 320, height: 80))
+  }
+
+  @Test
+  func fullScreenAccessibilityFrameMatchesTheFittedImageInGlobalCoordinates() {
+    let container = CGRect(x: 40, y: 100, width: 320, height: 180)
+
+    #expect(
+      MediaAspectFitImageSurface.accessibilityFrame(
+        fittedImageSize: CGSize(width: 120, height: 180),
+        containerFrame: container,
+        scale: 1,
+        offset: .zero
+      ) == CGRect(x: 140, y: 100, width: 120, height: 180)
+    )
+    #expect(
+      MediaAspectFitImageSurface.accessibilityFrame(
+        fittedImageSize: CGSize(width: 320, height: 80),
+        containerFrame: container,
+        scale: 1,
+        offset: .zero
+      ) == CGRect(x: 40, y: 150, width: 320, height: 80)
+    )
+  }
+
+  @Test
+  func fullScreenAccessibilityFrameTracksZoomAndPanWithinTheClippedViewer() {
+    let frame = MediaAspectFitImageSurface.accessibilityFrame(
+      fittedImageSize: CGSize(width: 120, height: 180),
+      containerFrame: CGRect(x: 40, y: 100, width: 320, height: 180),
+      scale: 2,
+      offset: CGSize(width: 30, height: -20)
+    )
+
+    #expect(frame == CGRect(x: 110, y: 100, width: 240, height: 180))
+    #expect(
+      MediaAspectFitImageSurface.accessibilityFrame(
+        fittedImageSize: .zero,
+        containerFrame: CGRect(x: 40, y: 100, width: 320, height: 180),
+        scale: 1,
+        offset: .zero
+      ) == .zero
+    )
+  }
+
+  @Test
+  func accessibleZoomReductionClampsAPreviouslyPannedPanorama() {
+    let clamped = MediaAspectFitImageSurface.clampedOffset(
+      CGSize(width: 640, height: 110),
+      imageSize: CGSize(width: 320, height: 80),
+      containerSize: CGSize(width: 320, height: 180),
+      scale: 4.5
+    )
+
+    #expect(clamped == CGSize(width: 560, height: 90))
+  }
+
+  @Test
+  func inlineGalleryUsesStableFormatsForImageCountsAndVideo() {
+    #expect(MediaGroupLayout.resolve(kinds: []) == .empty)
+    #expect(MediaGroupLayout.resolve(kinds: [.image]) == .singleImage)
+    #expect(MediaGroupLayout.resolve(kinds: [.image, .image]) == .imageMosaic(columns: 2))
+    #expect(
+      MediaGroupLayout.resolve(kinds: [.image, .image, .image])
+        == .imageMosaic(columns: 3)
+    )
+    #expect(
+      MediaGroupLayout.resolve(kinds: [.image, .image, .image, .image])
+        == .imageMosaic(columns: 2)
+    )
+    #expect(MediaGroupLayout.resolve(kinds: [.video]) == .video)
+    #expect(MediaInlineTileFormat.singleImage.aspectRatio == CGFloat(4) / 3)
+    #expect(MediaInlineTileFormat.mosaicImage.aspectRatio == 1)
+    #expect(MediaInlineTileFormat.video.aspectRatio == CGFloat(16) / 9)
+  }
+
+  @Test
+  func inlineFillCropsPortraitLandscapeAndPanoramaWithoutLetterboxing() {
+    let container = CGSize(width: 320, height: 240)
+
+    #expect(
+      MediaFillGeometry.renderedSize(
+        imageSize: CGSize(width: 800, height: 1_200),
+        containerSize: container
+      ) == CGSize(width: 320, height: 480)
+    )
+    #expect(
+      MediaFillGeometry.renderedSize(
+        imageSize: CGSize(width: 1_200, height: 800),
+        containerSize: container
+      ) == CGSize(width: 360, height: 240)
+    )
+    #expect(
+      MediaFillGeometry.renderedSize(
+        imageSize: CGSize(width: 2_400, height: 600),
+        containerSize: container
+      ) == CGSize(width: 960, height: 240)
+    )
+  }
+
+  @Test
+  func inlineFillRejectsInvalidGeometry() {
+    #expect(
+      MediaFillGeometry.renderedSize(
+        imageSize: .zero,
+        containerSize: CGSize(width: 320, height: 240)
+      ) == .zero
+    )
+    #expect(
+      MediaFillGeometry.renderedSize(
+        imageSize: CGSize(width: CGFloat.nan, height: 100),
+        containerSize: CGSize(width: 320, height: 240)
+      ) == .zero
+    )
   }
 
   @Test
@@ -246,6 +637,7 @@ struct MediaAttachmentComposerTests {
     await composerExpectEventually { model.isReadyForSubmission }
 
     let ids = model.readyUploadIDs
+    model.markReadyUploadsSubmitted()
     let consumed = model.consumeReadyUploads()
     await Task.yield()
 
@@ -254,6 +646,63 @@ struct MediaAttachmentComposerTests {
     #expect(model.isReadyForSubmission)
     #expect(model.readyUploadIDs.isEmpty)
     #expect(await service.discardedIDs.isEmpty)
+  }
+
+  @Test
+  func parentSuccessConsumesOnlyUploadsOwnedByTheIssuedMutation() async throws {
+    let service = ComposerMediaServiceFake()
+    let model = MediaAttachmentComposerModel(
+      purpose: .diaryEntry,
+      service: service,
+      uploader: ComposerImmediateUploader()
+    )
+
+    try model.addPreparedAttachment(
+      kind: .image,
+      fileName: "submitted.png",
+      contentType: "image/png",
+      data: Data([0x89, 0x50, 0x4E, 0x47])
+    )
+    await composerExpectEventually { model.isReadyForSubmission }
+    let submittedIDs = model.markReadyUploadsSubmitted()
+
+    try model.addPreparedAttachment(
+      kind: .image,
+      fileName: "post-submit.png",
+      contentType: "image/png",
+      data: Data([0x89, 0x50, 0x4E, 0x47])
+    )
+    await composerExpectEventually { model.readyUploadIDs.count == 2 }
+
+    let consumed = model.consumeReadyUploads()
+
+    #expect(consumed.map(\.id) == submittedIDs)
+    #expect(model.readyUploadIDs == [ComposerMediaFixtures.uploadIDs[1]])
+    #expect(model.uploads.count == 1)
+    #expect(await service.discardedIDs.isEmpty)
+    model.clear()
+  }
+
+  @Test
+  func submittedDraftEditingLocksForInflightAndUnknownOutcomesOnly() {
+    #expect(
+      !SubmittedDraftEditingPolicy.isLocked(
+        isSubmitting: false,
+        requiresOutcomeConfirmation: false
+      )
+    )
+    #expect(
+      SubmittedDraftEditingPolicy.isLocked(
+        isSubmitting: true,
+        requiresOutcomeConfirmation: false
+      )
+    )
+    #expect(
+      SubmittedDraftEditingPolicy.isLocked(
+        isSubmitting: false,
+        requiresOutcomeConfirmation: true
+      )
+    )
   }
 
   @Test
@@ -386,9 +835,22 @@ struct MediaAttachmentComposerTests {
       contentType: "image/jpeg",
       data: Data([0xFF, 0xD8, 0xFF, 0x00])
     )
+    let transientCommentComposer = MediaAttachmentComposerModel(
+      purpose: .comment,
+      service: service,
+      uploader: ComposerImmediateUploader()
+    )
+    coordinator.registerTransient(transientCommentComposer)
+    try transientCommentComposer.addPreparedAttachment(
+      kind: .image,
+      fileName: "unsubmitted-comment.jpg",
+      contentType: "image/jpeg",
+      data: Data([0xFF, 0xD8, 0xFF, 0x01])
+    )
     await composerExpectEventually {
       coordinator.relationshipScoreComposer.isReadyForSubmission
         && coordinator.diaryEntryComposer.isReadyForSubmission
+        && transientCommentComposer.isReadyForSubmission
     }
     coordinator.relationshipScoreComposer.markReadyUploadsSubmitted()
     coordinator.diaryEntryComposer.markReadyUploadsSubmitted()
@@ -408,9 +870,13 @@ struct MediaAttachmentComposerTests {
     await cleanupTask.value
 
     #expect(cleanupFinished)
-    #expect(await service.discardedIDs == [ComposerMediaFixtures.uploadIDs[0]])
+    #expect(
+      await service.discardedIDs
+        == [ComposerMediaFixtures.uploadIDs[0], ComposerMediaFixtures.uploadIDs[2]]
+    )
     #expect(coordinator.relationshipScoreComposer.uploads.isEmpty)
     #expect(coordinator.diaryEntryComposer.uploads.isEmpty)
+    #expect(transientCommentComposer.uploads.isEmpty)
     #expect(coordinator.relationshipScoreComposer.submittedReadyUploadIDs.isEmpty)
     #expect(coordinator.diaryEntryComposer.submittedReadyUploadIDs.isEmpty)
   }
@@ -670,6 +1136,31 @@ struct MediaAttachmentComposerTests {
   }
 
   @Test
+  func previewModelDiscardsCorruptLeaseBeforeReplacementLoad() async throws {
+    let descriptor = PrivatePreviewTestFixtures.descriptor()
+    let loader = DiscardBeforeReloadPrivatePreviewLoader()
+    let model = PrivateMediaPreviewModel(descriptor: descriptor)
+
+    model.load(using: loader)
+    await composerExpectEventually { model.state == .loaded }
+    let firstURL = try #require(model.localURL)
+
+    model.reloadDiscardingCurrentLease(using: loader)
+    await composerExpectEventually { model.state == .loaded && model.localURL != firstURL }
+
+    #expect(
+      await loader.events == [
+        .load(1),
+        .discard(1),
+        .load(2),
+      ]
+    )
+    model.clear()
+    await composerExpectEventually { await loader.events.contains(.release(2)) }
+    await loader.clearSession()
+  }
+
+  @Test
   func protectedPreviewUsesSanitizedTemporaryFileAndDeletesIt() throws {
     #expect(ProtectedTemporaryMediaPreview.safeFileExtension(from: "clip.MOV") == "mov")
     #expect(
@@ -748,6 +1239,37 @@ struct MediaAttachmentComposerTests {
 
     #expect(!fileManager.fileExists(atPath: previewDirectory.path))
     #expect(fileManager.fileExists(atPath: unrelatedFile.path))
+  }
+
+  @Test
+  func launchCleanupPurgesOnlyTheDedicatedPrivateUploadDirectory() throws {
+    let fileManager = FileManager.default
+    let temporaryRoot = fileManager.temporaryDirectory.appendingPathComponent(
+      "private-upload-cleanup-test-\(UUID().uuidString)",
+      isDirectory: true
+    )
+    let uploadDirectory = ProtectedTemporaryMediaUpload.directoryURL(in: temporaryRoot)
+    let unrelatedFile = temporaryRoot.appendingPathComponent("unrelated.tmp")
+    defer { try? fileManager.removeItem(at: temporaryRoot) }
+
+    try fileManager.createDirectory(
+      at: uploadDirectory,
+      withIntermediateDirectories: true
+    )
+    try Data([0x01]).write(to: uploadDirectory.appendingPathComponent("stale.upload"))
+    try Data([0x02]).write(to: unrelatedFile)
+
+    try ProtectedTemporaryMediaUpload.purgeStaleFiles(
+      fileManager: fileManager,
+      temporaryDirectory: temporaryRoot
+    )
+
+    #expect(!fileManager.fileExists(atPath: uploadDirectory.path))
+    #expect(fileManager.fileExists(atPath: unrelatedFile.path))
+    try ProtectedTemporaryMediaUpload.purgeStaleFiles(
+      fileManager: fileManager,
+      temporaryDirectory: temporaryRoot
+    )
   }
 
   @Test
@@ -964,6 +1486,59 @@ private actor LatePrivatePreviewLoader: PrivateMediaPreviewLoading {
   }
 }
 
+private actor DiscardBeforeReloadPrivatePreviewLoader: PrivateMediaPreviewLoading {
+  enum Event: Equatable, Sendable {
+    case load(Int)
+    case release(Int)
+    case discard(Int)
+  }
+
+  private var files: [URL: Int] = [:]
+  private var loadCount = 0
+  private(set) var events: [Event] = []
+
+  func load(_ descriptor: PrivateMediaPreviewDescriptor) async throws
+    -> PrivateMediaPreviewLease
+  {
+    loadCount += 1
+    let index = loadCount
+    events.append(.load(index))
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "replace-private-preview-\(UUID().uuidString).mp4"
+    )
+    try Data(repeating: UInt8(index), count: Int(descriptor.byteSize)).write(to: url)
+    files[url] = index
+    return PrivateMediaPreviewLease(
+      token: UUID(),
+      attachmentID: descriptor.attachmentID,
+      localURL: url,
+      fileName: descriptor.fileName,
+      contentType: descriptor.contentType,
+      byteSize: descriptor.byteSize
+    )
+  }
+
+  func release(_ lease: PrivateMediaPreviewLease) async {
+    guard let index = files.removeValue(forKey: lease.localURL) else { return }
+    events.append(.release(index))
+    try? FileManager.default.removeItem(at: lease.localURL)
+  }
+
+  func discard(_ lease: PrivateMediaPreviewLease) async {
+    guard let index = files.removeValue(forKey: lease.localURL) else { return }
+    events.append(.discard(index))
+    try? FileManager.default.removeItem(at: lease.localURL)
+  }
+
+  func clearSession() async {
+    let urls = Array(files.keys)
+    files.removeAll()
+    for url in urls {
+      try? FileManager.default.removeItem(at: url)
+    }
+  }
+}
+
 private enum PrivatePreviewTestFixtures {
   static func descriptor(index: Int = 0) -> PrivateMediaPreviewDescriptor {
     PrivateMediaPreviewDescriptor(
@@ -1065,6 +1640,17 @@ private actor ComposerImmediateUploader: PresignedMediaUploading {
     await Task.yield()
     progress(1)
   }
+
+  func put(
+    fileAt fileURL: URL,
+    byteSize: Int64,
+    using grant: MediaUploadGrant,
+    progress: @escaping @Sendable (Double) -> Void
+  ) async throws {
+    progress(0.5)
+    await Task.yield()
+    progress(1)
+  }
 }
 
 private actor ComposerSuspendedUploader: PresignedMediaUploading {
@@ -1072,6 +1658,16 @@ private actor ComposerSuspendedUploader: PresignedMediaUploading {
 
   func put(
     _ data: Data,
+    using grant: MediaUploadGrant,
+    progress: @escaping @Sendable (Double) -> Void
+  ) async throws {
+    hasStarted = true
+    try await Task.sleep(for: .seconds(60))
+  }
+
+  func put(
+    fileAt fileURL: URL,
+    byteSize: Int64,
     using grant: MediaUploadGrant,
     progress: @escaping @Sendable (Double) -> Void
   ) async throws {
@@ -1096,9 +1692,10 @@ private func composerExpectEventually(
 ) async {
   let clock = ContinuousClock()
   let deadline = clock.now.advanced(by: timeout)
+
   while clock.now < deadline {
     if await predicate() { return }
-    try? await Task.sleep(for: .milliseconds(5))
+    try? await Task.sleep(for: .milliseconds(10))
   }
   Issue.record("Timed out waiting for media composer state")
 }

@@ -10,6 +10,23 @@ final class RelationshipModel {
     var minimumCommentCount: Int64 = 0
   }
 
+  private struct ScoreSubmissionSnapshot: Equatable, Sendable {
+    let originalScore: Int
+    let originalUpdatedAt: Date
+    let originalChangeIDs: Set<Int64>
+    let targetScore: Int
+    let reason: String?
+    let attachmentIDs: [UUID]
+    let currentParticipantSlot: ParticipantSlot
+  }
+
+  private struct CommentSubmissionSnapshot: Equatable, Sendable {
+    let scoreChangeID: Int64
+    let originalCommentIDs: Set<Int64>?
+    let content: String?
+    let attachmentIDs: [UUID]
+  }
+
   enum LoadState: Equatable, Sendable {
     case idle
     case loading
@@ -33,6 +50,30 @@ final class RelationshipModel {
     case failed
   }
 
+  enum PagingState: Equatable, Sendable {
+    case idle
+    case loading
+    case failed
+  }
+
+  enum OutcomeInspectionState: Equatable, Sendable {
+    case idle
+    case loading
+    case loaded
+    case failed
+  }
+
+  enum OutcomeInspectionResult: Equatable, Sendable {
+    case inconclusive
+    case committed
+    case notCommitted
+  }
+
+  enum ManualRetryDraftContext: Equatable, Sendable {
+    case scoreChange
+    case comment(scoreChangeID: Int64)
+  }
+
   enum Conflict: Equatable, Sendable {
     case scoreChange
     case comment(scoreChangeID: Int64)
@@ -44,6 +85,7 @@ final class RelationshipModel {
   }
 
   private(set) var loadState: LoadState = .idle
+  private(set) var pagingState: PagingState = .idle
   private(set) var threadState: ThreadState = .idle
   private(set) var scoreSubmissionState: SubmissionState = .idle
   private(set) var commentSubmissionState: SubmissionState = .idle
@@ -58,11 +100,63 @@ final class RelationshipModel {
   private(set) var rejectedMediaMutation: RejectedMediaMutation?
   private(set) var authenticationRequired = false
   private(set) var notice: String?
+  private(set) var archiveNotice: String?
   private(set) var lastSuccessfulScoreChangeID: Int64?
   private(set) var lastSuccessfulCommentScoreChangeID: Int64?
   private(set) var commentSubmissionScoreChangeID: Int64?
   private(set) var commentNoticeScoreChangeID: Int64?
   private(set) var commentNoticeMessage: String?
+  private(set) var scoreOutcomeRequiresConfirmation = false
+  private(set) var scoreOutcomeInspectionState: OutcomeInspectionState = .idle
+  private(set) var scoreOutcomeInspectionResult: OutcomeInspectionResult = .inconclusive
+  private(set) var unknownOutcomeTargetScore: Int?
+  private(set) var commentOutcomeRequiresConfirmation = false
+  private(set) var commentOutcomeInspectionState: OutcomeInspectionState = .idle
+  private(set) var commentOutcomeInspectionResult: OutcomeInspectionResult = .inconclusive
+  private(set) var commentOutcomeScoreChangeID: Int64?
+  private(set) var manualRetryDraftContext: ManualRetryDraftContext?
+  private(set) var localCommentDraftScoreChangeID: Int64?
+  private(set) var localScoreDraftProtected = false
+
+  var hasProtectedManualRetryDraft: Bool {
+    manualRetryDraftContext != nil
+  }
+
+  var hasProtectedLocalCommentDraft: Bool {
+    localCommentDraftScoreChangeID != nil
+  }
+
+  var hasProtectedLocalScoreDraft: Bool {
+    localScoreDraftProtected
+  }
+
+  var canResolveUnknownScoreOutcomeAsCommitted: Bool {
+    scoreOutcomeRequiresConfirmation
+      && scoreOutcomeInspectionState == .loaded
+      && scoreOutcomeInspectionResult == .committed
+  }
+
+  var canRetryUnknownScoreOutcome: Bool {
+    scoreOutcomeRequiresConfirmation
+      && scoreOutcomeInspectionState == .loaded
+      && scoreOutcomeInspectionResult == .notCommitted
+  }
+
+  func commentOutcomeRequiresConfirmation(for scoreChangeID: Int64) -> Bool {
+    commentOutcomeRequiresConfirmation && commentOutcomeScoreChangeID == scoreChangeID
+  }
+
+  func canResolveUnknownCommentOutcomeAsCommitted(for scoreChangeID: Int64) -> Bool {
+    commentOutcomeRequiresConfirmation(for: scoreChangeID)
+      && commentOutcomeInspectionState == .loaded
+      && commentOutcomeInspectionResult == .committed
+  }
+
+  func canRetryUnknownCommentOutcome(for scoreChangeID: Int64) -> Bool {
+    commentOutcomeRequiresConfirmation(for: scoreChangeID)
+      && commentOutcomeInspectionState == .loaded
+      && commentOutcomeInspectionResult == .notCommitted
+  }
 
   @ObservationIgnored
   private let service: any RelationshipServing
@@ -97,6 +191,12 @@ final class RelationshipModel {
   @ObservationIgnored
   private var committedCommentOverlays: [Int64: CommittedCommentOverlay] = [:]
 
+  @ObservationIgnored
+  private var scoreSubmissionSnapshot: ScoreSubmissionSnapshot?
+
+  @ObservationIgnored
+  private var commentSubmissionSnapshot: CommentSubmissionSnapshot?
+
   init(service: any RelationshipServing) {
     self.service = service
   }
@@ -106,15 +206,30 @@ final class RelationshipModel {
     reload()
   }
 
-  func reload() {
+  func reload(
+    preservingVisibleContent: Bool = false,
+    updatesScoreOutcomeInspection: Bool = false
+  ) {
+    if !updatesScoreOutcomeInspection,
+      scoreOutcomeRequiresConfirmation,
+      scoreOutcomeInspectionState == .loading
+    {
+      scoreOutcomeInspectionState = .failed
+      scoreOutcomeInspectionResult = .inconclusive
+    }
     dataGeneration &+= 1
     let generation = dataGeneration
     let service = service
     loadTask?.cancel()
     pageTask?.cancel()
     pageTask = nil
-    loadState = .loading
-    notice = nil
+    pagingState = .idle
+    archiveNotice = nil
+    let keepsVisibleContent = preservingVisibleContent && loadState == .loaded
+    if !keepsVisibleContent {
+      loadState = .loading
+      notice = nil
+    }
 
     loadTask = Task { @MainActor [weak self] in
       do {
@@ -129,13 +244,41 @@ final class RelationshipModel {
         self.hasNextPage = firstPage.hasNext
         self.totalCount = firstPage.totalCount
         self.loadState = .loaded
+        if updatesScoreOutcomeInspection {
+          self.scoreOutcomeInspectionResult = Self.inspectScoreOutcome(
+            scores: scores,
+            changes: firstPage.changes,
+            snapshot: self.scoreSubmissionSnapshot
+          )
+          self.scoreOutcomeInspectionState = .loaded
+        }
         self.loadTask = nil
       } catch is CancellationError {
-        return
+        guard let self, self.dataGeneration == generation else { return }
+        self.loadTask = nil
+        if updatesScoreOutcomeInspection {
+          self.scoreOutcomeInspectionState = .failed
+          self.scoreOutcomeInspectionResult = .inconclusive
+        }
+        if keepsVisibleContent {
+          self.loadState = .loaded
+          self.notice = "최신 마음 기록 확인이 중단됐어요. 현재 화면은 그대로 두었어요."
+        } else {
+          self.loadState = .failed
+        }
       } catch {
         guard let self, self.dataGeneration == generation else { return }
         self.loadTask = nil
         if self.handleAuthenticationFailure(error) { return }
+        if updatesScoreOutcomeInspection {
+          self.scoreOutcomeInspectionState = .failed
+          self.scoreOutcomeInspectionResult = .inconclusive
+        }
+        if keepsVisibleContent {
+          self.loadState = .loaded
+          self.notice = "최신 마음 기록을 불러오지 못했어요. 현재 화면은 그대로 두었어요."
+          return
+        }
         if error as? WoorisaiAPIError == .serviceUnavailable {
           self.loadState = .unavailable
         } else {
@@ -145,11 +288,22 @@ final class RelationshipModel {
     }
   }
 
+  func refresh() async {
+    notice = nil
+    archiveNotice = nil
+    reload(preservingVisibleContent: true)
+    let task = loadTask
+    await task?.value
+    archiveNotice = notice
+  }
+
   func loadNextPage() {
     guard loadState == .loaded, hasNextPage, pageTask == nil else { return }
     let expectedPage = currentPage + 1
     let generation = dataGeneration
     let service = service
+    pagingState = .loading
+    archiveNotice = nil
 
     pageTask = Task { @MainActor [weak self] in
       do {
@@ -165,13 +319,18 @@ final class RelationshipModel {
         self.hasNextPage = page.hasNext
         self.totalCount = page.totalCount
         self.pageTask = nil
+        self.pagingState = .idle
+        self.archiveNotice = nil
       } catch is CancellationError {
-        return
+        guard let self, self.dataGeneration == generation else { return }
+        self.pageTask = nil
+        self.pagingState = .idle
       } catch {
         guard let self, self.dataGeneration == generation else { return }
         self.pageTask = nil
+        self.pagingState = .failed
         if self.handleAuthenticationFailure(error) { return }
-        self.notice = "다음 기록을 불러오지 못했어요. 다시 시도해 주세요."
+        self.archiveNotice = "다음 기록을 불러오지 못했어요. 다시 시도해 주세요."
       }
     }
   }
@@ -179,6 +338,8 @@ final class RelationshipModel {
   func canCreateScoreChange(targetScore: Int) -> Bool {
     guard loadState == .loaded,
       scoreSubmissionState != .submitting,
+      !scoreOutcomeRequiresConfirmation,
+      manualRetryDraftContext == nil || manualRetryDraftContext == .scoreChange,
       let outgoingScore = scores?.outgoingScore
     else {
       return false
@@ -212,11 +373,31 @@ final class RelationshipModel {
       return false
     }
 
+    guard let scores else { return false }
+    let submissionSnapshot = ScoreSubmissionSnapshot(
+      originalScore: scores.outgoingScore,
+      originalUpdatedAt: scores.outgoingUpdatedAt,
+      originalChangeIDs: Set(changes.map(\.id)),
+      targetScore: targetScore,
+      reason: draft.reason,
+      attachmentIDs: draft.mediaUploadIDs,
+      currentParticipantSlot: scores.currentParticipant.slot
+    )
+
     let generation = dataGeneration
     let service = service
     scoreSubmissionState = .submitting
+    localScoreDraftProtected = false
     rejectedMediaMutation = nil
     lastSuccessfulScoreChangeID = nil
+    scoreOutcomeRequiresConfirmation = false
+    scoreOutcomeInspectionState = .idle
+    scoreOutcomeInspectionResult = .inconclusive
+    unknownOutcomeTargetScore = nil
+    scoreSubmissionSnapshot = submissionSnapshot
+    if manualRetryDraftContext == .scoreChange {
+      manualRetryDraftContext = nil
+    }
     notice = nil
     scoreTask?.cancel()
     scoreTask = Task { @MainActor [weak self] in
@@ -242,38 +423,90 @@ final class RelationshipModel {
         self.lastSuccessfulScoreChangeID = created.change.id
         self.scoreSubmissionState = .idle
         self.scoreTask = nil
+        self.scoreOutcomeRequiresConfirmation = false
+        self.scoreOutcomeInspectionState = .idle
+        self.scoreOutcomeInspectionResult = .inconclusive
+        self.unknownOutcomeTargetScore = nil
+        self.scoreSubmissionSnapshot = nil
+        self.manualRetryDraftContext = nil
+        self.localScoreDraftProtected = false
         self.notice = "새 점수 기록을 남겼어요."
       } catch is CancellationError {
-        return
+        guard let self, self.dataGeneration == generation else { return }
+        self.scoreTask = nil
+        self.scoreSubmissionState = .failed
+        self.localScoreDraftProtected = true
+        self.scoreOutcomeRequiresConfirmation = true
+        self.scoreOutcomeInspectionState = .idle
+        self.scoreOutcomeInspectionResult = .inconclusive
+        self.unknownOutcomeTargetScore = targetScore
+        self.notice = "저장 결과를 확인할 수 없어 재전송을 잠갔어요."
       } catch {
         guard let self, self.dataGeneration == generation else { return }
         self.scoreTask = nil
-        if Self.isDefinitiveNonCommit(error) {
+        let isDefinitiveNonCommit = Self.isDefinitiveNonCommit(error)
+        if isDefinitiveNonCommit {
           self.rejectedMediaMutation = .scoreChange
         }
         if self.handleAuthenticationFailure(error) { return }
         if error as? WoorisaiAPIError == .conflict {
           self.scoreSubmissionState = .idle
+          self.scoreOutcomeRequiresConfirmation = false
+          self.scoreOutcomeInspectionResult = .inconclusive
+          self.scoreSubmissionSnapshot = nil
+          self.manualRetryDraftContext = nil
+          self.localScoreDraftProtected = true
           self.conflict = .scoreChange
+        } else if isDefinitiveNonCommit {
+          self.scoreSubmissionState = .failed
+          self.scoreOutcomeRequiresConfirmation = false
+          self.scoreOutcomeInspectionResult = .inconclusive
+          self.scoreSubmissionSnapshot = nil
+          self.manualRetryDraftContext = nil
+          self.localScoreDraftProtected = true
+          self.notice = "점수 기록을 저장하지 못했어요. 내용을 확인하고 다시 시도해 주세요."
         } else {
           self.scoreSubmissionState = .failed
-          self.notice = "저장 결과를 확인할 수 없어요. 자동으로 다시 보내지 않았습니다."
+          self.localScoreDraftProtected = true
+          self.scoreOutcomeRequiresConfirmation = true
+          self.scoreOutcomeInspectionState = .idle
+          self.scoreOutcomeInspectionResult = .inconclusive
+          self.unknownOutcomeTargetScore = targetScore
+          self.notice = "저장 결과를 확인할 수 없어 재전송을 잠갔어요."
         }
       }
     }
     return true
   }
 
-  func loadThread(scoreChangeID: Int64) {
+  func loadThread(
+    scoreChangeID: Int64,
+    preservingVisibleContent: Bool = false,
+    updatesCommentOutcomeInspection: Bool = false
+  ) {
+    if !updatesCommentOutcomeInspection,
+      commentOutcomeRequiresConfirmation,
+      commentOutcomeInspectionState == .loading
+    {
+      commentOutcomeInspectionState = .failed
+      commentOutcomeInspectionResult = .inconclusive
+    }
     threadGeneration &+= 1
     let generation = threadGeneration
     threadReadGeneration &+= 1
     let readGeneration = threadReadGeneration
     let service = service
     threadTask?.cancel()
+    let keepsVisibleContent =
+      preservingVisibleContent
+      && threadState == .loaded
+      && selectedThreadScoreChangeID == scoreChangeID
+      && selectedThread != nil
     selectedThreadScoreChangeID = scoreChangeID
-    selectedThread = nil
-    threadState = .loading
+    if !keepsVisibleContent {
+      selectedThread = nil
+      threadState = .loading
+    }
 
     threadTask = Task { @MainActor [weak self] in
       do {
@@ -285,9 +518,31 @@ final class RelationshipModel {
         else { return }
         self.selectedThread = self.mergingCommittedComments(into: thread)
         self.threadState = .loaded
+        if updatesCommentOutcomeInspection {
+          self.commentOutcomeInspectionResult = Self.inspectCommentOutcome(
+            thread: thread,
+            snapshot: self.commentSubmissionSnapshot
+          )
+          self.commentOutcomeInspectionState = .loaded
+        }
         self.threadTask = nil
       } catch is CancellationError {
-        return
+        guard let self,
+          self.threadGeneration == generation,
+          self.threadReadGeneration == readGeneration
+        else { return }
+        self.threadTask = nil
+        if updatesCommentOutcomeInspection {
+          self.commentOutcomeInspectionState = .failed
+          self.commentOutcomeInspectionResult = .inconclusive
+        }
+        if keepsVisibleContent {
+          self.threadState = .loaded
+          self.commentNoticeScoreChangeID = scoreChangeID
+          self.commentNoticeMessage = "최신 대화 확인이 중단됐어요. 현재 대화와 초안은 그대로 두었어요."
+        } else {
+          self.threadState = .failed
+        }
       } catch {
         guard let self,
           self.threadGeneration == generation,
@@ -295,6 +550,16 @@ final class RelationshipModel {
         else { return }
         self.threadTask = nil
         if self.handleAuthenticationFailure(error) { return }
+        if updatesCommentOutcomeInspection {
+          self.commentOutcomeInspectionState = .failed
+          self.commentOutcomeInspectionResult = .inconclusive
+        }
+        if keepsVisibleContent {
+          self.threadState = .loaded
+          self.commentNoticeScoreChangeID = scoreChangeID
+          self.commentNoticeMessage = "최신 대화를 불러오지 못했어요. 현재 대화와 초안은 그대로 두었어요."
+          return
+        }
         switch error as? WoorisaiAPIError {
         case .notFound: self.threadState = .notFound
         case .serviceUnavailable: self.threadState = .unavailable
@@ -329,7 +594,11 @@ final class RelationshipModel {
     content: String,
     mediaUploadIDs: [UUID] = []
   ) -> Bool {
-    guard commentSubmissionState != .submitting else { return false }
+    guard commentSubmissionState != .submitting,
+      !commentOutcomeRequiresConfirmation,
+      manualRetryDraftContext == nil
+        || manualRetryDraftContext == .comment(scoreChangeID: scoreChangeID)
+    else { return false }
     let draft: RelationshipScoreCommentDraft
     do {
       draft = try RelationshipScoreCommentDraft(
@@ -344,14 +613,35 @@ final class RelationshipModel {
       return false
     }
 
+    let originalCommentIDs: Set<Int64>?
+    if selectedThreadScoreChangeID == scoreChangeID, let selectedThread {
+      originalCommentIDs = Set(selectedThread.comments.map(\.id))
+    } else {
+      originalCommentIDs = nil
+    }
+    let submissionSnapshot = CommentSubmissionSnapshot(
+      scoreChangeID: scoreChangeID,
+      originalCommentIDs: originalCommentIDs,
+      content: draft.content,
+      attachmentIDs: draft.mediaUploadIDs
+    )
+
     commentWriteGeneration &+= 1
     let writeGeneration = commentWriteGeneration
     let successMinimumCommentCount = knownCommentCount(for: scoreChangeID) + 1
     let service = service
     commentSubmissionScoreChangeID = scoreChangeID
     commentSubmissionState = .submitting
+    if localCommentDraftScoreChangeID == scoreChangeID {
+      localCommentDraftScoreChangeID = nil
+    }
     rejectedMediaMutation = nil
     lastSuccessfulCommentScoreChangeID = nil
+    clearUnknownCommentOutcome()
+    commentSubmissionSnapshot = submissionSnapshot
+    if manualRetryDraftContext == .comment(scoreChangeID: scoreChangeID) {
+      manualRetryDraftContext = nil
+    }
     commentNoticeScoreChangeID = nil
     commentNoticeMessage = nil
     commentTask?.cancel()
@@ -382,28 +672,55 @@ final class RelationshipModel {
         }
         self.lastSuccessfulCommentScoreChangeID = scoreChangeID
         self.commentSubmissionState = .idle
+        self.localCommentDraftScoreChangeID = nil
+        self.clearUnknownCommentOutcome()
+        self.commentSubmissionSnapshot = nil
+        self.manualRetryDraftContext = nil
         self.commentNoticeScoreChangeID = scoreChangeID
         self.commentNoticeMessage = "댓글을 남겼어요."
       } catch is CancellationError {
         guard let self, self.commentWriteGeneration == writeGeneration else { return }
         self.commentTask = nil
         self.commentSubmissionState = .failed
+        self.localCommentDraftScoreChangeID = scoreChangeID
+        self.commentOutcomeRequiresConfirmation = true
+        self.commentOutcomeInspectionState = .idle
+        self.commentOutcomeInspectionResult = .inconclusive
+        self.commentOutcomeScoreChangeID = scoreChangeID
         self.commentNoticeScoreChangeID = scoreChangeID
-        self.commentNoticeMessage = "댓글 저장 결과를 확인할 수 없어 자동 재시도하지 않았습니다."
+        self.commentNoticeMessage = "댓글 저장 결과를 확인할 수 없어 재전송을 잠갔어요."
       } catch {
         guard let self, self.commentWriteGeneration == writeGeneration else { return }
         self.commentTask = nil
-        if Self.isDefinitiveNonCommit(error) {
+        let isDefinitiveNonCommit = Self.isDefinitiveNonCommit(error)
+        if isDefinitiveNonCommit {
           self.rejectedMediaMutation = .comment(scoreChangeID: scoreChangeID)
         }
         if self.handleAuthenticationFailure(error) { return }
         if error as? WoorisaiAPIError == .conflict {
           self.commentSubmissionState = .idle
+          self.localCommentDraftScoreChangeID = scoreChangeID
+          self.clearUnknownCommentOutcome()
+          self.commentSubmissionSnapshot = nil
+          self.manualRetryDraftContext = nil
           self.conflict = .comment(scoreChangeID: scoreChangeID)
+        } else if isDefinitiveNonCommit {
+          self.commentSubmissionState = .failed
+          self.localCommentDraftScoreChangeID = scoreChangeID
+          self.clearUnknownCommentOutcome()
+          self.commentSubmissionSnapshot = nil
+          self.manualRetryDraftContext = nil
+          self.commentNoticeScoreChangeID = scoreChangeID
+          self.commentNoticeMessage = "댓글을 저장하지 못했어요. 내용을 확인하고 다시 시도해 주세요."
         } else {
           self.commentSubmissionState = .failed
+          self.localCommentDraftScoreChangeID = scoreChangeID
+          self.commentOutcomeRequiresConfirmation = true
+          self.commentOutcomeInspectionState = .idle
+          self.commentOutcomeInspectionResult = .inconclusive
+          self.commentOutcomeScoreChangeID = scoreChangeID
           self.commentNoticeScoreChangeID = scoreChangeID
-          self.commentNoticeMessage = "댓글 저장 결과를 확인할 수 없어 자동 재시도하지 않았습니다."
+          self.commentNoticeMessage = "댓글 저장 결과를 확인할 수 없어 재전송을 잠갔어요."
         }
       }
     }
@@ -417,7 +734,7 @@ final class RelationshipModel {
     case .scoreChange:
       reload()
     case .comment(let scoreChangeID):
-      loadThread(scoreChangeID: scoreChangeID)
+      loadThread(scoreChangeID: scoreChangeID, preservingVisibleContent: true)
     }
   }
 
@@ -428,12 +745,143 @@ final class RelationshipModel {
     case .scoreChange:
       reload()
     case .comment(let scoreChangeID):
-      loadThread(scoreChangeID: scoreChangeID)
+      loadThread(scoreChangeID: scoreChangeID, preservingVisibleContent: true)
     }
   }
 
   func dismissNotice() {
     notice = nil
+  }
+
+  func inspectUnknownScoreOutcome() {
+    guard scoreOutcomeRequiresConfirmation else { return }
+    scoreOutcomeInspectionState = .loading
+    scoreOutcomeInspectionResult = .inconclusive
+    reload(
+      preservingVisibleContent: true,
+      updatesScoreOutcomeInspection: true
+    )
+  }
+
+  @discardableResult
+  func resolveUnknownScoreOutcomeAsCommitted() -> Bool {
+    guard canResolveUnknownScoreOutcomeAsCommitted else { return false }
+    scoreOutcomeRequiresConfirmation = false
+    scoreOutcomeInspectionState = .idle
+    scoreOutcomeInspectionResult = .inconclusive
+    unknownOutcomeTargetScore = nil
+    scoreSubmissionSnapshot = nil
+    manualRetryDraftContext = nil
+    localScoreDraftProtected = false
+    scoreSubmissionState = .idle
+    notice = "이미 저장된 점수 기록을 확인하고 초안을 정리했어요."
+    return true
+  }
+
+  @discardableResult
+  func confirmUnknownScoreOutcomeForRetry() -> Bool {
+    guard canRetryUnknownScoreOutcome else { return false }
+    scoreOutcomeRequiresConfirmation = false
+    scoreOutcomeInspectionState = .idle
+    scoreOutcomeInspectionResult = .inconclusive
+    unknownOutcomeTargetScore = nil
+    scoreSubmissionSnapshot = nil
+    manualRetryDraftContext = .scoreChange
+    localScoreDraftProtected = true
+    scoreSubmissionState = .idle
+    notice = "저장되지 않은 것을 확인했어요. 다시 기록할 수 있어요."
+    return true
+  }
+
+  func inspectUnknownCommentOutcome(scoreChangeID: Int64) {
+    guard commentOutcomeRequiresConfirmation(for: scoreChangeID) else { return }
+    commentOutcomeInspectionState = .loading
+    commentOutcomeInspectionResult = .inconclusive
+    loadThread(
+      scoreChangeID: scoreChangeID,
+      preservingVisibleContent: true,
+      updatesCommentOutcomeInspection: true
+    )
+  }
+
+  @discardableResult
+  func resolveUnknownCommentOutcomeAsCommitted(scoreChangeID: Int64) -> Bool {
+    guard canResolveUnknownCommentOutcomeAsCommitted(for: scoreChangeID) else { return false }
+    clearUnknownCommentOutcome()
+    commentSubmissionSnapshot = nil
+    manualRetryDraftContext = nil
+    localCommentDraftScoreChangeID = nil
+    commentSubmissionState = .idle
+    commentNoticeScoreChangeID = scoreChangeID
+    commentNoticeMessage = "이미 저장된 댓글을 확인하고 초안을 정리했어요."
+    return true
+  }
+
+  @discardableResult
+  func confirmUnknownCommentOutcomeForRetry(scoreChangeID: Int64) -> Bool {
+    guard canRetryUnknownCommentOutcome(for: scoreChangeID) else { return false }
+    clearUnknownCommentOutcome()
+    commentSubmissionSnapshot = nil
+    manualRetryDraftContext = .comment(scoreChangeID: scoreChangeID)
+    localCommentDraftScoreChangeID = scoreChangeID
+    commentSubmissionState = .idle
+    commentNoticeScoreChangeID = scoreChangeID
+    commentNoticeMessage = "저장되지 않은 것을 확인했어요. 다시 댓글을 남길 수 있어요."
+    return true
+  }
+
+  @discardableResult
+  func abandonInconclusiveUnknownScoreOutcome() -> Bool {
+    guard scoreOutcomeRequiresConfirmation,
+      scoreOutcomeInspectionState == .loaded,
+      scoreOutcomeInspectionResult == .inconclusive
+    else { return false }
+    scoreOutcomeRequiresConfirmation = false
+    scoreOutcomeInspectionState = .idle
+    scoreOutcomeInspectionResult = .inconclusive
+    unknownOutcomeTargetScore = nil
+    scoreSubmissionSnapshot = nil
+    manualRetryDraftContext = nil
+    localScoreDraftProtected = false
+    scoreSubmissionState = .idle
+    notice = "중복을 피하기 위해 재전송하지 않고 초안을 정리했어요."
+    return true
+  }
+
+  @discardableResult
+  func abandonInconclusiveUnknownCommentOutcome(scoreChangeID: Int64) -> Bool {
+    guard commentOutcomeRequiresConfirmation(for: scoreChangeID),
+      commentOutcomeInspectionState == .loaded,
+      commentOutcomeInspectionResult == .inconclusive
+    else { return false }
+    clearUnknownCommentOutcome()
+    commentSubmissionSnapshot = nil
+    manualRetryDraftContext = nil
+    localCommentDraftScoreChangeID = nil
+    commentSubmissionState = .idle
+    commentNoticeScoreChangeID = scoreChangeID
+    commentNoticeMessage = "중복을 피하기 위해 재전송하지 않고 초안을 정리했어요."
+    return true
+  }
+
+  func releaseManualRetryDraftProtection(_ context: ManualRetryDraftContext) {
+    guard manualRetryDraftContext == context else { return }
+    manualRetryDraftContext = nil
+  }
+
+  func updateLocalCommentDraftProtection(scoreChangeID: Int64, isProtected: Bool) {
+    if isProtected {
+      localCommentDraftScoreChangeID = scoreChangeID
+    } else if localCommentDraftScoreChangeID == scoreChangeID {
+      localCommentDraftScoreChangeID = nil
+    }
+  }
+
+  func updateLocalScoreDraftProtection(isProtected: Bool) {
+    localScoreDraftProtected = isProtected
+    if !isProtected, manualRetryDraftContext == .scoreChange {
+      manualRetryDraftContext = nil
+    }
   }
 
   func clear() {
@@ -452,6 +900,7 @@ final class RelationshipModel {
     threadTask = nil
     commentTask = nil
     loadState = .idle
+    pagingState = .idle
     threadState = .idle
     scoreSubmissionState = .idle
     commentSubmissionState = .idle
@@ -466,11 +915,22 @@ final class RelationshipModel {
     rejectedMediaMutation = nil
     authenticationRequired = false
     notice = nil
+    archiveNotice = nil
     lastSuccessfulScoreChangeID = nil
     lastSuccessfulCommentScoreChangeID = nil
     commentSubmissionScoreChangeID = nil
     commentNoticeScoreChangeID = nil
     commentNoticeMessage = nil
+    scoreOutcomeRequiresConfirmation = false
+    scoreOutcomeInspectionState = .idle
+    scoreOutcomeInspectionResult = .inconclusive
+    unknownOutcomeTargetScore = nil
+    scoreSubmissionSnapshot = nil
+    clearUnknownCommentOutcome()
+    commentSubmissionSnapshot = nil
+    manualRetryDraftContext = nil
+    localCommentDraftScoreChangeID = nil
+    localScoreDraftProtected = false
     committedCommentOverlays.removeAll()
   }
 
@@ -500,6 +960,7 @@ final class RelationshipModel {
     selectedThreadScoreChangeID = nil
     selectedThread = nil
     loadState = .idle
+    pagingState = .idle
     threadState = .idle
     scoreSubmissionState = .idle
     commentSubmissionState = .idle
@@ -507,9 +968,27 @@ final class RelationshipModel {
     commentSubmissionScoreChangeID = nil
     commentNoticeScoreChangeID = nil
     commentNoticeMessage = nil
+    archiveNotice = nil
+    scoreOutcomeRequiresConfirmation = false
+    scoreOutcomeInspectionState = .idle
+    scoreOutcomeInspectionResult = .inconclusive
+    unknownOutcomeTargetScore = nil
+    scoreSubmissionSnapshot = nil
+    clearUnknownCommentOutcome()
+    commentSubmissionSnapshot = nil
+    manualRetryDraftContext = nil
+    localCommentDraftScoreChangeID = nil
+    localScoreDraftProtected = false
     committedCommentOverlays.removeAll()
     authenticationRequired = true
     return true
+  }
+
+  private func clearUnknownCommentOutcome() {
+    commentOutcomeRequiresConfirmation = false
+    commentOutcomeInspectionState = .idle
+    commentOutcomeInspectionResult = .inconclusive
+    commentOutcomeScoreChangeID = nil
   }
 
   private func mergingCommittedComments(
@@ -569,6 +1048,55 @@ final class RelationshipModel {
       )
     }
     return knownCount
+  }
+
+  private static func inspectScoreOutcome(
+    scores: RelationshipScores,
+    changes: [RelationshipScoreChange],
+    snapshot: ScoreSubmissionSnapshot?
+  ) -> OutcomeInspectionResult {
+    guard let snapshot else { return .inconclusive }
+
+    let matchingSubmittedChange = changes.contains { change in
+      !snapshot.originalChangeIDs.contains(change.id)
+        && change.sourceParticipant.slot == snapshot.currentParticipantSlot
+        && change.changedBy.slot == snapshot.currentParticipantSlot
+        && change.resultingScore == snapshot.targetScore
+        && change.reason == snapshot.reason
+        && change.attachments.map(\.id) == snapshot.attachmentIDs
+        && change.createdAt >= snapshot.originalUpdatedAt
+    }
+    if matchingSubmittedChange { return .committed }
+
+    if scores.outgoingScore == snapshot.originalScore,
+      scores.outgoingUpdatedAt == snapshot.originalUpdatedAt
+    {
+      return .notCommitted
+    }
+    return .inconclusive
+  }
+
+  private static func inspectCommentOutcome(
+    thread: RelationshipScoreThread,
+    snapshot: CommentSubmissionSnapshot?
+  ) -> OutcomeInspectionResult {
+    guard let snapshot,
+      snapshot.scoreChangeID == thread.change.id,
+      let originalCommentIDs = snapshot.originalCommentIDs
+    else {
+      return .inconclusive
+    }
+
+    let matchingSubmittedComment = thread.comments.contains { comment in
+      !originalCommentIDs.contains(comment.id)
+        && comment.author.isCurrentParticipant
+        && comment.content == snapshot.content
+        && comment.attachments.map(\.id) == snapshot.attachmentIDs
+    }
+    if matchingSubmittedComment { return .committed }
+
+    let latestCommentIDs = Set(thread.comments.map(\.id))
+    return originalCommentIDs.isSubset(of: latestCommentIDs) ? .notCommitted : .inconclusive
   }
 
   private static func withCommentCount(
