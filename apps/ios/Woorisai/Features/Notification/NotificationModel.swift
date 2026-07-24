@@ -230,6 +230,22 @@ final class NotificationModel {
     state = .idle
   }
 
+  /// Lock the app WITHOUT unregistering: the FID stays on the server so notifications keep arriving
+  /// while locked. Deliberately does NOT bump `sessionGeneration` — a cancelled in-flight
+  /// registration then settles through `finishRegistrationAttempt` (no compensating DELETE) rather
+  /// than `finishOutdatedRegistrationAttempt`, preserving the committed FID. Flipping
+  /// `authenticatedSessionIsActive` to false gates every re-entry point (which would otherwise fail
+  /// without an in-memory credential). The next `authenticatedSessionDidStart()` re-asserts it.
+  func pauseRegistrationForLock() {
+    authenticatedSessionIsActive = false
+    registrationRefreshPending = false
+    foregroundPermissionTask?.cancel()
+    foregroundPermissionTask = nil
+    registrationTask?.cancel()
+    authenticationRequired = false
+    state = .idle
+  }
+
   func receiveNotification(eventType: String?, resourceID: String?) {
     guard
       let intent = NotificationPayloadRouter.refetchIntent(

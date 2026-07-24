@@ -26,6 +26,8 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>우리사이 잠금을 Face ID로 해제합니다.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>WoorisaiAPIHost</key>

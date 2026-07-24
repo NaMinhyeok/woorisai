@@ -30,7 +30,10 @@ struct WoorisaiApp: App {
     _authenticationModel = State(
       initialValue: AuthenticationModel(
         validator: services.credentialValidator,
-        credentialStore: services.credentialStore
+        credentialStore: services.credentialStore,
+        vault: services.credentialVault,
+        biometricProbe: services.biometricProbe,
+        restoresSession: services.shouldRestoreSession
       )
     )
     _relationshipModel = State(
@@ -80,6 +83,9 @@ struct WoorisaiApp: App {
       )
       .task {
         appDelegate.pushCoordinator.attach(notificationModel: notificationModel)
+      }
+      .task {
+        await authenticationModel.restoreLockedSessionIfAvailable()
       }
       let privacyProtectedRootView =
         rootView
@@ -264,6 +270,8 @@ private struct AppRootView: View {
   var body: some View {
     if let participant = authenticationModel.authenticatedParticipant {
       authenticatedContent(participant: participant)
+    } else if authenticationModel.isAwaitingBiometricUnlock {
+      BiometricUnlockView(authenticationModel: authenticationModel)
     } else {
       LoginOptionsView(
         model: loginOptionsModel,
@@ -311,7 +319,8 @@ private struct AppRootView: View {
         notificationState: notificationModel.state,
         canRetryNotifications: notificationModel.canRetryRegistration,
         onRetryNotifications: notificationModel.retryRegistration,
-        onSignOut: signOut
+        onLock: lockSession,
+        onForget: forgetSession
       )
       .tabItem {
         Label("설정", systemImage: "gearshape")
@@ -401,39 +410,42 @@ private struct AppRootView: View {
     }
   #endif
 
-  private func signOut() {
-    guard !isEndingSession else { return }
-    isEndingSession = true
-    #if DEBUG
-      hasPreparedSyntheticMedia = false
-    #endif
-    let releaseRejectedScoreSubmission =
-      relationshipModel.rejectedMediaMutation == .scoreChange
-    let releaseRejectedDiarySubmission =
-      diaryModel.rejectedMediaMutation == .createEntry
-    notificationModel.discardPendingRefetchIntents()
-    relationshipNavigationPath.removeAll()
-    diaryNavigationPath.removeAll()
-    selectedTab = .relationship
-    loginOptionsModel.reset()
-    relationshipModel.clear()
-    diaryModel.clear()
-    Task {
-      await Task.yield()
-      await prepareTopLevelMediaForSessionEnd(
-        releaseRejectedScoreSubmission: releaseRejectedScoreSubmission,
-        releaseRejectedDiarySubmission: releaseRejectedDiarySubmission
-      )
-      await notificationModel.unregisterBeforeSignOut()
-      notificationModel.discardPendingRefetchIntents()
-      relationshipModel.clear()
-      diaryModel.clear()
-      await authenticationModel.signOut()
-      isEndingSession = false
-    }
+  /// Lock the app: clear the in-memory session but keep the Keychain vault so Face ID can reopen
+  /// it, and keep the push FID registered so notifications keep arriving while locked.
+  private func lockSession() {
+    endSession(
+      resetsLoginOptions: true,
+      notificationTeardown: { notificationModel.pauseRegistrationForLock() },
+      authenticationTeardown: { await authenticationModel.lock() }
+    )
+  }
+
+  /// Full sign-out: purge the Keychain vault and unregister the push FID. Next launch needs a PIN.
+  private func forgetSession() {
+    endSession(
+      resetsLoginOptions: true,
+      notificationTeardown: { await notificationModel.unregisterBeforeSignOut() },
+      authenticationTeardown: { await authenticationModel.signOutAndForget() }
+    )
   }
 
   private func requirePINAgain(for participant: AuthenticatedParticipant) {
+    // The server rejected this credential, so unregister the FID and purge the vault (done inside
+    // `authenticationModel.requirePINAgain`) — the stored session is no longer valid.
+    endSession(
+      resetsLoginOptions: false,
+      notificationTeardown: { await notificationModel.unregisterBeforeSignOut() },
+      authenticationTeardown: { await authenticationModel.requirePINAgain(for: participant) }
+    )
+  }
+
+  /// Shared session-teardown: quiesce feature models and media, run the notification and
+  /// authentication teardown steps in order, then release the ending-session gate.
+  private func endSession(
+    resetsLoginOptions: Bool,
+    notificationTeardown: @escaping @MainActor () async -> Void,
+    authenticationTeardown: @escaping @MainActor () async -> Void
+  ) {
     guard !isEndingSession else { return }
     isEndingSession = true
     #if DEBUG
@@ -447,6 +459,7 @@ private struct AppRootView: View {
     relationshipNavigationPath.removeAll()
     diaryNavigationPath.removeAll()
     selectedTab = .relationship
+    if resetsLoginOptions { loginOptionsModel.reset() }
     relationshipModel.clear()
     diaryModel.clear()
     Task {
@@ -455,11 +468,11 @@ private struct AppRootView: View {
         releaseRejectedScoreSubmission: releaseRejectedScoreSubmission,
         releaseRejectedDiarySubmission: releaseRejectedDiarySubmission
       )
-      await notificationModel.unregisterBeforeSignOut()
+      await notificationTeardown()
       notificationModel.discardPendingRefetchIntents()
       relationshipModel.clear()
       diaryModel.clear()
-      await authenticationModel.requirePINAgain(for: participant)
+      await authenticationTeardown()
       isEndingSession = false
     }
   }
@@ -570,12 +583,14 @@ private enum AuthenticatedTab: Hashable {
 private struct AppSettingsView: View {
   @Environment(\.openURL) private var openURL
   @State private var confirmsSessionLock = false
+  @State private var confirmsForget = false
 
   let participant: AuthenticatedParticipant
   let notificationState: NotificationModel.State
   let canRetryNotifications: Bool
   let onRetryNotifications: @MainActor () -> Void
-  let onSignOut: @MainActor () -> Void
+  let onLock: @MainActor () -> Void
+  let onForget: @MainActor () -> Void
 
   var body: some View {
     NavigationStack {
@@ -628,12 +643,21 @@ private struct AppSettingsView: View {
             Label("앱 잠그기", systemImage: "lock.fill")
               .foregroundStyle(WoorisaiPalette.coralDark)
           }
-          .accessibilityHint("작성 중인 글과 첨부를 버리고 현재 PIN 세션을 안전하게 정리합니다.")
+          .accessibilityHint("작성 중인 글과 첨부를 정리하고 앱을 잠급니다.")
           .accessibilityIdentifier("settings.lock")
+
+          Button(role: .destructive) {
+            confirmsForget = true
+          } label: {
+            Label("이 기기에서 로그인 정보 지우기", systemImage: "trash")
+              .foregroundStyle(WoorisaiPalette.coralDark)
+          }
+          .accessibilityHint("이 기기에 저장된 로그인 정보를 삭제하고 로그아웃합니다.")
+          .accessibilityIdentifier("settings.forget")
         } header: {
           Text("보안")
         } footer: {
-          Text("다시 들어오려면 참가자를 고르고 네 자리 PIN을 입력해야 해요.")
+          Text("잠그면 저장해 둔 경우 Face ID로, 아니면 PIN으로 다시 들어와요. 로그인 정보를 지우면 다음에 PIN을 다시 입력해야 해요.")
         }
       }
       .scrollContentBackground(.hidden)
@@ -646,11 +670,22 @@ private struct AppSettingsView: View {
         isPresented: $confirmsSessionLock,
         titleVisibility: .visible
       ) {
-        Button("잠그기", role: .destructive, action: onSignOut)
+        Button("잠그기", role: .destructive, action: onLock)
           .accessibilityIdentifier("settings.lock.confirm")
         Button("계속 사용하기", role: .cancel) {}
       } message: {
-        Text("작성 중인 글과 첨부, 로그인 정보가 이 기기에서 사라집니다.")
+        Text("작성 중인 글과 첨부가 정리돼요. 다시 들어올 땐 Face ID(설정해 둔 경우) 또는 PIN을 사용합니다.")
+      }
+      .confirmationDialog(
+        "로그인 정보를 지울까요?",
+        isPresented: $confirmsForget,
+        titleVisibility: .visible
+      ) {
+        Button("지우기", role: .destructive, action: onForget)
+          .accessibilityIdentifier("settings.forget.confirm")
+        Button("취소", role: .cancel) {}
+      } message: {
+        Text("이 기기에 저장된 로그인 정보가 삭제돼요. 다시 들어오려면 PIN을 입력해야 해요.")
       }
     }
   }
@@ -744,7 +779,10 @@ private enum AppDependencies {
         notificationFIDService: client,
         notificationPermissions: SystemNotificationPermissionAuthorizer(),
         notificationInstallationIDs: FirebaseNotificationInstallationIDProvider(),
-        credentialStore: credentialStore
+        credentialStore: credentialStore,
+        credentialVault: KeychainCredentialVault(),
+        biometricProbe: LocalAuthenticationBiometricProbe(),
+        shouldRestoreSession: true
       )
     } catch {
       let service = ConfigurationFailureService()
@@ -775,6 +813,11 @@ private struct AppServices {
   let notificationPermissions: any NotificationPermissionAuthorizing
   let notificationInstallationIDs: any NotificationInstallationIDProviding
   let credentialStore: InMemoryCredentialStore
+  // Defaulted so only the real-client branch opts into biometric session persistence; every
+  // test / UI-test / failure branch inherits inert values, keeping session restore a no-op.
+  var credentialVault: any CredentialVaultStoring = InertCredentialVault()
+  var biometricProbe: any BiometricAvailabilityProbing = UnavailableBiometricProbe()
+  var shouldRestoreSession = false
 }
 
 private struct ConfigurationFailureService: LoginOptionsLoading, CredentialValidating,
