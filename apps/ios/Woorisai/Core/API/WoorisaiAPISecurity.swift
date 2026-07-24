@@ -40,6 +40,98 @@ public struct ParticipantCredential: Equatable, Sendable, CustomStringConvertibl
   public var debugDescription: String { description }
 }
 
+/// An opaque, serialized form of a `ParticipantCredential` for at-rest storage (the Keychain).
+///
+/// It exposes neither the participant slot nor the PIN. Only this module can interpret `rawData`,
+/// and reconstruction re-runs full credential validation, so a tampered blob can never smuggle a
+/// malformed authorization header into the request middleware. It is co-located with
+/// `ParticipantCredential` on purpose: the archive reads the `fileprivate` header value, which
+/// therefore stays invisible to the rest of the module.
+public struct ArchivedCredential: Sendable, Equatable, CustomStringConvertible,
+  CustomDebugStringConvertible
+{
+  fileprivate let slot: ParticipantSlot
+  fileprivate let authorizationHeaderValue: String
+
+  fileprivate init(slot: ParticipantSlot, authorizationHeaderValue: String) {
+    self.slot = slot
+    self.authorizationHeaderValue = authorizationHeaderValue
+  }
+
+  /// Opaque bytes suitable for Keychain storage. The app persists and reloads these without ever
+  /// seeing the slot or PIN.
+  public var rawData: Data {
+    let payload = Payload(
+      version: Self.currentVersion,
+      slot: slot.rawValue,
+      authorization: authorizationHeaderValue
+    )
+    // A fixed, small, well-formed payload cannot fail to encode.
+    return (try? JSONEncoder().encode(payload)) ?? Data()
+  }
+
+  /// Rebuild an archive from previously stored bytes. Returns `nil` when the bytes are absent,
+  /// truncated, or not a recognized archive version.
+  public init?(rawData: Data) {
+    guard !rawData.isEmpty,
+      let payload = try? JSONDecoder().decode(Payload.self, from: rawData),
+      payload.version == Self.currentVersion,
+      let slot = ParticipantSlot(rawValue: payload.slot),
+      !payload.authorization.isEmpty
+    else {
+      return nil
+    }
+    self.slot = slot
+    authorizationHeaderValue = payload.authorization
+  }
+
+  public var description: String { "ArchivedCredential(slot: [REDACTED])" }
+
+  public var debugDescription: String { description }
+
+  private static let currentVersion = 1
+
+  private struct Payload: Codable {
+    let version: Int
+    let slot: Int
+    let authorization: String
+  }
+}
+
+extension ParticipantCredential {
+  /// Produce an opaque archive for at-rest storage. Hands out a token, never the PIN.
+  public func archived() -> ArchivedCredential {
+    ArchivedCredential(slot: slot, authorizationHeaderValue: authorizationHeaderValue)
+  }
+
+  /// Rebuild a credential from an archive. Reconstruction goes through the canonical
+  /// `init(slot:pin:)`, so the result is byte-identical to the original and every tamper
+  /// (bad prefix, non-base64 body, wrong slot, non-four-digit PIN) is rejected with `invalidPIN`.
+  public init(archived: ArchivedCredential) throws {
+    let prefix = "Basic "
+    guard archived.authorizationHeaderValue.hasPrefix(prefix) else {
+      throw ParticipantCredentialError.invalidPIN
+    }
+
+    let encoded = String(archived.authorizationHeaderValue.dropFirst(prefix.count))
+    guard let decoded = Data(base64Encoded: encoded),
+      let pair = String(data: decoded, encoding: .utf8)
+    else {
+      throw ParticipantCredentialError.invalidPIN
+    }
+
+    let components = pair.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+    guard components.count == 2,
+      let slotValue = Int(components[0]),
+      slotValue == archived.slot.rawValue
+    else {
+      throw ParticipantCredentialError.invalidPIN
+    }
+
+    try self.init(slot: archived.slot, pin: String(components[1]))
+  }
+}
+
 /// The only credential store used by the API client. It never reads or writes disk, Keychain,
 /// UserDefaults, logs, or analytics.
 public actor InMemoryCredentialStore {

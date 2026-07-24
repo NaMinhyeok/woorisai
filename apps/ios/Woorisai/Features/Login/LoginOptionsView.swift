@@ -57,6 +57,7 @@ struct LoginOptionsView: View {
     .accessibilityIdentifier("loginOptions.screen")
     .task {
       model.loadIfNeeded()
+      await authenticationModel.refreshRememberOption()
     }
     .onDisappear {
       isPINFocused = false
@@ -86,7 +87,8 @@ struct LoginOptionsView: View {
           await Task.yield()
           isAuthenticationFailureFocused = true
         }
-      case .choosingParticipant, .validating, .authenticated:
+      case .choosingParticipant, .validating, .authenticated,
+        .restoring, .locked, .unlocking:
         isAuthenticationFailureFocused = false
         isPINFocused = false
       }
@@ -348,6 +350,14 @@ struct LoginOptionsView: View {
       Text("숫자 네 자리를 입력해 주세요.")
         .font(.footnote)
         .foregroundStyle(WoorisaiPalette.muted)
+
+      if authenticationModel.canOfferRemembering {
+        Toggle("다음부터 Face ID로 빠르게 열기", isOn: $authenticationModel.remembersSession)
+          .tint(WoorisaiPalette.coral)
+          .font(.footnote.weight(.medium))
+          .foregroundStyle(WoorisaiPalette.muted)
+          .accessibilityIdentifier("authentication.rememberSession")
+      }
 
       if authenticationModel.isValidating {
         HStack(spacing: 10) {

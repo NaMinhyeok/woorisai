@@ -14,6 +14,7 @@
 		08BA050338A7087392F35FA5 /* WoorisaiMediaAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE95E8D90CD2C5CE8E6D059 /* WoorisaiMediaAPI.swift */; };
 		0CD093B4BC667804EF42EA0A /* WoorisaiNotificationAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7DF92B71ECF71DB02663BEB /* WoorisaiNotificationAPITests.swift */; };
 		0E453322DB5433D050CA53DF /* WoorisaiDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E977F9625B38730AA0754F6E /* WoorisaiDesignSystem.swift */; };
+		17CB643E5A7D2A5A4391ACCD /* BiometricAuthentication.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF8D69BC54C7F2F3C3FEE477 /* BiometricAuthentication.swift */; };
 		18332D71FADB81EC4FD4EBA0 /* RelationshipScoreComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8249C3565178262DFEAA88F9 /* RelationshipScoreComposer.swift */; };
 		1B310268E530569EB0538E6A /* openapi.yaml in Resources */ = {isa = PBXBuildFile; fileRef = A8914F28C22B6C25363853A4 /* openapi.yaml */; };
 		1C307F126A78B6B4DBD8F0F8 /* WoorisaiAPIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F76F28C7930A95A511B832 /* WoorisaiAPIClientTests.swift */; };
@@ -27,6 +28,7 @@
 		54AB4AAC4FAA284A616B2835 /* RelationshipThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84CB8EBDA198FBAEEA5F5D61 /* RelationshipThreadView.swift */; };
 		596C9564C98DE058F3ABE59B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 48EA39B38C8BA4876BED02D2 /* PrivacyInfo.xcprivacy */; };
 		59A69753C46836A9AD276F62 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E58C85C20DC0DA675659BA7C /* FirebaseCore */; };
+		5BA4C32DE96C4A79972170BF /* WoorisaiCredentialArchiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D03FE4592BD9E48C45EEF8 /* WoorisaiCredentialArchiveTests.swift */; };
 		65269832E3991CF2F7DF0F03 /* MediaDownloadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1DBC2440F658F77E4B504BA /* MediaDownloadModel.swift */; };
 		65D65C07B47B5D2271CDCC2F /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 494190F8106AE3DC7A296104 /* OpenAPIRuntime */; };
 		67C5E61029095849A0B6A3FB /* WoorisaiAPISecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016E0342D25764971F0C8C5D /* WoorisaiAPISecurity.swift */; };
@@ -60,6 +62,7 @@
 		A8B089BD20E57081A7CA47D6 /* NotificationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C81581956669C817FAF1A9 /* NotificationModel.swift */; };
 		B1EA8723F27875648C0FD41C /* LoginOptionsModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69B8D1F311F3C8A284C6AA82 /* LoginOptionsModelTests.swift */; };
 		B20279B3E777D92970EB22CD /* HTTPTypes in Frameworks */ = {isa = PBXBuildFile; productRef = F9DA49E2160A95F8C0DE5F12 /* HTTPTypes */; };
+		BB1AD82BEE6678671A3D0F4E /* CredentialVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F2D037050C97D031B2C83DF /* CredentialVault.swift */; };
 		BB523B14A36A83AA80347BCF /* MediaModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163C17EB85034CF3A5294251 /* MediaModelTests.swift */; };
 		BF35156CF63E02ACA0BF636D /* WoorisaiMediaAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B57791B84326D1027855CB /* WoorisaiMediaAPITests.swift */; };
 		C13225DC17B33AFD84229711 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 489ABB621BD4B3382F0C0C3A /* FirebaseMessaging */; };
@@ -71,9 +74,11 @@
 		D50556CAC20DC147278D7A42 /* RuntimeConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFA757BF6C16BF15B169D9B1 /* RuntimeConfiguration.swift */; };
 		D6371D9798A1830F00FA4403 /* DiaryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CACBA0C5943550718A9CF316 /* DiaryDetailView.swift */; };
 		D8B4730C8BA91CF333F019D0 /* WoorisaiRelationshipAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3EEC8E27EAEF654BDECD80C /* WoorisaiRelationshipAPITests.swift */; };
+		DC9D1596643F2DD268D3E4B6 /* BiometricUnlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1A1B5D9F66EAEBCD85723D /* BiometricUnlockView.swift */; };
 		E042F0468444338E88506079 /* RuntimeConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264A194A52EFFBD3C21047E2 /* RuntimeConfigurationTests.swift */; };
 		E2C8CC58B5E743000926D78A /* WoorisaiAPIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91DA4EA9B105368B6D4D7081 /* WoorisaiAPIError.swift */; };
 		E4B25236D9EF81D2FDE94DC2 /* WoorisaiDiaryAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F4CC053300CA7A376951318 /* WoorisaiDiaryAPI.swift */; };
+		E601DEDB0886C0217AF4B84E /* AuthenticationModelSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F3A2FA12EBC380CC39F1511 /* AuthenticationModelSessionTests.swift */; };
 		E71A454BC61CCE229E0C2FAB /* WoorisaiNotificationAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A22E638070EE9C908F5CE154 /* WoorisaiNotificationAPI.swift */; };
 		EA0AF0C3B7628520CC9B0B88 /* WoorisaiApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9838A7619AE4DB6AA9775BC6 /* WoorisaiApp.swift */; };
 		EDEE9D2F5829F56A4612AAC7 /* FirebaseNotificationBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70A1DD2A52AA5C72AD141605 /* FirebaseNotificationBridge.swift */; };
@@ -168,12 +173,14 @@
 		0C3FB69EA91C8716D02D2DB6 /* WoorisaiAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAPIClient.swift; sourceTree = "<group>"; };
 		138E16AB78EFF85EF7FDA33D /* WoorisaiRelationshipAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiRelationshipAPI.swift; sourceTree = "<group>"; };
 		163C17EB85034CF3A5294251 /* MediaModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaModelTests.swift; sourceTree = "<group>"; };
+		1F2D037050C97D031B2C83DF /* CredentialVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialVault.swift; sourceTree = "<group>"; };
 		264A194A52EFFBD3C21047E2 /* RuntimeConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeConfigurationTests.swift; sourceTree = "<group>"; };
 		2C329B0E13F53B6313F8F9D6 /* LoginOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginOptionsView.swift; sourceTree = "<group>"; };
 		2E2DEEBE274D14A59AF70729 /* DiaryModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryModelTests.swift; sourceTree = "<group>"; };
 		2E7D04D016E81AC8374C19ED /* WoorisaiAPI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = WoorisaiAPI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3023E181908B31C4D4E22E89 /* RelationshipModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelationshipModel.swift; sourceTree = "<group>"; };
 		3443E4C7DC63337254603F5A /* NotificationModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationModelTests.swift; sourceTree = "<group>"; };
+		37D03FE4592BD9E48C45EEF8 /* WoorisaiCredentialArchiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiCredentialArchiveTests.swift; sourceTree = "<group>"; };
 		42D77E27E13F2E22B89F2822 /* WoorisaiAPIErrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAPIErrorTests.swift; sourceTree = "<group>"; };
 		42F7CBF836FE7D93FBB5E422 /* WoorisaiAPISecurityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAPISecurityTests.swift; sourceTree = "<group>"; };
 		48EA39B38C8BA4876BED02D2 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -183,6 +190,7 @@
 		504C2CA676C2283C75A89CE2 /* WoorisaiTextInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiTextInput.swift; sourceTree = "<group>"; };
 		510FB592BC2CF5306A38C6C3 /* WoorisaiTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WoorisaiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		58B57791B84326D1027855CB /* WoorisaiMediaAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiMediaAPITests.swift; sourceTree = "<group>"; };
+		5F3A2FA12EBC380CC39F1511 /* AuthenticationModelSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationModelSessionTests.swift; sourceTree = "<group>"; };
 		628BB76BCF7198B6FEA2497B /* RelationshipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelationshipView.swift; sourceTree = "<group>"; };
 		69598E271D3A2C640DACA11F /* LoginOptionsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginOptionsModel.swift; sourceTree = "<group>"; };
 		69B8D1F311F3C8A284C6AA82 /* LoginOptionsModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginOptionsModelTests.swift; sourceTree = "<group>"; };
@@ -218,8 +226,10 @@
 		E662786A1559E2619E0A1727 /* WoorisaiLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiLaunchTests.swift; sourceTree = "<group>"; };
 		E7DF92B71ECF71DB02663BEB /* WoorisaiNotificationAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiNotificationAPITests.swift; sourceTree = "<group>"; };
 		E977F9625B38730AA0754F6E /* WoorisaiDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiDesignSystem.swift; sourceTree = "<group>"; };
+		EF8D69BC54C7F2F3C3FEE477 /* BiometricAuthentication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricAuthentication.swift; sourceTree = "<group>"; };
 		F2C69F2AE9BECCB22CE5D5C5 /* DiaryEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryEditors.swift; sourceTree = "<group>"; };
 		FB4220607E2A6EF277F9E469 /* MediaGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaGallery.swift; sourceTree = "<group>"; };
+		FE1A1B5D9F66EAEBCD85723D /* BiometricUnlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricUnlockView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -359,6 +369,7 @@
 				07F76F28C7930A95A511B832 /* WoorisaiAPIClientTests.swift */,
 				42D77E27E13F2E22B89F2822 /* WoorisaiAPIErrorTests.swift */,
 				42F7CBF836FE7D93FBB5E422 /* WoorisaiAPISecurityTests.swift */,
+				37D03FE4592BD9E48C45EEF8 /* WoorisaiCredentialArchiveTests.swift */,
 				4A66EEABE8FDC71D9BB39BAF /* WoorisaiCredentialValidationTests.swift */,
 				A0A91E2F497BFD528F20517E /* WoorisaiDiaryAPITests.swift */,
 				58B57791B84326D1027855CB /* WoorisaiMediaAPITests.swift */,
@@ -372,6 +383,9 @@
 			isa = PBXGroup;
 			children = (
 				CF8AE3E17CE3F4522F76D04B /* AuthenticationModel.swift */,
+				EF8D69BC54C7F2F3C3FEE477 /* BiometricAuthentication.swift */,
+				FE1A1B5D9F66EAEBCD85723D /* BiometricUnlockView.swift */,
+				1F2D037050C97D031B2C83DF /* CredentialVault.swift */,
 				69598E271D3A2C640DACA11F /* LoginOptionsModel.swift */,
 				2C329B0E13F53B6313F8F9D6 /* LoginOptionsView.swift */,
 			);
@@ -445,6 +459,7 @@
 		DDE61BD6E57993E923360453 /* WoorisaiTests */ = {
 			isa = PBXGroup;
 			children = (
+				5F3A2FA12EBC380CC39F1511 /* AuthenticationModelSessionTests.swift */,
 				9D5D5403E383CBDFEFD4475A /* AuthenticationModelTests.swift */,
 				2E2DEEBE274D14A59AF70729 /* DiaryModelTests.swift */,
 				69B8D1F311F3C8A284C6AA82 /* LoginOptionsModelTests.swift */,
@@ -687,6 +702,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E601DEDB0886C0217AF4B84E /* AuthenticationModelSessionTests.swift in Sources */,
 				9EEE4609734523DB1B96A03F /* AuthenticationModelTests.swift in Sources */,
 				6D556465B3D825861E49339F /* DiaryModelTests.swift in Sources */,
 				B1EA8723F27875648C0FD41C /* LoginOptionsModelTests.swift in Sources */,
@@ -728,6 +744,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				9C4A3FD346D98BEED93C7820 /* AuthenticationModel.swift in Sources */,
+				17CB643E5A7D2A5A4391ACCD /* BiometricAuthentication.swift in Sources */,
+				DC9D1596643F2DD268D3E4B6 /* BiometricUnlockView.swift in Sources */,
+				BB1AD82BEE6678671A3D0F4E /* CredentialVault.swift in Sources */,
 				D6371D9798A1830F00FA4403 /* DiaryDetailView.swift in Sources */,
 				4336E517475FE2B53CE85A7F /* DiaryEditors.swift in Sources */,
 				545618ACD244E2B1D21AB71B /* DiaryFeedViews.swift in Sources */,
@@ -761,6 +780,7 @@
 				1C307F126A78B6B4DBD8F0F8 /* WoorisaiAPIClientTests.swift in Sources */,
 				77D32A0FEC803FE45946EA7F /* WoorisaiAPIErrorTests.swift in Sources */,
 				080F953B16C9ECFC78BD2F87 /* WoorisaiAPISecurityTests.swift in Sources */,
+				5BA4C32DE96C4A79972170BF /* WoorisaiCredentialArchiveTests.swift in Sources */,
 				D1D95A8BC17651DFCB7670CB /* WoorisaiCredentialValidationTests.swift in Sources */,
 				897B26692FD0F92EE6CD1BF0 /* WoorisaiDiaryAPITests.swift in Sources */,
 				BF35156CF63E02ACA0BF636D /* WoorisaiMediaAPITests.swift in Sources */,
