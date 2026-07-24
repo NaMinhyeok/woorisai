@@ -62,7 +62,19 @@ struct BiometricUnlockView: View {
     case .restoring:
       progress(message: "세션을 확인하고 있어요.", identifier: "biometricUnlock.restoring")
     case .unlocking:
-      progress(message: "잠금을 해제하고 있어요.", identifier: "biometricUnlock.unlocking")
+      VStack(spacing: WoorisaiSpacing.regular) {
+        progress(message: "잠금을 해제하고 있어요.", identifier: "biometricUnlock.unlocking")
+
+        // Server revalidation can stall (slow network). Always leave an exit: the PIN fallback
+        // cancels the in-flight unlock instead of pinning the user to a spinner.
+        Button("PIN으로 들어가기") {
+          Task { await authenticationModel.fallBackToPINLogin() }
+        }
+        .font(.headline.weight(.semibold))
+        .foregroundStyle(WoorisaiPalette.coralDark)
+        .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
+        .accessibilityIdentifier("biometricUnlock.unlocking.usePIN")
+      }
     case .locked(let context):
       lockedContent(context)
     default:
@@ -119,12 +131,15 @@ struct BiometricUnlockView: View {
   }
 
   private func triggerAutoUnlockIfNeeded() {
-    // Fire once, only from a settled `.locked` state while the scene is active. A failed unlock
-    // returns to `.locked(failure)` but must NOT auto-retrigger — the user retries deliberately,
-    // and this also prevents a duplicate prompt when the biometric sheet churns `scenePhase`.
+    // Fire once, only from a pristine `.locked` state while the scene is active. A failed unlock
+    // returns to `.locked(failure)` and must NOT auto-retrigger — not even after a background
+    // round-trip: re-prompting Face ID cannot fix a network/lockout failure, and the user retries
+    // a cancellation deliberately. This also prevents a duplicate prompt when the biometric sheet
+    // churns `scenePhase`.
     guard !hasTriggeredAutoUnlock,
       scenePhase == .active,
-      case .locked = authenticationModel.state
+      case .locked(let context) = authenticationModel.state,
+      context.lastFailure == nil
     else { return }
     hasTriggeredAutoUnlock = true
     authenticationModel.unlock()
@@ -138,6 +153,8 @@ struct BiometricUnlockView: View {
       "잠금 해제를 취소했어요. 다시 시도하거나 PIN으로 들어갈 수 있어요."
     case .offline:
       "지금은 서버에 연결할 수 없어요. 잠시 후 다시 시도하거나 PIN으로 들어가 주세요."
+    case .biometryLockedOut:
+      "생체인증이 잠겼어요. iPhone 잠금을 암호로 한 번 풀거나, PIN으로 들어가 주세요."
     case .failed:
       "잠금을 해제하지 못했어요. 다시 시도하거나 PIN으로 들어가 주세요."
     }

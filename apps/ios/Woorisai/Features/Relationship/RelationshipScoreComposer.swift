@@ -52,6 +52,7 @@ struct ScoreComposerSheet: View {
           .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
+        .keyboardDoneToolbar()
       }
       .safeAreaInset(edge: .bottom, spacing: 0) {
         stickySubmit
@@ -283,11 +284,6 @@ struct ScoreComposerSheet: View {
           }
           .accessibilityIdentifier("relationship.reason")
 
-        if isReasonFocused {
-          KeyboardDismissButton {
-            isReasonFocused = false
-          }
-        }
       }
     }
   }
@@ -508,10 +504,11 @@ private struct RelationshipUnknownOutcomeRecovery: View {
       Button("저장 안 됨 · 다시 시도 허용", action: onConfirmManualRetry)
         .disabled(inspectionState != .loaded || !allowsManualRetry)
         .accessibilityIdentifier("relationship.mutation.confirmRetry")
+      // Always enabled: abandon is the offline escape hatch. Every other recovery action needs a
+      // successful inspection, which cannot happen while the network is down.
       Button("판단 보류 · 재전송 없이 초안 정리", role: .destructive) {
         onAbandonInconclusive()
       }
-      .disabled(inspectionState != .loaded || inspectionResult != .inconclusive)
       .accessibilityIdentifier("relationship.mutation.abandonInconclusive")
       Button("취소", role: .cancel) {}
     } message: {
@@ -535,7 +532,7 @@ private struct RelationshipUnknownOutcomeRecovery: View {
         return "다른 점수 변경이 함께 보여 자동 판단할 수 없어요. 재전송하지 않고 초안을 정리할 수 있어요."
       }
     case .failed:
-      return "최신 기록을 불러오지 못했어요. 초안을 유지한 채 다시 시도해 주세요."
+      return "최신 기록을 불러오지 못했어요. 다시 시도하거나, 재전송 없이 초안을 정리하고 나갈 수 있어요."
     }
   }
 }

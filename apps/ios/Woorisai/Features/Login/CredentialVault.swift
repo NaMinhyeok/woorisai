@@ -5,8 +5,13 @@ import WoorisaiAPI
 enum CredentialVaultError: Error, Sendable, Equatable {
   /// The user dismissed the biometric sheet.
   case cancelled
-  /// No stored credential, or the item is temporarily inaccessible (device locked).
+  /// No stored credential (presence check), or the Keychain is temporarily inaccessible.
   case unavailable
+  /// The stored item can no longer be read at all: a `.biometryCurrentSet` item is permanently
+  /// invalidated by biometry re-enrollment (read returns `errSecItemNotFound` while the
+  /// attributes-only presence check still sees it), or the item vanished. Never transient —
+  /// callers must forget the vault instead of asking the user to retry.
+  case invalidated
   /// A stored blob could not be decoded into an archive.
   case itemCorrupted
   /// Biometric authentication failed, lockout, or any other Keychain error.
@@ -107,7 +112,9 @@ final class KeychainCredentialVault: CredentialVaultStoring, @unchecked Sendable
         case errSecUserCanceled:
           continuation.resume(throwing: CredentialVaultError.cancelled)
         case errSecItemNotFound:
-          continuation.resume(throwing: CredentialVaultError.unavailable)
+          // The unlock flow only reads after a positive presence check, so "not found" at read
+          // time means the item was invalidated (biometry re-enrollment) — not "try again later".
+          continuation.resume(throwing: CredentialVaultError.invalidated)
         default:
           // Auth failure, lockout, or any other status. The UI offers PIN as the recovery path.
           continuation.resume(throwing: CredentialVaultError.failed)

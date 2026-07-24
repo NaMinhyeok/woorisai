@@ -385,7 +385,8 @@ struct DiaryModelTests {
 
     model.updateEntry(entryID: 41, content: "판단할 수 없는 수정")
     await diaryExpectEventually { model.mutationOutcomeRequiresConfirmation }
-    #expect(!model.abandonInconclusiveUnknownOutcome(context: context))
+    // A mismatched context is still rejected — only the active unknown outcome can be abandoned.
+    #expect(!model.abandonInconclusiveUnknownOutcome(context: .updateEntry(entryID: 999)))
 
     model.reconcileUnknownOutcome(entryID: 41)
     await diaryExpectEventually { model.editorReconciliationState == .loaded }
@@ -395,6 +396,30 @@ struct DiaryModelTests {
     #expect(model.unknownMutationContext == nil)
     #expect(model.submittedMutationSnapshot == nil)
     #expect(!model.hasProtectedLocalDraft)
+    #expect(await service.updateEntryCount == 1)
+  }
+
+  @Test
+  func unknownEditorOutcomeCanBeAbandonedWithoutReconciliation() async {
+    // Offline escape guarantee: the unknown outcome usually IS a connectivity failure, so the
+    // reconciliation reload fails too. Abandon must not require it — otherwise the edit sheet
+    // (취소·스와이프 잠금 상태) can only be escaped by force-quitting the app.
+    let service = DiaryServiceFake(updateEntryFailure: .transport)
+    let model = DiaryModel(service: service)
+    let context = DiaryModel.UnknownMutationContext.updateEntry(entryID: 41)
+    model.loadDetail(entryID: 41)
+    await diaryExpectEventually { model.detailState == .loaded }
+    model.updateLocalDraftProtection(context: context, isProtected: true)
+
+    model.updateEntry(entryID: 41, content: "오프라인에서 결과 불명")
+    await diaryExpectEventually { model.mutationOutcomeRequiresConfirmation }
+
+    #expect(model.abandonInconclusiveUnknownOutcome(context: context))
+    #expect(!model.mutationOutcomeRequiresConfirmation)
+    #expect(model.unknownMutationContext == nil)
+    #expect(!model.hasProtectedLocalDraft)
+    #expect(model.mutationNotice?.contains("저장 여부를 확인하지 못한 채") == true)
+    // Abandon never retransmits.
     #expect(await service.updateEntryCount == 1)
   }
 

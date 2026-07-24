@@ -832,10 +832,13 @@ final class RelationshipModel {
 
   @discardableResult
   func abandonInconclusiveUnknownScoreOutcome() -> Bool {
-    guard scoreOutcomeRequiresConfirmation,
-      scoreOutcomeInspectionState == .loaded,
-      scoreOutcomeInspectionResult == .inconclusive
-    else { return false }
+    // Abandon never resends, so it must stay available even when the inspection could not run
+    // (offline). Requiring a successful inspection here would trap the user: the unknown outcome
+    // usually WAS a connectivity failure, so the inspection fails too and every recovery action
+    // stays disabled while the sheet blocks dismissal.
+    guard scoreOutcomeRequiresConfirmation else { return false }
+    let verifiedInconclusive =
+      scoreOutcomeInspectionState == .loaded && scoreOutcomeInspectionResult == .inconclusive
     scoreOutcomeRequiresConfirmation = false
     scoreOutcomeInspectionState = .idle
     scoreOutcomeInspectionResult = .inconclusive
@@ -844,23 +847,30 @@ final class RelationshipModel {
     manualRetryDraftContext = nil
     localScoreDraftProtected = false
     scoreSubmissionState = .idle
-    notice = "중복을 피하기 위해 재전송하지 않고 초안을 정리했어요."
+    notice =
+      verifiedInconclusive
+      ? "중복을 피하기 위해 재전송하지 않고 초안을 정리했어요."
+      : "저장 여부를 확인하지 못한 채 재전송 없이 초안을 정리했어요. 나중에 기록에서 저장 여부를 확인해 주세요."
     return true
   }
 
   @discardableResult
   func abandonInconclusiveUnknownCommentOutcome(scoreChangeID: Int64) -> Bool {
-    guard commentOutcomeRequiresConfirmation(for: scoreChangeID),
-      commentOutcomeInspectionState == .loaded,
-      commentOutcomeInspectionResult == .inconclusive
-    else { return false }
+    // Same escape guarantee as the score variant: abandon must not require a successful
+    // inspection, or an offline unknown outcome leaves no enabled recovery action.
+    guard commentOutcomeRequiresConfirmation(for: scoreChangeID) else { return false }
+    let verifiedInconclusive =
+      commentOutcomeInspectionState == .loaded && commentOutcomeInspectionResult == .inconclusive
     clearUnknownCommentOutcome()
     commentSubmissionSnapshot = nil
     manualRetryDraftContext = nil
     localCommentDraftScoreChangeID = nil
     commentSubmissionState = .idle
     commentNoticeScoreChangeID = scoreChangeID
-    commentNoticeMessage = "중복을 피하기 위해 재전송하지 않고 초안을 정리했어요."
+    commentNoticeMessage =
+      verifiedInconclusive
+      ? "중복을 피하기 위해 재전송하지 않고 초안을 정리했어요."
+      : "저장 여부를 확인하지 못한 채 재전송 없이 초안을 정리했어요. 나중에 대화에서 저장 여부를 확인해 주세요."
     return true
   }
 

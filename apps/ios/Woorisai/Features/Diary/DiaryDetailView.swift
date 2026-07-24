@@ -491,6 +491,7 @@ struct DiaryDetailView: View {
           }
         }
         .scrollDismissesKeyboard(.interactively)
+        .keyboardDoneToolbar()
         .refreshable {
           await model.refreshDetail(entryID: entryID)
         }
@@ -545,7 +546,9 @@ struct DiaryDetailView: View {
     }
     .onChange(of: model.mutationNotice) { _, notice in
       if notice == "댓글을 남겼어요." {
-        focusedField = nil
+        // The field disables while submitting (dropping focus); restore it so consecutive
+        // replies do not require re-tapping the input.
+        focusedField = .comment
       }
       if notice == "일기를 수정했어요." {
         isEditingEntry = false
@@ -739,7 +742,7 @@ struct DiaryDetailView: View {
           onReloadLatest: reloadDetailPreservingEditor,
           onResolveAsSaved: resolveUnknownInlineMutationAsSaved,
           onConfirmManualRetry: allowUnknownInlineMutationRetry,
-          onAbandonInconclusive: {}
+          onAbandonInconclusive: abandonUnknownInlineMutation
         )
       }
 
@@ -760,22 +763,12 @@ struct DiaryDetailView: View {
         VStack(spacing: WoorisaiSpacing.small) {
           commentInput
           HStack(spacing: WoorisaiSpacing.small) {
-            if focusedField == .comment {
-              KeyboardDismissButton {
-                focusedField = nil
-              }
-            }
             commentSubmitButton
           }
         }
       } else {
         HStack(alignment: .bottom, spacing: WoorisaiSpacing.small) {
           commentInput
-          if focusedField == .comment {
-            KeyboardDismissButton {
-              focusedField = nil
-            }
-          }
           commentSubmitButton
         }
       }
@@ -811,7 +804,7 @@ struct DiaryDetailView: View {
 
   private var commentSubmitButton: some View {
     Button {
-      focusedField = nil
+      // Keep the keyboard up: this is a conversation — the next reply usually follows right away.
       model.createComment(entryID: entryID, content: commentContent)
     } label: {
       Group {
@@ -1227,6 +1220,16 @@ struct DiaryDetailView: View {
       isInlineUnknownContext(context)
     else { return }
     _ = model.confirmManualRetryAfterUnknownOutcome(context: context)
+  }
+
+  /// Offline escape for inline mutations (삭제·인라인 댓글): entry deletion has no draft, so a
+  /// failed reconciliation used to leave no enabled recovery action while the back button stayed
+  /// hidden.
+  private func abandonUnknownInlineMutation() {
+    guard let context = model.unknownMutationContext,
+      isInlineUnknownContext(context)
+    else { return }
+    _ = model.abandonInconclusiveUnknownOutcome(context: context)
   }
 
   private func beginEditing(_ entry: DiaryEntry) {

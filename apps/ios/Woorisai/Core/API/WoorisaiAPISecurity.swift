@@ -175,6 +175,12 @@ public actor InMemoryCredentialStore {
   fileprivate func currentCredential() -> ParticipantCredential? {
     credential
   }
+
+  /// Opaque archive of the current credential for the at-rest vault, or `nil` when signed out.
+  /// Exposes neither the slot nor the PIN — the same boundary as `ParticipantCredential.archived()`.
+  public func archivedCurrentCredential() -> ArchivedCredential? {
+    credential?.archived()
+  }
 }
 
 enum APIOperationAuthorizationPolicy {
@@ -324,6 +330,10 @@ enum WoorisaiAPITransportFactory {
     configuration.urlCache = nil
     configuration.urlCredentialStorage = nil
     configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+    // API calls are small JSON exchanges (media bytes go through presigned URLs on their own
+    // session). Without this, a stalled connection pins spinner states — biometric unlock has no
+    // cancel — to the 60s system default.
+    configuration.timeoutIntervalForRequest = 15
     return configuration
   }
 

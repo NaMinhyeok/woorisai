@@ -101,7 +101,8 @@ targets:
         FirebaseMessagingInstallationIdEnabled: true
         ITSAppUsesNonExemptEncryption: false
         NSFaceIDUsageDescription: "우리사이 잠금을 Face ID로 해제합니다."
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         WoorisaiAPIHost: $(WOORISAI_API_HOST)
         WoorisaiBuildConfiguration: $(CONFIGURATION)
     settings:

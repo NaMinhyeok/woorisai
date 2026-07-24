@@ -746,14 +746,17 @@ final class DiaryModel {
 
   @discardableResult
   func abandonInconclusiveUnknownOutcome(context: UnknownMutationContext) -> Bool {
+    // Abandon never resends, so it must NOT require a successful reconciliation: the unknown
+    // outcome is usually a connectivity failure, so the reload fails too — requiring `.loaded`
+    // here left the editor sheets with every recovery action disabled and dismissal locked.
     guard mutationOutcomeRequiresConfirmation,
-      unknownMutationContext == context,
-      inspectedUnknownMutationContext == context,
-      editorReconciliationState == .loaded
+      unknownMutationContext == context
     else {
       mutationNotice = "먼저 최신 내용을 불러와 저장 여부를 확인해 주세요."
       return false
     }
+    let verifiedByReconciliation =
+      inspectedUnknownMutationContext == context && editorReconciliationState == .loaded
     mutationOutcomeRequiresConfirmation = false
     unknownMutationContext = nil
     inspectedUnknownMutationContext = nil
@@ -763,7 +766,10 @@ final class DiaryModel {
     editorReconciliationState = .idle
     reconciliationContentUnavailable = false
     mutationState = .idle
-    mutationNotice = "중복을 피하기 위해 재전송하지 않고 초안을 정리했어요."
+    mutationNotice =
+      verifiedByReconciliation
+      ? "중복을 피하기 위해 재전송하지 않고 초안을 정리했어요."
+      : "저장 여부를 확인하지 못한 채 재전송 없이 초안을 정리했어요. 나중에 최신 내용에서 저장 여부를 확인해 주세요."
     return true
   }
 
