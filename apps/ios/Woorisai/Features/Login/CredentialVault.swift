@@ -41,14 +41,22 @@ final class KeychainCredentialVault: CredentialVaultStoring, @unchecked Sendable
   }
 
   func hasStoredCredential() async -> Bool {
+    // Forbid interaction instead of skipping protected items: `kSecUseAuthenticationUISkip` would
+    // silently drop the access-controlled item from the results (`errSecItemNotFound`), making the
+    // stored session invisible. With interaction forbidden the item stays in the results and
+    // surfaces as `errSecInteractionNotAllowed`, still without ever presenting a prompt.
+    let context = LAContext()
+    context.interactionNotAllowed = true
     var query = baseQuery()
     query[kSecReturnData as String] = false
     query[kSecReturnAttributes as String] = true
-    // Skip UI so an access-controlled item can never trigger a prompt during a mere presence check.
-    query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUISkip
+    query[kSecUseAuthenticationContext as String] = context
     let status = SecItemCopyMatching(query as CFDictionary, nil)
-    // `interactionNotAllowed` means "exists but would require auth" — still present.
+    // `interactionNotAllowed` means "exists but would require auth"; `authFailed` means "exists
+    // but biometry is locked out" — both are still present, and the locked screen's PIN fallback
+    // covers the lockout case.
     return status == errSecSuccess || status == errSecInteractionNotAllowed
+      || status == errSecAuthFailed
   }
 
   func save(_ credential: ArchivedCredential) async throws {
