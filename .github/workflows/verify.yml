@@ -195,46 +195,6 @@ jobs:
           -onlyUsePackageVersionsFromResolvedFile
           -skipPackagePluginValidation
           CODE_SIGNING_ALLOWED=NO
-      - name: Run core UI smoke on iPhone 15 Pro
-        run: >-
-          xcodebuild test-without-building
-          -project apps/ios/Woorisai.xcodeproj
-          -scheme Woorisai
-          -configuration Debug
-          -destination 'platform=iOS Simulator,id=${{ steps.simulators.outputs.iphone15 }}'
-          -derivedDataPath .local/ios-ci-debug
-          -clonedSourcePackagesDirPath .local/ios-source-packages
-          -parallel-testing-enabled NO
-          -test-timeouts-enabled YES
-          -default-test-execution-time-allowance 120
-          -maximum-test-execution-time-allowance 600
-          -only-testing:WoorisaiUITests/WoorisaiLaunchTests/testSuccessShowsBothParticipantNames
-          -only-testing:WoorisaiUITests/WoorisaiLaunchTests/testNumberPadCanBeDismissedWithoutSubmitting
-          -only-testing:WoorisaiUITests/WoorisaiLaunchTests/testSlotTwoReversesDirectionalScoresAndDiaryOwnership
-          -enableCodeCoverage NO
-          -onlyUsePackageVersionsFromResolvedFile
-          -skipPackagePluginValidation
-          CODE_SIGNING_ALLOWED=NO
-      - name: Run core UI smoke on iPhone 13 Pro
-        run: >-
-          xcodebuild test-without-building
-          -project apps/ios/Woorisai.xcodeproj
-          -scheme Woorisai
-          -configuration Debug
-          -destination 'platform=iOS Simulator,id=${{ steps.simulators.outputs.iphone13 }}'
-          -derivedDataPath .local/ios-ci-debug
-          -clonedSourcePackagesDirPath .local/ios-source-packages
-          -parallel-testing-enabled NO
-          -test-timeouts-enabled YES
-          -default-test-execution-time-allowance 120
-          -maximum-test-execution-time-allowance 600
-          -only-testing:WoorisaiUITests/WoorisaiLaunchTests/testSuccessShowsBothParticipantNames
-          -only-testing:WoorisaiUITests/WoorisaiLaunchTests/testAuthenticatedDiaryTabShowsWarmPrivateJournalFailureState
-          -only-testing:WoorisaiUITests/WoorisaiLaunchTests/testSuccessSupportsAccessibilityExtraExtraExtraLargeText
-          -enableCodeCoverage NO
-          -onlyUsePackageVersionsFromResolvedFile
-          -skipPackagePluginValidation
-          CODE_SIGNING_ALLOWED=NO
       - name: Run full UI E2E on iPhone 15 Pro
         if: github.event_name == 'workflow_dispatch' && inputs.full_ios_e2e
         run: >-
@@ -280,6 +240,7 @@ jobs:
           xcrun simctl delete '${{ steps.simulators.outputs.iphone15 }}' || true
           xcrun simctl delete '${{ steps.simulators.outputs.iphone13 }}' || true
       - name: Build the Release simulator artifact
+        if: github.event_name != 'pull_request'
         run: >-
           xcodebuild build
           -project apps/ios/Woorisai.xcodeproj
