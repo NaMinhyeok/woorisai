@@ -16,7 +16,7 @@ on:
       beta_group:
         description: Internal TestFlight group to auto-assign the build to (blank to skip)
         required: false
-        default: ""
+        default: "내부 테스트"
         type: string
 
 permissions:
