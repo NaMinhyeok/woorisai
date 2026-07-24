@@ -47,15 +47,23 @@ Authorization: Basic base64("<slot>:<4-digit PIN>")
   결과를 결정한다.
 - Middleware는 승인된 same-origin HTTPS API host에만 header를 주입한다. Redirect target과
   presigned R2 request에는 전달하지 않는다.
-- 401은 local credential을 제거하고 PIN 재입력을 요구한다. Server login/logout call은 없다.
-- Credential은 process memory에만 둔다. 지속 보존 요구가 생기면 password credential로
-  분류해 device-only, non-synchronizing Keychain 정책을 별도 결정한다.
-- Local session lock은 credential, private cache와 navigation state를 지우는 client 동작이다.
-  이 동작은 반복 사용 중 실수로 누르기 쉬운 feature navigation bar가 아니라 Settings의 보안
-  section에서 확인 dialog를 거쳐 제공한다. Server logout endpoint를 의미하지 않는다.
+- 401은 local credential과 저장된 Keychain archive를 제거하고 PIN 재입력을 요구한다.
+  Server login/logout call은 없다.
+- Credential은 기본으로 process memory에만 둔다. 로그인 화면에서 생체인증 저장을 opt-in한
+  경우에만 불투명 archive를 Keychain에 보관한다: `WhenPasscodeSetThisDeviceOnly` +
+  `.biometryCurrentSet`(device-only, non-synchronizing, 생체 재등록 시 무효화), 읽기는 생체
+  프롬프트로 gate하고 존재 확인은 `LAContext.interactionNotAllowed`로 프롬프트 없이 수행한다.
+- 다시 실행하면 존재 확인이 잠금 화면 여부를 결정하고, 생체 해제 뒤 보호 요청 재검증
+  (2xx/401)이 세션 복원을 확정한다. Server에는 여전히 세션이 없다.
+- Local session lock은 in-memory credential, private cache와 navigation state를 지우되
+  Keychain archive와 push FID는 유지하는 client 동작이다. 이 동작은 반복 사용 중 실수로
+  누르기 쉬운 feature navigation bar가 아니라 Settings의 보안 section에서 확인 dialog를 거쳐
+  제공한다. Settings의 "이 기기에서 로그인 정보 지우기"가 Keychain archive까지 제거하는 전체
+  sign-out이다. 둘 다 server logout endpoint를 의미하지 않는다.
 
-Memory-only credential은 device 저장소 노출 범위를 줄이는 대신 app을 다시 실행할 때마다 PIN을
-재입력하게 한다. 현재 두 명이 사용하는 private app에서는 이 불편을 수용한다.
+Memory-only 기본값은 device 저장소 노출 범위를 줄이는 대신 app을 다시 실행할 때마다 PIN을
+재입력하게 한다. 생체인증 opt-in은 이 불편과 at-rest 저장의 균형을 사용자가 기기 단위로
+결정하게 한다.
 
 ## State와 error
 

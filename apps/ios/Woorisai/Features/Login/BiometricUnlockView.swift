@@ -22,6 +22,12 @@ struct BiometricUnlockView: View {
       .frame(maxWidth: .infinity)
     }
     .onAppear { triggerAutoUnlockIfNeeded() }
+    .onChange(of: authenticationModel.state) { _, _ in
+      // Launch-time restore usually settles into `.locked` after the scene is already active, so
+      // neither `onAppear` (still `.restoring`) nor the scenePhase change can fire the first
+      // prompt. Re-arming is unaffected: a post-failure `.locked` is blocked by the trigger flag.
+      triggerAutoUnlockIfNeeded()
+    }
     .onChange(of: scenePhase) { _, phase in
       if phase == .background {
         // A real background cycle (home / app switcher) re-arms auto-unlock, so returning to a
