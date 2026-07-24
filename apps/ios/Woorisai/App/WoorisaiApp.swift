@@ -83,22 +83,26 @@ struct WoorisaiApp: App {
       )
       .task {
         appDelegate.pushCoordinator.attach(notificationModel: notificationModel)
+        appDelegate.attachPrivacyCoverPolicy(authenticationModel: authenticationModel)
       }
       .task {
         await authenticationModel.restoreLockedSessionIfAvailable()
       }
+      let contentIsPrivate = !authenticationModel.isAwaitingBiometricUnlock
       let privacyProtectedRootView =
         rootView
         .background {
           AppPrivacyAccessibilityBridge(
             contentHidden: hasPresentedActiveScene
-              && AppPrivacyCoverPolicy.shouldCover(scenePhase)
+              && AppPrivacyCoverPolicy.shouldCover(scenePhase, contentIsPrivate: contentIsPrivate)
           )
           .frame(width: 0, height: 0)
           .accessibilityHidden(true)
         }
         .overlay {
-          if hasPresentedActiveScene && AppPrivacyCoverPolicy.shouldCover(scenePhase) {
+          if hasPresentedActiveScene,
+            AppPrivacyCoverPolicy.shouldCover(scenePhase, contentIsPrivate: contentIsPrivate)
+          {
             AppPrivacyCoverView()
               .ignoresSafeArea()
           }
@@ -108,7 +112,7 @@ struct WoorisaiApp: App {
           if phase == .active {
             hasPresentedActiveScene = true
             AppPrivacyAccessibilityController.setContentHidden(false)
-          } else if hasPresentedActiveScene {
+          } else if hasPresentedActiveScene && contentIsPrivate {
             AppPrivacyAccessibilityController.setContentHidden(true)
           } else {
             AppPrivacyAccessibilityController.setContentHidden(false)
@@ -127,8 +131,14 @@ struct WoorisaiApp: App {
   }
 }
 
+/// The single decision point for BOTH privacy covers — the SwiftUI overlay below and the UIKit
+/// `AppSnapshotPrivacyShield` in `WoorisaiAppDelegate`. Content is covered only while the scene is
+/// not active AND the visible content is actually private. The biometric lock flow is exempt: that
+/// screen is itself the non-sensitive cover, and covering it blanks the app behind the Face ID
+/// sheet (the system prompt drives the scene to `.inactive`/resign-active).
 enum AppPrivacyCoverPolicy {
-  static func shouldCover(_ scenePhase: ScenePhase) -> Bool {
+  static func shouldCover(_ scenePhase: ScenePhase, contentIsPrivate: Bool) -> Bool {
+    guard contentIsPrivate else { return false }
     switch scenePhase {
     case .active:
       return false
@@ -145,21 +155,36 @@ private struct AppPrivacyCoverView: UIViewRepresentable {
     AppPrivacyCoverUIView()
   }
 
-  func updateUIView(_ uiView: AppPrivacyCoverUIView, context: Context) {
-    uiView.backgroundColor = .systemBackground
-  }
+  func updateUIView(_ uiView: AppPrivacyCoverUIView, context: Context) {}
 
   static func dismantleUIView(_ uiView: AppPrivacyCoverUIView, coordinator: ()) {
     uiView.isAccessibilityElement = false
   }
 }
 
-private final class AppPrivacyCoverUIView: UIView {
+/// The shared branded privacy cover, used by both the SwiftUI overlay and the UIKit
+/// `AppSnapshotPrivacyShield`. Brand background + lock mark so a cover triggered by everyday
+/// `.inactive` events (제어 센터, 전화 수신, 권한 팝업) reads as a deliberate screen, not a
+/// black/white glitch — never `.systemBackground` here.
+final class AppPrivacyCoverUIView: UIView {
   override init(frame: CGRect) {
     super.init(frame: frame)
-    backgroundColor = .systemBackground
+    backgroundColor = WoorisaiPalette.creamUIColor
     isAccessibilityElement = false
     accessibilityElementsHidden = true
+
+    let markConfiguration = UIImage.SymbolConfiguration(pointSize: 44, weight: .semibold)
+    let mark = UIImageView(
+      image: UIImage(systemName: "lock.heart", withConfiguration: markConfiguration)
+    )
+    mark.tintColor = WoorisaiPalette.coralUIColor
+    mark.isAccessibilityElement = false
+    mark.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(mark)
+    NSLayoutConstraint.activate([
+      mark.centerXAnchor.constraint(equalTo: centerXAnchor),
+      mark.centerYAnchor.constraint(equalTo: centerYAnchor),
+    ])
   }
 
   @available(*, unavailable)
@@ -319,6 +344,19 @@ private struct AppRootView: View {
         notificationState: notificationModel.state,
         canRetryNotifications: notificationModel.canRetryRegistration,
         onRetryNotifications: notificationModel.retryRegistration,
+        canRememberSession: authenticationModel.canOfferRemembering,
+        isSessionRemembered: Binding(
+          get: { authenticationModel.isSessionRemembered },
+          set: { remember in
+            Task {
+              if remember {
+                await authenticationModel.rememberCurrentSession()
+              } else {
+                await authenticationModel.forgetRememberedSession()
+              }
+            }
+          }
+        ),
         onLock: lockSession,
         onForget: forgetSession
       )
@@ -341,6 +379,7 @@ private struct AppRootView: View {
       #endif
       notificationModel.authenticatedSessionDidStart()
       consumeNotificationIntents(notificationModel.pendingRefetchIntents)
+      await authenticationModel.refreshRememberedSessionStatus()
     }
     .onChange(of: notificationModel.authenticationRequired) { _, required in
       if required { requirePINAgain(for: participant) }
@@ -589,6 +628,8 @@ private struct AppSettingsView: View {
   let notificationState: NotificationModel.State
   let canRetryNotifications: Bool
   let onRetryNotifications: @MainActor () -> Void
+  let canRememberSession: Bool
+  @Binding var isSessionRemembered: Bool
   let onLock: @MainActor () -> Void
   let onForget: @MainActor () -> Void
 
@@ -637,6 +678,15 @@ private struct AppSettingsView: View {
           }
         }
         Section {
+          if canRememberSession {
+            Toggle(isOn: $isSessionRemembered) {
+              Label("Face ID로 빠르게 열기", systemImage: "faceid")
+            }
+            .tint(WoorisaiPalette.coral)
+            .accessibilityHint("이 기기에 로그인 정보를 저장하고 다음부터 Face ID로 들어옵니다.")
+            .accessibilityIdentifier("settings.rememberSession")
+          }
+
           Button {
             confirmsSessionLock = true
           } label: {

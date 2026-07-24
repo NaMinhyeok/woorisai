@@ -141,7 +141,9 @@ struct ScoreChangeThreadView: View {
       commentMediaModel.consumeReadyUploads()
       comment = ""
       showsMediaTray = false
-      isCommentFocused = false
+      // Keep the conversation flowing: restore focus after a successful send (the field drops it
+      // while disabled during the submit) instead of forcing a re-tap for the next reply.
+      isCommentFocused = true
       latestScrollRequest &+= 1
       syncCommentDraftProtection()
     }
@@ -196,6 +198,7 @@ struct ScoreChangeThreadView: View {
           }
         }
         .scrollDismissesKeyboard(.interactively)
+        .keyboardDoneToolbar()
         .safeAreaInset(edge: .bottom, spacing: 0) {
           commentComposerBar
         }
@@ -297,11 +300,6 @@ struct ScoreChangeThreadView: View {
               mediaTrayButton
               commentCountLabel
               Spacer(minLength: WoorisaiSpacing.small)
-              if isCommentFocused {
-                KeyboardDismissButton {
-                  isCommentFocused = false
-                }
-              }
               commentSubmitButton
             }
           }
@@ -309,11 +307,6 @@ struct ScoreChangeThreadView: View {
           HStack(alignment: .bottom, spacing: WoorisaiSpacing.small) {
             mediaTrayButton
             commentTextField
-            if isCommentFocused {
-              KeyboardDismissButton {
-                isCommentFocused = false
-              }
-            }
             commentSubmitButton
           }
           commentCountLabel
@@ -487,7 +480,6 @@ struct ScoreChangeThreadView: View {
       mediaUploadIDs: uploadIDs
     )
     if accepted {
-      isCommentFocused = false
       commentMediaModel.markReadyUploadsSubmitted()
     }
   }
@@ -647,10 +639,10 @@ private struct RelationshipCommentUnknownOutcomeRecovery: View {
       Button("저장 안 됨 · 다시 시도 허용", action: onConfirmManualRetry)
         .disabled(!allowsManualRetry)
         .accessibilityIdentifier("relationship.commentMutation.confirmRetry")
+      // Always enabled: abandon is the offline escape hatch — see the score composer's dialog.
       Button("판단 보류 · 재전송 없이 초안 정리", role: .destructive) {
         onAbandonInconclusive()
       }
-      .disabled(inspectionState != .loaded || inspectionResult != .inconclusive)
       .accessibilityIdentifier("relationship.commentMutation.abandonInconclusive")
       Button("취소", role: .cancel) {}
     } message: {

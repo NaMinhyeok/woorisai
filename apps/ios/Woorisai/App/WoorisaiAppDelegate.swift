@@ -6,6 +6,19 @@ final class WoorisaiAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
   let pushCoordinator = FirebasePushLifecycleCoordinator()
   private let snapshotPrivacyShield = AppSnapshotPrivacyShield()
 
+  /// Mirrors `AppPrivacyCoverPolicy`'s content question for the UIKit shield. Attached by the app
+  /// root; an unattached delegate still covers conservatively.
+  private weak var privacyCoverAuthenticationModel: AuthenticationModel?
+
+  func attachPrivacyCoverPolicy(authenticationModel: AuthenticationModel) {
+    privacyCoverAuthenticationModel = authenticationModel
+  }
+
+  private var coverContentIsPrivate: Bool {
+    guard let privacyCoverAuthenticationModel else { return true }
+    return !privacyCoverAuthenticationModel.isAwaitingBiometricUnlock
+  }
+
   func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -26,11 +39,15 @@ final class WoorisaiAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
   }
 
   func applicationWillResignActive(_ application: UIApplication) {
+    // The biometric unlock flow also resigns active (Face ID system sheet); the policy exempts it
+    // so the shield never blanks the lock screen behind the prompt.
+    guard coverContentIsPrivate else { return }
     snapshotPrivacyShield.show(in: application.visiblePrivacyShieldWindows)
     AppPrivacyAccessibilityController.setContentHidden(true)
   }
 
   func applicationDidEnterBackground(_ application: UIApplication) {
+    guard coverContentIsPrivate else { return }
     snapshotPrivacyShield.show(in: application.visiblePrivacyShieldWindows)
     AppPrivacyAccessibilityController.setContentHidden(true)
   }
@@ -95,8 +112,7 @@ final class AppSnapshotPrivacyShield {
       if let existingCover = covers[windowID] {
         cover = existingCover
       } else {
-        cover = UIView(frame: window.bounds)
-        cover.backgroundColor = .systemBackground
+        cover = AppPrivacyCoverUIView(frame: window.bounds)
         cover.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         cover.accessibilityIdentifier = Self.accessibilityIdentifier
         covers[windowID] = cover

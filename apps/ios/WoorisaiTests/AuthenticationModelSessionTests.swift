@@ -105,6 +105,57 @@ struct AuthenticationModelSessionTests {
     await sessionExpectEventually { model.state == .choosingParticipant }
     #expect(await vault.deleteCount >= 1)
     #expect(await !store.containsCredential)
+    #expect(model.storedSessionNotice == .rejected)
+  }
+
+  @Test
+  func unlockInvalidatedItemForgetsVaultAndExplains() async throws {
+    let store = InMemoryCredentialStore()
+    let vault = FakeCredentialVault(stored: true, loadResult: .failure(.invalidated))
+    let model = makeModel(store: store, vault: vault, probe: availableProbe(), restores: true)
+    await model.restoreLockedSessionIfAvailable()
+
+    model.unlock()
+
+    // Without the purge this loops forever: the presence check still sees the invalidated item,
+    // so every launch would re-lock against an archive that can never be read again.
+    await sessionExpectEventually { model.state == .choosingParticipant }
+    #expect(await vault.deleteCount >= 1)
+    #expect(model.storedSessionNotice == .invalidated)
+  }
+
+  @Test
+  func selectingParticipantClearsStoredSessionNotice() async throws {
+    let store = InMemoryCredentialStore()
+    let vault = FakeCredentialVault(stored: true, loadResult: .failure(.invalidated))
+    let model = makeModel(store: store, vault: vault, probe: availableProbe(), restores: true)
+    await model.restoreLockedSessionIfAvailable()
+    model.unlock()
+    await sessionExpectEventually { model.storedSessionNotice == .invalidated }
+
+    await model.select(option)
+
+    #expect(model.storedSessionNotice == nil)
+  }
+
+  @Test
+  func unlockGenericFailureWithUnusableBiometryReportsLockout() async throws {
+    let store = InMemoryCredentialStore()
+    let vault = FakeCredentialVault(stored: true, loadResult: .failure(.failed))
+    let probe = MutableBiometricProbe(
+      value: BiometricAvailability(kind: .faceID, canPromptForUnlock: true)
+    )
+    let model = makeModel(store: store, vault: vault, probe: probe, restores: true)
+    await model.restoreLockedSessionIfAvailable()
+    await probe.set(.unavailable)
+
+    model.unlock()
+
+    await sessionExpectEventually {
+      model.state
+        == .locked(BiometricUnlockContext(kind: .faceID, lastFailure: .biometryLockedOut))
+    }
+    #expect(await vault.deleteCount == 0)
   }
 
   @Test
@@ -179,6 +230,77 @@ struct AuthenticationModelSessionTests {
 
     await sessionExpectEventually { model.authenticatedParticipant == self.participant }
     #expect(await vault.saveCount == 0)
+  }
+
+  @Test
+  func submitWithoutRememberingPurgesStaleVault() async throws {
+    // Identity-confusion guard: participant A's archive is in the vault (PIN fallback kept it),
+    // participant B logs in without remembering. The stale archive MUST be purged, or the next
+    // launch would Face-ID-unlock as A.
+    let store = InMemoryCredentialStore()
+    let vault = FakeCredentialVault(stored: true, loadResult: .success(try archive()))
+    let participantB = AuthenticatedParticipant(slot: .two, displayName: "여름")
+    let validator = SessionScriptedValidator(store: store, steps: [.success(participantB)])
+    let model = makeModel(store: store, validator: validator, vault: vault, probe: availableProbe())
+
+    await model.select(LoginOption(slot: 2, displayName: "여름"))
+    model.updatePIN("9876")
+    model.submit()
+
+    await sessionExpectEventually { model.authenticatedParticipant == participantB }
+    #expect(await vault.saveCount == 0)
+    #expect(await vault.deleteCount >= 1)
+    #expect(await vault.hasStoredCredential() == false)
+  }
+
+  // MARK: - Settings-driven remembering
+
+  @Test
+  func rememberCurrentSessionSavesArchiveFromActiveSession() async throws {
+    let store = InMemoryCredentialStore()
+    let vault = FakeCredentialVault(stored: false, loadResult: .success(try archive()))
+    let validator = SessionScriptedValidator(store: store, steps: [.success(participant)])
+    let model = makeModel(store: store, validator: validator, vault: vault, probe: availableProbe())
+    await model.select(option)
+    model.updatePIN("0123")
+    model.submit()
+    await sessionExpectEventually { model.authenticatedParticipant == self.participant }
+
+    await model.rememberCurrentSession()
+
+    #expect(await vault.saveCount == 1)
+    #expect(model.isSessionRemembered)
+  }
+
+  @Test
+  func forgetRememberedSessionPurgesVaultWithoutEndingSession() async throws {
+    let store = InMemoryCredentialStore()
+    let vault = FakeCredentialVault(stored: true, loadResult: .success(try archive()))
+    let validator = SessionScriptedValidator(store: store, steps: [.success(participant)])
+    let model = makeModel(store: store, validator: validator, vault: vault, probe: availableProbe())
+    await model.select(option)
+    model.updatePIN("0123")
+    model.remembersSession = true
+    model.submit()
+    await sessionExpectEventually { model.authenticatedParticipant == self.participant }
+
+    await model.forgetRememberedSession()
+
+    #expect(await vault.deleteCount >= 1)
+    #expect(!model.isSessionRemembered)
+    #expect(model.authenticatedParticipant == self.participant)
+  }
+
+  @Test
+  func rememberCurrentSessionWithoutActiveSessionDoesNotSave() async throws {
+    let store = InMemoryCredentialStore()
+    let vault = FakeCredentialVault(stored: false, loadResult: .success(try archive()))
+    let model = makeModel(store: store, vault: vault, probe: availableProbe())
+
+    await model.rememberCurrentSession()
+
+    #expect(await vault.saveCount == 0)
+    #expect(!model.isSessionRemembered)
   }
 
   @Test
@@ -259,6 +381,22 @@ struct AuthenticationModelSessionTests {
 
 private struct FakeBiometricProbe: BiometricAvailabilityProbing {
   let value: BiometricAvailability
+  func availability() async -> BiometricAvailability { value }
+}
+
+/// A probe whose answer can change mid-test — models biometry locking out between the restore
+/// probe and the post-failure re-probe.
+private actor MutableBiometricProbe: BiometricAvailabilityProbing {
+  private var value: BiometricAvailability
+
+  init(value: BiometricAvailability) {
+    self.value = value
+  }
+
+  func set(_ newValue: BiometricAvailability) {
+    value = newValue
+  }
+
   func availability() async -> BiometricAvailability { value }
 }
 

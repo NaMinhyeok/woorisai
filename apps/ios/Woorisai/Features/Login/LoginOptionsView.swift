@@ -21,6 +21,9 @@ struct LoginOptionsView: View {
       ScrollView {
         VStack(spacing: dynamicTypeSize.isAccessibilitySize ? 20 : 26) {
           brandHeader
+          if let notice = authenticationModel.storedSessionNotice {
+            storedSessionNoticeView(notice)
+          }
           stateContent
         }
         .frame(maxWidth: 520)
@@ -30,6 +33,7 @@ struct LoginOptionsView: View {
       }
       .scrollDismissesKeyboard(.interactively)
     }
+    .keyboardDoneToolbar()
     .safeAreaInset(edge: .bottom, spacing: 0) {
       if authenticationModel.selectedOption != nil {
         loginActionBar
@@ -81,7 +85,15 @@ struct LoginOptionsView: View {
       case .enteringPIN:
         isAuthenticationFailureFocused = false
         isPINFocused = true
-      case .credentialRejected, .unavailable, .failed:
+      case .credentialRejected:
+        // The user retypes immediately after a rejected PIN — keep the keyboard up so the retry
+        // does not need an extra tap on the field. VoiceOver still gets the failure message.
+        Task { @MainActor in
+          await Task.yield()
+          isAuthenticationFailureFocused = true
+          isPINFocused = true
+        }
+      case .unavailable, .failed:
         isPINFocused = false
         Task { @MainActor in
           await Task.yield()
@@ -90,11 +102,6 @@ struct LoginOptionsView: View {
       case .choosingParticipant, .validating, .authenticated,
         .restoring, .locked, .unlocking:
         isAuthenticationFailureFocused = false
-        isPINFocused = false
-      }
-    }
-    .onChange(of: authenticationModel.pin) { _, pin in
-      if pin.count == 4 {
         isPINFocused = false
       }
     }
@@ -148,6 +155,29 @@ struct LoginOptionsView: View {
           .frame(maxWidth: 320)
       }
     }
+  }
+
+  /// Why the stored session ended on its own — without this, a launch that used to Face-ID-unlock
+  /// silently lands on the participant chooser and reads as a broken app.
+  private func storedSessionNoticeView(_ notice: StoredSessionNotice) -> some View {
+    let message: String
+    switch notice {
+    case .invalidated:
+      message = "Face ID 정보가 바뀌어 저장해 둔 로그인을 초기화했어요. PIN으로 다시 들어와 주세요."
+    case .rejected:
+      message = "저장해 둔 로그인 정보가 더 이상 맞지 않아 초기화했어요. PIN으로 다시 들어와 주세요."
+    }
+    return Label(message, systemImage: "info.circle")
+    .font(.callout)
+    .foregroundStyle(WoorisaiPalette.ink)
+    .padding(WoorisaiSpacing.regular)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      WoorisaiPalette.coralSoft.opacity(0.5),
+      in: RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous)
+    )
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("loginOptions.sessionNotice")
   }
 
   @ViewBuilder
@@ -339,12 +369,6 @@ struct LoginOptionsView: View {
         .accessibilityLabel("네 자리 PIN")
         .accessibilityHint("숫자 네 자리를 입력하세요")
         .accessibilityIdentifier("authentication.pin")
-
-        if isPINFocused {
-          KeyboardDismissButton {
-            isPINFocused = false
-          }
-        }
       }
 
       Text("숫자 네 자리를 입력해 주세요.")

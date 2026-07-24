@@ -2,7 +2,13 @@ import SwiftUI
 import UIKit
 
 enum WoorisaiPalette {
-  static let cream = adaptive(light: (255, 248, 241), dark: (23, 19, 18))
+  /// UIKit-level brand colors for non-SwiftUI chrome (privacy covers). Keep in sync with `cream`
+  /// and `coral` below; system semantic colors (`.systemBackground` 등) must not replace these —
+  /// they read as a foreign black/white flash against the warm brand background.
+  static let creamUIColor = adaptiveUIColor(light: (255, 248, 241), dark: (23, 19, 18))
+  static let coralUIColor = adaptiveUIColor(light: (217, 92, 78), dark: (255, 143, 125))
+
+  static let cream = Color(uiColor: creamUIColor)
   static let creamDeep = adaptive(light: (249, 238, 228), dark: (46, 37, 33))
   static let surface = adaptive(light: (255, 252, 250), dark: (37, 31, 29))
   static let field = adaptive(light: (255, 251, 248), dark: (48, 40, 37))
@@ -10,7 +16,7 @@ enum WoorisaiPalette {
   static let ink = adaptive(light: (57, 45, 42), dark: (247, 238, 234))
   static let muted = adaptive(light: (112, 94, 88), dark: (200, 181, 172))
   static let line = adaptive(light: (160, 139, 130), dark: (142, 114, 104))
-  static let coral = adaptive(light: (217, 92, 78), dark: (255, 143, 125))
+  static let coral = Color(uiColor: coralUIColor)
   static let coralDark = adaptive(light: (168, 63, 53), dark: (255, 170, 153))
   static let coralSoft = adaptive(light: (255, 224, 216), dark: (84, 48, 43))
   static let rose = adaptive(light: (246, 181, 173), dark: (192, 120, 112))
@@ -22,23 +28,31 @@ enum WoorisaiPalette {
   static let primaryButtonEnd = adaptive(light: (150, 47, 40), dark: (132, 42, 36))
   static let primaryButtonDisabled = adaptive(light: (132, 102, 97), dark: (140, 108, 102))
   static let primaryButtonLabel = Color.white
-  static let shadow = adaptive(light: (57, 45, 42), dark: (0, 0, 0))
+  // Dark mode: a pure-black drop shadow is invisible on the warm-dark background, flattening
+  // every card. A faint warm glow reads as elevation instead. (Call sites keep their 0.08–0.2
+  // opacities.)
+  static let shadow = adaptive(light: (57, 45, 42), dark: (255, 190, 175))
 
   private static func adaptive(
     light: (red: Int, green: Int, blue: Int),
     dark: (red: Int, green: Int, blue: Int)
   ) -> Color {
-    Color(
-      uiColor: UIColor { traits in
-        let components = traits.userInterfaceStyle == .dark ? dark : light
-        return UIColor(
-          red: CGFloat(components.red) / 255,
-          green: CGFloat(components.green) / 255,
-          blue: CGFloat(components.blue) / 255,
-          alpha: 1
-        )
-      }
-    )
+    Color(uiColor: adaptiveUIColor(light: light, dark: dark))
+  }
+
+  private static func adaptiveUIColor(
+    light: (red: Int, green: Int, blue: Int),
+    dark: (red: Int, green: Int, blue: Int)
+  ) -> UIColor {
+    UIColor { traits in
+      let components = traits.userInterfaceStyle == .dark ? dark : light
+      return UIColor(
+        red: CGFloat(components.red) / 255,
+        green: CGFloat(components.green) / 255,
+        blue: CGFloat(components.blue) / 255,
+        alpha: 1
+      )
+    }
   }
 }
 
@@ -275,37 +289,39 @@ struct PrimaryHeartButton: View {
   }
 }
 
-struct KeyboardDismissButton: View {
-  let action: () -> Void
-
-  var body: some View {
-    Button {
-      action()
-      UIApplication.shared.sendAction(
-        #selector(UIResponder.resignFirstResponder),
-        to: nil,
-        from: nil,
-        for: nil
-      )
-    } label: {
-      Image(systemName: "keyboard.chevron.compact.down")
-        .font(.body.weight(.semibold))
-        .foregroundStyle(WoorisaiPalette.coralDark)
-        .frame(
-          width: WoorisaiControlMetric.minimumTapTarget,
-          height: WoorisaiControlMetric.minimumTapTarget
-        )
-        .background(WoorisaiPalette.field, in: Circle())
-        .overlay {
-          Circle().stroke(WoorisaiPalette.line, lineWidth: 1)
+/// The app-standard keyboard finish affordance: a "완료" button in the system toolbar directly
+/// above the keyboard. Attach ONCE per screen that contains text input. This replaces the old
+/// inline dismiss chips that appeared next to a focused field — those reflowed the layout on every
+/// focus change and sat far from the keyboard in full-screen editors. New input screens get the
+/// standard behavior by adding this modifier, not by composing their own dismiss control.
+struct KeyboardDoneToolbar: ViewModifier {
+  func body(content: Content) -> some View {
+    content.toolbar {
+      ToolbarItemGroup(placement: .keyboard) {
+        Spacer()
+        Button("완료") {
+          UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+          )
         }
+        .font(.headline.weight(.semibold))
+        .foregroundStyle(WoorisaiPalette.coralDark)
+        .accessibilityLabel("키보드 내리기")
+        .accessibilityIdentifier("keyboard.dismiss")
+      }
     }
-    .buttonStyle(.plain)
-    .accessibilityLabel("키보드 닫기")
-    .accessibilityHint("입력한 내용은 그대로 유지됩니다.")
-    .accessibilityIdentifier("keyboard.dismiss")
   }
 }
+
+extension View {
+  func keyboardDoneToolbar() -> some View {
+    modifier(KeyboardDoneToolbar())
+  }
+}
+
 
 struct WoorisaiSectionHeading: View {
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize

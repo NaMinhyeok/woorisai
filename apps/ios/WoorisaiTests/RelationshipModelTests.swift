@@ -323,6 +323,50 @@ struct RelationshipModelTests {
   }
 
   @Test
+  func unknownScoreOutcomeCanBeAbandonedWithoutInspection() async {
+    // Offline escape guarantee: abandon must work even when the inspection never ran or failed —
+    // requiring a successful inspection trapped the composer sheet behind disabled actions.
+    let service = RelationshipServiceFake(scoreWrite: .transport)
+    let model = RelationshipModel(service: service)
+    model.loadIfNeeded()
+    await relationshipExpectEventually { model.loadState == .loaded }
+
+    #expect(model.createScoreChange(targetScore: 75, reason: "오프라인 점수"))
+    await relationshipExpectEventually { model.scoreOutcomeRequiresConfirmation }
+
+    #expect(model.abandonInconclusiveUnknownScoreOutcome())
+    #expect(!model.scoreOutcomeRequiresConfirmation)
+    #expect(model.notice?.contains("저장 여부를 확인하지 못한 채") == true)
+    #expect(await service.scoreCreateCount == 1)
+  }
+
+  @Test
+  func unknownCommentOutcomeCanBeAbandonedWithoutInspection() async {
+    let service = RelationshipServiceFake(commentWrite: .transport)
+    let model = RelationshipModel(service: service)
+    model.loadIfNeeded()
+    await relationshipExpectEventually { model.loadState == .loaded }
+    model.loadThread(scoreChangeID: RelationshipFixtures.change.id)
+    await relationshipExpectEventually { model.threadState == .loaded }
+
+    #expect(
+      model.createComment(
+        scoreChangeID: RelationshipFixtures.change.id,
+        content: "오프라인 댓글"
+      )
+    )
+    await relationshipExpectEventually { model.commentOutcomeRequiresConfirmation }
+
+    #expect(
+      model.abandonInconclusiveUnknownCommentOutcome(
+        scoreChangeID: RelationshipFixtures.change.id
+      )
+    )
+    #expect(!model.commentOutcomeRequiresConfirmation)
+    #expect(await service.commentCreateCount == 1)
+  }
+
+  @Test
   func inconsistentCommentSnapshotCannotBeRetriedAndCanOnlyBeAbandoned() async {
     let service = RelationshipServiceFake(
       commentWrite: .transport,

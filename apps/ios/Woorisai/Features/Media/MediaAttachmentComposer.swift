@@ -1021,7 +1021,7 @@ struct MediaAttachmentComposer: View {
         if !model.uploads.isEmpty {
           Text(attachmentCountLabel)
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(WoorisaiPalette.muted)
             .accessibilityLabel(attachmentCountLabel)
         }
       }
@@ -1136,7 +1136,7 @@ struct MediaAttachmentComposer: View {
         Spacer()
         Text(item.byteSize.formatted(.byteCount(style: .file)))
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(WoorisaiPalette.muted)
       }
 
       uploadStatus(item)
@@ -1214,7 +1214,7 @@ struct MediaAttachmentComposer: View {
     case .idle:
       Text("업로드 대기 중")
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(WoorisaiPalette.muted)
     case .initiating:
       ProgressView("업로드 준비 중")
     case .uploading(let progress):
@@ -1239,7 +1239,7 @@ struct MediaAttachmentComposer: View {
     case .cancelled:
       Label("업로드를 취소했어요.", systemImage: "xmark.circle")
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(WoorisaiPalette.muted)
     }
   }
 

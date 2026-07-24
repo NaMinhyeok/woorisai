@@ -18,6 +18,7 @@
 		18332D71FADB81EC4FD4EBA0 /* RelationshipScoreComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8249C3565178262DFEAA88F9 /* RelationshipScoreComposer.swift */; };
 		1B310268E530569EB0538E6A /* openapi.yaml in Resources */ = {isa = PBXBuildFile; fileRef = A8914F28C22B6C25363853A4 /* openapi.yaml */; };
 		1C307F126A78B6B4DBD8F0F8 /* WoorisaiAPIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F76F28C7930A95A511B832 /* WoorisaiAPIClientTests.swift */; };
+		1C971BE298F945C146E1C935 /* AppPrivacyCoverPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B7614B43B67709D446592F /* AppPrivacyCoverPolicyTests.swift */; };
 		2A3F2B0051E1E63844B0DC56 /* OpenAPIURLSession in Frameworks */ = {isa = PBXBuildFile; productRef = 944CAB6ED8CA020A36DFBACC /* OpenAPIURLSession */; };
 		374C922C2523DBF1A64E33CC /* WoorisaiAPI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2E7D04D016E81AC8374C19ED /* WoorisaiAPI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		37718E5D45C5CB0AB112AF7A /* NotificationModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3443E4C7DC63337254603F5A /* NotificationModelTests.swift */; };
@@ -171,6 +172,7 @@
 		08FE64A009715C385F5653CA /* RelationshipModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelationshipModelTests.swift; sourceTree = "<group>"; };
 		09C81581956669C817FAF1A9 /* NotificationModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationModel.swift; sourceTree = "<group>"; };
 		0C3FB69EA91C8716D02D2DB6 /* WoorisaiAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiAPIClient.swift; sourceTree = "<group>"; };
+		10B7614B43B67709D446592F /* AppPrivacyCoverPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPrivacyCoverPolicyTests.swift; sourceTree = "<group>"; };
 		138E16AB78EFF85EF7FDA33D /* WoorisaiRelationshipAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiRelationshipAPI.swift; sourceTree = "<group>"; };
 		163C17EB85034CF3A5294251 /* MediaModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaModelTests.swift; sourceTree = "<group>"; };
 		1F2D037050C97D031B2C83DF /* CredentialVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialVault.swift; sourceTree = "<group>"; };
@@ -459,6 +461,7 @@
 		DDE61BD6E57993E923360453 /* WoorisaiTests */ = {
 			isa = PBXGroup;
 			children = (
+				10B7614B43B67709D446592F /* AppPrivacyCoverPolicyTests.swift */,
 				5F3A2FA12EBC380CC39F1511 /* AuthenticationModelSessionTests.swift */,
 				9D5D5403E383CBDFEFD4475A /* AuthenticationModelTests.swift */,
 				2E2DEEBE274D14A59AF70729 /* DiaryModelTests.swift */,
@@ -702,6 +705,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1C971BE298F945C146E1C935 /* AppPrivacyCoverPolicyTests.swift in Sources */,
 				E601DEDB0886C0217AF4B84E /* AuthenticationModelSessionTests.swift in Sources */,
 				9EEE4609734523DB1B96A03F /* AuthenticationModelTests.swift in Sources */,
 				6D556465B3D825861E49339F /* DiaryModelTests.swift in Sources */,

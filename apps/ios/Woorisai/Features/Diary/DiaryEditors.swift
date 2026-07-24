@@ -118,6 +118,7 @@ struct DiaryCommentEditor: View {
         }
         .scrollDismissesKeyboard(.interactively)
       }
+      .keyboardDoneToolbar()
       .safeAreaInset(edge: .bottom, spacing: 0) {
         stickySubmitBar
       }
@@ -156,27 +157,8 @@ struct DiaryCommentEditor: View {
     }
   }
 
-  @ViewBuilder
   private var editorHeading: some View {
-    if dynamicTypeSize.isAccessibilitySize {
-      VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
-        editorTitleAndCount
-        if isFocused {
-          KeyboardDismissButton {
-            isFocused = false
-          }
-        }
-      }
-    } else {
-      HStack(alignment: .center, spacing: WoorisaiSpacing.small) {
-        editorTitleAndCount
-        if isFocused {
-          KeyboardDismissButton {
-            isFocused = false
-          }
-        }
-      }
-    }
+    editorTitleAndCount
   }
 
   private var editorTitleAndCount: some View {
@@ -386,6 +368,7 @@ struct DiaryEntryComposer: View {
         }
         .scrollDismissesKeyboard(.interactively)
       }
+      .keyboardDoneToolbar()
       .safeAreaInset(edge: .bottom, spacing: 0) {
         stickyActionBar
       }
@@ -465,27 +448,11 @@ struct DiaryEntryComposer: View {
     }
   }
 
-  @ViewBuilder
+  // Keyboard dismissal lives in the shared keyboard toolbar (`keyboardDoneToolbar`), not in an
+  // inline chip: the chip reflowed this heading on every focus change and sat at the top of the
+  // card, far from the keyboard.
   private var contentHeading: some View {
-    if dynamicTypeSize.isAccessibilitySize {
-      VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
-        contentTitleAndCount
-        if isContentFocused {
-          KeyboardDismissButton {
-            isContentFocused = false
-          }
-        }
-      }
-    } else {
-      HStack(alignment: .center, spacing: WoorisaiSpacing.small) {
-        contentTitleAndCount
-        if isContentFocused {
-          KeyboardDismissButton {
-            isContentFocused = false
-          }
-        }
-      }
-    }
+    contentTitleAndCount
   }
 
   private var contentTitleAndCount: some View {
@@ -796,7 +763,10 @@ struct DiaryUnknownOutcomeRecovery: View {
   }
 
   private var canAbandonInconclusive: Bool {
-    canResolve && !allowsResolveAsSaved && !allowsManualRetry
+    // Abandon is the offline escape hatch: offer it whenever the inspection could not resolve the
+    // outcome — including when the reload itself fails (offline). Hidden only while a resolved
+    // inspection offers a definitive action instead.
+    !canResolve || (!allowsResolveAsSaved && !allowsManualRetry)
   }
 
   private var recoveryMessage: String {
@@ -811,7 +781,7 @@ struct DiaryUnknownOutcomeRecovery: View {
       }
       return "최신 내용을 확인했어요. 일치하는 저장 결과를 선택해 주세요."
     case .failed:
-      return "최신 내용을 불러오지 못했어요. 초안을 유지한 채 다시 시도해 주세요."
+      return "최신 내용을 불러오지 못했어요. 다시 시도하거나, 재전송 없이 초안을 정리하고 나갈 수 있어요."
     }
   }
 }

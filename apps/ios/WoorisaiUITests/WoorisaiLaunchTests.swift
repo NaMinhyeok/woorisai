@@ -210,7 +210,8 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertTrue(rejected.waitForExistence(timeout: 10))
     XCTAssertTrue(element("authentication.pinEntry", in: app).exists)
     XCTAssertTrue(element("authentication.actionBar", in: app).exists)
-    XCTAssertFalse(app.keyboards.firstMatch.exists)
+    // A rejected PIN keeps the keyboard up so the user can retype without re-tapping the field.
+    XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
 
     submitPIN("0123", in: app)
     XCTAssertTrue(element("relationship.loaded", in: app).waitForExistence(timeout: 10))

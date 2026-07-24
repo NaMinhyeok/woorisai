@@ -1273,13 +1273,6 @@ struct MediaAttachmentComposerTests {
   }
 
   @Test
-  func privacyCoverPolicyProtectsEveryNonactiveScenePhase() {
-    #expect(!AppPrivacyCoverPolicy.shouldCover(.active))
-    #expect(AppPrivacyCoverPolicy.shouldCover(.inactive))
-    #expect(AppPrivacyCoverPolicy.shouldCover(.background))
-  }
-
-  @Test
   func snapshotPrivacyShieldStaysTopmostWithoutDuplicatingAndIsRemovedOnActivation() {
     let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
     let sensitiveContent = UILabel(frame: window.bounds)

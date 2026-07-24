@@ -5,7 +5,19 @@ import WoorisaiAPI
 enum BiometricUnlockFailure: Equatable, Sendable {
   case cancelled
   case offline
+  /// Biometry is locked out (too many failed attempts). Retrying in-app is futile until the
+  /// device passcode unlocks biometry again, so the UI must steer to PIN instead of "재시도".
+  case biometryLockedOut
   case failed
+}
+
+/// Why a stored session ended without the user asking it to — shown once on the login screen so a
+/// silent drop back to the participant chooser never looks like "Face ID가 고장났다".
+enum StoredSessionNotice: Equatable, Sendable {
+  /// The Keychain item was permanently invalidated (biometry re-enrollment).
+  case invalidated
+  /// The server rejected the stored credential (PIN changed).
+  case rejected
 }
 
 struct BiometricUnlockContext: Equatable, Sendable {
@@ -41,6 +53,14 @@ final class AuthenticationModel {
   /// Whether the "remember with biometrics" toggle should be offered. Refreshed from the probe;
   /// stays false wherever biometrics are unavailable (including tests / UI tests).
   private(set) var canOfferRemembering = false
+
+  /// One-shot explanation for a stored session that ended on its own (invalidated / rejected).
+  /// Shown on the login screen; cleared as soon as the user moves on to a participant.
+  private(set) var storedSessionNotice: StoredSessionNotice?
+
+  /// Whether the vault currently holds a credential — backs the settings toggle. Refreshed via
+  /// `refreshRememberedSessionStatus()` and kept current by the settings actions below.
+  private(set) var isSessionRemembered = false
 
   var canSubmit: Bool {
     pin.utf8.count == 4 && pin.utf8.allSatisfy(Self.isASCIIDigit)
@@ -121,6 +141,36 @@ final class AuthenticationModel {
     canOfferRemembering = await biometricProbe.availability().canPromptForUnlock
   }
 
+  /// Refresh both settings-toggle inputs: whether biometrics can gate a vault at all, and whether
+  /// a credential is currently stored.
+  func refreshRememberedSessionStatus() async {
+    canOfferRemembering = await biometricProbe.availability().canPromptForUnlock
+    isSessionRemembered = await vault.hasStoredCredential()
+  }
+
+  /// Settings-driven opt-in AFTER login: persist the active session's credential so the user does
+  /// not have to sign out and back in just to enable Face ID unlock.
+  func rememberCurrentSession() async {
+    guard case .authenticated = state,
+      let archive = await credentialStore.archivedCurrentCredential()
+    else {
+      isSessionRemembered = false
+      return
+    }
+    do {
+      try await vault.save(archive)
+      isSessionRemembered = true
+    } catch {
+      isSessionRemembered = false
+    }
+  }
+
+  /// Settings-driven opt-out: forget the stored credential without ending the current session.
+  func forgetRememberedSession() async {
+    await vault.deleteCredential()
+    isSessionRemembered = false
+  }
+
   func select(_ option: LoginOption) async {
     guard ParticipantSlot(rawValue: option.slot) != nil else {
       state = .failed(option)
@@ -133,16 +183,24 @@ final class AuthenticationModel {
     unlockTask?.cancel()
     unlockTask = nil
     pin = ""
+    storedSessionNotice = nil
     state = .enteringPIN(option)
     await credentialStore.clear()
   }
 
   func updatePIN(_ newValue: String) {
-    let bytes = Array(newValue.utf8)
+    // Pasted PINs commonly carry stray whitespace ("1234 ", "12 34"); strip it instead of
+    // silently rejecting the whole paste with no feedback.
+    let sanitized = String(newValue.unicodeScalars.filter { !$0.properties.isWhitespace })
+    let bytes = Array(sanitized.utf8)
     guard bytes.count <= 4, bytes.allSatisfy(Self.isASCIIDigit) else {
       return
     }
-    pin = newValue
+    // Refocusing a SecureField makes iOS clear it and push "" through the binding. Only a real
+    // change counts as "the user started retyping" — otherwise the programmatic no-op would
+    // dismiss the credential-rejected message the instant it appears.
+    guard sanitized != pin else { return }
+    pin = sanitized
 
     if case .credentialRejected(let option) = state {
       state = .enteringPIN(option)
@@ -180,6 +238,14 @@ final class AuthenticationModel {
             await vault.deleteCredential()
             return
           }
+          self.isSessionRemembered = true
+        } else {
+          // A non-remembered login must invalidate whatever the vault held before: a stale
+          // archive would let the next launch biometric-unlock as whoever logged in previously —
+          // including the other participant.
+          await vault.deleteCredential()
+          guard self.requestGeneration == generation else { return }
+          self.isSessionRemembered = false
         }
 
         self.pin = ""
@@ -237,6 +303,7 @@ final class AuthenticationModel {
   /// fresh PIN login. Backs the settings "이 기기에서 로그인 정보 지우기" action.
   func signOutAndForget() async {
     await vault.deleteCredential()
+    isSessionRemembered = false
     await cancel()
   }
 
@@ -244,6 +311,7 @@ final class AuthenticationModel {
     // The server rejected this credential, so it can never unlock again — forget it first to avoid
     // a launch → Face ID → rehydrate-rejected-credential → reject loop.
     await vault.deleteCredential()
+    isSessionRemembered = false
     requestGeneration &+= 1
     validationTask?.cancel()
     validationTask = nil
@@ -350,19 +418,37 @@ final class AuthenticationModel {
     context: BiometricUnlockContext,
     generation: UInt
   ) async {
-    let outcome = Self.unlockOutcome(for: error, kind: context.kind)
+    var outcome = Self.unlockOutcome(for: error, kind: context.kind)
+    if case .locked(let lockedContext) = outcome.state, lockedContext.lastFailure == .failed {
+      // A generic failure while biometrics report unusable is a lockout: retrying in-app cannot
+      // succeed until the device passcode re-enables biometry, so say that instead of "재시도".
+      let availability = await biometricProbe.availability()
+      if !availability.canPromptForUnlock {
+        outcome = UnlockOutcome(
+          state: .locked(
+            BiometricUnlockContext(kind: context.kind, lastFailure: .biometryLockedOut)
+          ),
+          forgetsVault: false,
+          notice: nil
+        )
+      }
+    }
     await credentialStore.clear()
     if outcome.forgetsVault {
       await vault.deleteCredential()
+      isSessionRemembered = false
     }
     guard requestGeneration == generation else { return }
     unlockTask = nil
+    storedSessionNotice = outcome.notice
     state = outcome.state
   }
 
-  /// The unlock-failure policy — how a Keychain/biometric or server error becomes a UX state, and
-  /// whether the stored credential should be forgotten. This is the one place that decides "retry
-  /// biometrics", "fall back to PIN", or "forget and start over".
+  /// The unlock-failure policy — how a Keychain/biometric or server error becomes a UX state,
+  /// whether the stored credential should be forgotten, and what the login screen should tell the
+  /// user about it. This is the one place that decides "retry biometrics", "fall back to PIN", or
+  /// "forget and start over". Every terminal drop to `.choosingParticipant` MUST carry a notice —
+  /// a silent jump from a successful Face ID to the participant chooser reads as a broken app.
   private static func unlockOutcome(
     for error: any Error,
     kind: BiometricKind
@@ -372,22 +458,29 @@ final class AuthenticationModel {
       ParticipantCredentialError.invalidPIN, CredentialVaultError.itemCorrupted:
       // The stored credential can never succeed (server rejected it, or the blob is corrupt):
       // forget it and drop to a fresh PIN login.
-      return UnlockOutcome(state: .choosingParticipant, forgetsVault: true)
+      return UnlockOutcome(state: .choosingParticipant, forgetsVault: true, notice: .rejected)
+    case CredentialVaultError.invalidated:
+      // Biometry re-enrollment permanently killed the item. Without the purge this loops forever:
+      // the presence check still sees the item, so every launch re-locks against a dead archive.
+      return UnlockOutcome(state: .choosingParticipant, forgetsVault: true, notice: .invalidated)
     case CredentialVaultError.cancelled:
       return UnlockOutcome(
         state: .locked(BiometricUnlockContext(kind: kind, lastFailure: .cancelled)),
-        forgetsVault: false
+        forgetsVault: false,
+        notice: nil
       )
     case WoorisaiAPIError.transport, WoorisaiAPIError.serviceUnavailable,
       CredentialVaultError.unavailable:
       return UnlockOutcome(
         state: .locked(BiometricUnlockContext(kind: kind, lastFailure: .offline)),
-        forgetsVault: false
+        forgetsVault: false,
+        notice: nil
       )
     default:
       return UnlockOutcome(
         state: .locked(BiometricUnlockContext(kind: kind, lastFailure: .failed)),
-        forgetsVault: false
+        forgetsVault: false,
+        notice: nil
       )
     }
   }
@@ -395,6 +488,7 @@ final class AuthenticationModel {
   private struct UnlockOutcome {
     let state: State
     let forgetsVault: Bool
+    let notice: StoredSessionNotice?
   }
 
   private static func isASCIIDigit(_ byte: UInt8) -> Bool {

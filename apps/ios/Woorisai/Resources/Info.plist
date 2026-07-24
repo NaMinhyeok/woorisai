@@ -29,7 +29,10 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>우리사이 잠금을 Face ID로 해제합니다.</string>
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<key>WoorisaiAPIHost</key>
 	<string>$(WOORISAI_API_HOST)</string>
 	<key>WoorisaiBuildConfiguration</key>
