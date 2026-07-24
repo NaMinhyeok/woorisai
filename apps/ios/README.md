@@ -127,6 +127,16 @@ Simulator는 generated client, feature state, navigation과 접근성 회귀를 
 실제 Basic API, R2, FID/APNs, background와 privacy snapshot은 같은 archive를 실제 기기에서
 검증해야 하며 simulator 결과로 대체하지 않는다.
 
+## UI smoke
+
+CI `Verify`는 iOS unit/API test만 실행한다. 화면 회귀는 다음 script로 로컬에서 확인하고,
+UI에 영향 있는 변경은 merge 전에 통과 결과를 남긴다.
+
+```bash
+apps/ios/scripts/ui-smoke.zsh          # 화면 2종의 핵심 smoke 6개
+apps/ios/scripts/ui-smoke.zsh --full   # 화면 2종의 전체 WoorisaiUITests
+```
+
 ## 선택적 화면 캡처
 
 Debug app을 만든 뒤 login-options 상태별 framebuffer를 다음 script로 저장할 수 있다.
