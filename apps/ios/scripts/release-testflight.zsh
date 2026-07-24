@@ -26,6 +26,8 @@ typeset -g release_profile_uuid=""
 typeset -g release_profile_sha256=""
 typeset -g release_installed_profile_path=""
 typeset -g release_installed_profile_owned=false
+typeset -g release_beta_group=""
+typeset -gr release_ascapi_base="https://api.appstoreconnect.apple.com"
 
 # This sources executable parser code, never a dotenv file. The parser treats dotenv input as data.
 source "${release_script_dir}/validate-env.zsh"
@@ -41,7 +43,7 @@ release_fail() {
 
 release_usage() {
   print -u2 -- \
-    "usage: release-testflight.zsh [--env-file PATH] [--build-number NUMBER] [--marketing-version VERSION] [--evidence-file ABSOLUTE_PATH] [--distribution-p12 PATH --distribution-p12-password-file PATH --provisioning-profile PATH] [--no-upload]"
+    "usage: release-testflight.zsh [--env-file PATH] [--build-number NUMBER] [--marketing-version VERSION] [--evidence-file ABSOLUTE_PATH] [--beta-group NAME] [--distribution-p12 PATH --distribution-p12-password-file PATH --provisioning-profile PATH] [--no-upload]"
 }
 
 release_cleanup_signing() {
@@ -796,6 +798,141 @@ release_prepare_authentication_key() {
   print -r -- "$destination_path"
 }
 
+release_b64url() {
+  /usr/bin/openssl base64 -A | /usr/bin/tr '+/' '-_' | /usr/bin/tr -d '='
+}
+
+release_normalize_ec_scalar() {
+  local scalar="$1"
+
+  # `openssl asn1parse` prints the DER INTEGER content: a leading 00 sign byte when the high bit is
+  # set (65-66 hex chars), or fewer than 64 when the scalar has leading zero bytes. JOSE needs a
+  # fixed 32-byte (64 hex) big-endian value.
+  while (( ${#scalar} > 64 )) && [[ "${scalar[1,2]}" == "00" ]]; do
+    scalar="${scalar:2}"
+  done
+  while (( ${#scalar} < 64 )); do
+    scalar="0${scalar}"
+  done
+  if (( ${#scalar} != 64 )); then
+    release_fail "an App Store Connect token signature scalar is malformed"
+  fi
+  print -r -- "$scalar"
+}
+
+release_ascapi_bearer() {
+  local key_path="${WOORISAI_ENV_VALUES[APP_STORE_CONNECT_KEY_PATH]}"
+  local key_id="${WOORISAI_ENV_VALUES[APP_STORE_CONNECT_KEY_ID]}"
+  local issuer="${WOORISAI_ENV_VALUES[APP_STORE_CONNECT_ISSUER_ID]}"
+  local now exp header payload signing_input sig_der r s sig
+  local -a ints
+
+  now="$(/bin/date +%s)"
+  exp=$(( now + 1200 ))
+  header="$(/usr/bin/printf '{"alg":"ES256","kid":"%s","typ":"JWT"}' "$key_id" | release_b64url)"
+  payload="$(/usr/bin/printf '{"iss":"%s","iat":%d,"exp":%d,"aud":"appstoreconnect-v1"}' \
+    "$issuer" "$now" "$exp" | release_b64url)"
+  signing_input="${header}.${payload}"
+
+  sig_der="${release_temp_dir}/ascapi-jwt-$RANDOM.der"
+  if ! /usr/bin/printf '%s' "$signing_input" | \
+    /usr/bin/openssl dgst -sha256 -sign "$key_path" -binary >"$sig_der" 2>/dev/null; then
+    /bin/rm -f -- "$sig_der"
+    release_fail "the App Store Connect API token could not be signed"
+  fi
+  ints=("${(@f)$(/usr/bin/openssl asn1parse -inform DER -in "$sig_der" 2>/dev/null | \
+    /usr/bin/awk -F: '/INTEGER/{print $NF}')}")
+  /bin/rm -f -- "$sig_der"
+  (( ${#ints[@]} == 2 )) || \
+    release_fail "the App Store Connect API token signature is malformed"
+  r="$(release_normalize_ec_scalar "${ints[1]}")"
+  s="$(release_normalize_ec_scalar "${ints[2]}")"
+  sig="$(/usr/bin/printf '%s%s' "$r" "$s" | /usr/bin/xxd -r -p | release_b64url)"
+
+  print -r -- "${signing_input}.${sig}"
+}
+
+release_ascapi_get() {
+  local path="$1"
+  local bearer="$2"
+  local out="$3"
+  local http_code=""
+
+  http_code="$(/usr/bin/curl --silent --show-error --location --max-time 60 \
+    --write-out '%{http_code}' --output "$out" \
+    --header "Authorization: Bearer ${bearer}" \
+    "${release_ascapi_base}${path}" 2>/dev/null)" || return 1
+  [[ "$http_code" == 200 ]]
+}
+
+release_ascapi_assign_build() {
+  local bearer="$1"
+  local group_id="$2"
+  local build_id="$3"
+  local http_code=""
+
+  http_code="$(/usr/bin/curl --silent --show-error --location --max-time 60 \
+    --request POST --write-out '%{http_code}' --output /dev/null \
+    --header "Authorization: Bearer ${bearer}" \
+    --header "Content-Type: application/json" \
+    --data "$(/usr/bin/printf '{"data":[{"type":"builds","id":"%s"}]}' "$build_id")" \
+    "${release_ascapi_base}/v1/betaGroups/${group_id}/relationships/builds" 2>/dev/null)" || \
+    return 1
+  [[ "$http_code" == 204 ]]
+}
+
+release_assign_build_to_internal_group() {
+  local marketing_version="$1"
+  local build_number="$2"
+  local group_name="$3"
+  local bearer app_id build_id group_id
+  local response="${release_temp_dir}/ascapi-response-$RANDOM.json"
+  local -i attempt=0
+
+  release_log "Assigning build ${marketing_version} (${build_number}) to internal group '${group_name}'."
+  bearer="$(release_ascapi_bearer)"
+
+  if ! release_ascapi_get \
+    "/v1/apps?filter%5BbundleId%5D=${release_bundle_identifier}&fields%5Bapps%5D=bundleId&limit=1" \
+    "$bearer" "$response"; then
+    release_fail "the App Store Connect app record could not be queried"
+  fi
+  app_id="$(/usr/bin/jq --raw-output '.data[0].id // empty' "$response")"
+  [[ -n "$app_id" ]] || \
+    release_fail "no App Store Connect app was found for ${release_bundle_identifier}"
+
+  # The build can lag briefly behind altool's processing wait before it is queryable.
+  build_id=""
+  while (( attempt < 10 )); do
+    if release_ascapi_get \
+      "/v1/builds?filter%5Bapp%5D=${app_id}&filter%5BpreReleaseVersion.version%5D=${marketing_version}&filter%5Bversion%5D=${build_number}&fields%5Bbuilds%5D=version&limit=1" \
+      "$bearer" "$response"; then
+      build_id="$(/usr/bin/jq --raw-output '.data[0].id // empty' "$response")"
+      [[ -n "$build_id" ]] && break
+    fi
+    (( attempt += 1 ))
+    /bin/sleep 15
+  done
+  [[ -n "$build_id" ]] || \
+    release_fail "uploaded build ${marketing_version} (${build_number}) did not become visible in App Store Connect"
+
+  if ! release_ascapi_get \
+    "/v1/betaGroups?filter%5Bapp%5D=${app_id}&filter%5BisInternalGroup%5D=true&fields%5BbetaGroups%5D=name&limit=200" \
+    "$bearer" "$response"; then
+    release_fail "App Store Connect beta groups could not be queried"
+  fi
+  group_id="$(/usr/bin/jq --raw-output --arg name "$group_name" \
+    'first(.data[] | select(.attributes.name == $name) | .id) // empty' "$response")"
+  [[ -n "$group_id" ]] || \
+    release_fail "no internal TestFlight group named '${group_name}' was found (upload already succeeded)"
+
+  if ! release_ascapi_assign_build "$bearer" "$group_id" "$build_id"; then
+    release_fail "the build could not be assigned to internal group '${group_name}' (upload already succeeded)"
+  fi
+  /bin/rm -f -- "$response"
+  release_log "Assigned build to internal TestFlight group '${group_name}'."
+}
+
 release_archive_and_export() {
   local marketing_version="$1"
   local build_number="$2"
@@ -912,6 +1049,11 @@ release_archive_and_export() {
     "$validation_status" \
     "$upload_status" \
     "$app_store_build_identifier"
+
+  if [[ "$should_upload" == true && -n "$release_beta_group" ]]; then
+    release_assign_build_to_internal_group \
+      "$marketing_version" "$build_number" "$release_beta_group"
+  fi
 }
 
 release_main() {
@@ -960,6 +1102,11 @@ release_main() {
       --provisioning-profile)
         (( $# >= 2 )) || { release_usage; return 2; }
         release_provisioning_profile_path="$2"
+        shift 2
+        ;;
+      --beta-group)
+        (( $# >= 2 )) || { release_usage; return 2; }
+        release_beta_group="$2"
         shift 2
         ;;
       --no-upload)
