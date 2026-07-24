@@ -141,6 +141,13 @@ jobs:
             apps/ios/.env.production.example
       - name: Verify privacy-safe release evidence
         run: apps/ios/scripts/test-release-evidence.zsh
+      - name: Cache pinned Swift packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .local/ios-source-packages
+          key: ios-spm-${{ hashFiles('apps/ios/Woorisai.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: |
+            ios-spm-
       - name: Resolve pinned Swift packages
         run: >-
           xcodebuild -resolvePackageDependencies
