@@ -13,6 +13,11 @@ on:
         description: Unique App Store Connect build number
         required: true
         type: string
+      beta_group:
+        description: Internal TestFlight group to auto-assign the build to (blank to skip)
+        required: false
+        default: ""
+        type: string
 
 permissions:
   actions: read
@@ -127,6 +132,7 @@ jobs:
           WOORISAI_API_HOST: ${{ secrets.WOORISAI_API_HOST }}
           RELEASE_MARKETING_VERSION: ${{ inputs.marketing_version }}
           RELEASE_BUILD_NUMBER: ${{ inputs.build_number }}
+          BETA_GROUP: ${{ inputs.beta_group }}
         run: |
           set -euo pipefail
           umask 077
@@ -252,6 +258,7 @@ jobs:
             --env-file "${release_env_path}" \
             --marketing-version "${RELEASE_MARKETING_VERSION}" \
             --build-number "${RELEASE_BUILD_NUMBER}" \
+            --beta-group "${BETA_GROUP}" \
             --distribution-p12 "${distribution_p12_path}" \
             --distribution-p12-password-file "${distribution_password_path}" \
             --provisioning-profile "${provisioning_profile_path}" \
