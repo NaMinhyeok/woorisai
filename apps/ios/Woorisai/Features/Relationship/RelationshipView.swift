@@ -72,6 +72,7 @@ private enum RelationshipSheetDestination: String, Identifiable {
 }
 
 struct RelationshipView: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @State private var model: RelationshipModel
   @State private var scoreMediaModel: MediaAttachmentComposerModel
@@ -132,6 +133,10 @@ struct RelationshipView: View {
         }
     }
     .accessibilityIdentifier("relationship.screen")
+    // Recording a score is the app's central act; confirm it in the hand, not only on screen.
+    .sensoryFeedback(trigger: model.lastSuccessfulScoreChangeID) { _, scoreChangeID in
+      scoreChangeID == nil ? nil : .success
+    }
     .task {
       model.loadIfNeeded()
     }
@@ -260,6 +265,11 @@ struct RelationshipView: View {
         await model.refresh()
       }
     }
+    .woorisaiToast(
+      model.toast,
+      reduceMotion: reduceMotion,
+      onDismiss: model.dismissToast
+    )
     .accessibilityIdentifier("relationship.loaded")
   }
 

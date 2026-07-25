@@ -683,6 +683,82 @@ struct DiaryModelTests {
     #expect(model.selectedDetail == nil)
     #expect(model.listState == .idle)
   }
+
+  @Test
+  func committedMutationReportsATypedOutcomeAndATransientToastInsteadOfAStickyNotice() async {
+    let service = DiaryServiceFake()
+    let model = DiaryModel(service: service)
+    model.loadIfNeeded()
+    await diaryExpectEventually { model.listState == .loaded }
+
+    #expect(model.createEntry(content: "타입 이벤트 확인"))
+    await diaryExpectEventually { model.lastMutationCompletion != nil }
+
+    // Success is transient; the persistent card stays reserved for problems the user must act on.
+    #expect(model.mutationToast == "새 일기를 남겼어요.")
+    #expect(model.mutationNotice == nil)
+    #expect(
+      model.lastMutationCompletion?.outcome
+        == .entryCreated(entryID: DiaryFeatureFixtures.createdEntry.id)
+    )
+
+    model.dismissToast()
+    #expect(model.mutationToast == nil)
+    // Dismissing the toast must not erase the event screens key their navigation off.
+    #expect(model.lastMutationCompletion != nil)
+  }
+
+  @Test
+  func repeatedIdenticalOutcomesRemainDistinctEventsForTheScreensReactingToThem() async {
+    let service = DiaryServiceFake()
+    let model = DiaryModel(service: service)
+    model.loadDetail(entryID: DiaryFeatureFixtures.entry.id)
+    await diaryExpectEventually { model.detailState == .loaded }
+
+    model.createComment(entryID: DiaryFeatureFixtures.entry.id, content: "첫 답장")
+    await diaryExpectEventually { model.lastMutationCompletion != nil }
+    let first = model.lastMutationCompletion
+
+    model.createComment(entryID: DiaryFeatureFixtures.entry.id, content: "두 번째 답장")
+    await diaryExpectEventually { model.lastMutationCompletion?.sequence != first?.sequence }
+    let second = model.lastMutationCompletion
+
+    // Two replies in a row carry the same outcome. Without the sequence the second would not read as
+    // a change, and the composer would silently stop restoring focus after the first reply.
+    #expect(first?.outcome == second?.outcome)
+    #expect(first != second)
+  }
+
+  @Test
+  func failedMutationKeepsThePersistentNoticeAndRaisesNoSuccessSignal() async {
+    let service = DiaryServiceFake(createEntryFailure: .transport)
+    let model = DiaryModel(service: service)
+    model.loadIfNeeded()
+    await diaryExpectEventually { model.listState == .loaded }
+
+    model.createEntry(content: "응답을 잃은 일기")
+    await diaryExpectEventually { model.mutationState == .failed }
+
+    #expect(model.mutationToast == nil)
+    #expect(model.mutationNotice?.contains("재전송을 잠갔습니다") == true)
+    #expect(model.lastMutationCompletion == nil)
+  }
+
+  @Test
+  func mutationOutcomeCarriesTheEntryItBelongsToSoScreensCanScopeTheirReactions() {
+    #expect(DiaryModel.MutationOutcome.entryCreated(entryID: 7).entryID == 7)
+    #expect(DiaryModel.MutationOutcome.entryUpdated(entryID: 7).entryID == 7)
+    #expect(DiaryModel.MutationOutcome.entryDeleted(entryID: 7).entryID == 7)
+    #expect(
+      DiaryModel.MutationOutcome.commentCreated(entryID: 7, commentID: 90).entryID == 7
+    )
+    #expect(
+      DiaryModel.MutationOutcome.commentUpdated(entryID: 7, commentID: 90).entryID == 7
+    )
+    #expect(
+      DiaryModel.MutationOutcome.commentDeleted(entryID: 7, commentID: 90).entryID == 7
+    )
+  }
 }
 
 private func diaryExpectEventually(

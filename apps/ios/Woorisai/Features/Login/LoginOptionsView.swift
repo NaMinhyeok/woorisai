@@ -30,10 +30,10 @@ struct LoginOptionsView: View {
         .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? 20 : 24)
         .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 24 : 40)
         .frame(maxWidth: .infinity)
+        .dismissesKeyboardOnBackgroundTap()
       }
       .scrollDismissesKeyboard(.interactively)
     }
-    .keyboardDoneToolbar()
     .safeAreaInset(edge: .bottom, spacing: 0) {
       if authenticationModel.selectedOption != nil {
         loginActionBar
@@ -80,6 +80,9 @@ struct LoginOptionsView: View {
         isLoginFailureFocused = false
       }
     }
+    .onChange(of: authenticationModel.pin) { _, _ in
+      autoSubmitCompletePIN()
+    }
     .onChange(of: authenticationModel.state, initial: true) { _, state in
       switch state {
       case .enteringPIN:
@@ -105,6 +108,21 @@ struct LoginOptionsView: View {
         isPINFocused = false
       }
     }
+  }
+
+  /// A 4-digit PIN is complete by construction — `updatePIN` refuses a fifth digit — so the fourth
+  /// keystroke IS the submit intent, the same as iOS's own passcode field. Requiring a separate
+  /// button tap only added a keyboard dismissal and a scroll to every single login.
+  ///
+  /// Deliberately limited to `.enteringPIN`. `.unavailable`/`.failed` promise the user that an
+  /// unknown authentication result is never resent automatically, so those states keep the explicit
+  /// 다시 시도 button. `.credentialRejected` clears the PIN, so retyping four digits re-arms this.
+  private func autoSubmitCompletePIN() {
+    guard case .enteringPIN = authenticationModel.state,
+      authenticationModel.canSubmit
+    else { return }
+    authenticationModel.submit()
+    isPINFocused = false
   }
 
   #if DEBUG

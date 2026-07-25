@@ -99,7 +99,11 @@ final class RelationshipModel {
   private(set) var conflict: Conflict?
   private(set) var rejectedMediaMutation: RejectedMediaMutation?
   private(set) var authenticationRequired = false
+  /// Problems and instructions that must stay on screen until the user resolves or dismisses them.
   private(set) var notice: String?
+  /// Transient success confirmation; the toast view owns the dismissal timing. See
+  /// `DiaryModel.mutationToast` for why success and failure no longer share one persistent card.
+  private(set) var toast: String?
   private(set) var archiveNotice: String?
   private(set) var lastSuccessfulScoreChangeID: Int64?
   private(set) var lastSuccessfulCommentScoreChangeID: Int64?
@@ -117,6 +121,10 @@ final class RelationshipModel {
   private(set) var manualRetryDraftContext: ManualRetryDraftContext?
   private(set) var localCommentDraftScoreChangeID: Int64?
   private(set) var localScoreDraftProtected = false
+  /// Comment drafts keyed by score change, mirroring `DiaryModel.commentDrafts`. Holding the text
+  /// here — instead of in the thread screen's own state — is what lets the back button stay visible
+  /// while a reply is half-typed: leaving and returning restores it rather than losing it.
+  private(set) var commentDrafts: [Int64: String] = [:]
 
   var hasProtectedManualRetryDraft: Bool {
     manualRetryDraftContext != nil
@@ -399,6 +407,7 @@ final class RelationshipModel {
       manualRetryDraftContext = nil
     }
     notice = nil
+    toast = nil
     scoreTask?.cancel()
     scoreTask = Task { @MainActor [weak self] in
       do {
@@ -430,7 +439,8 @@ final class RelationshipModel {
         self.scoreSubmissionSnapshot = nil
         self.manualRetryDraftContext = nil
         self.localScoreDraftProtected = false
-        self.notice = "새 점수 기록을 남겼어요."
+        self.notice = nil
+        self.toast = "새 점수 기록을 남겼어요."
       } catch is CancellationError {
         guard let self, self.dataGeneration == generation else { return }
         self.scoreTask = nil
@@ -644,6 +654,7 @@ final class RelationshipModel {
     }
     commentNoticeScoreChangeID = nil
     commentNoticeMessage = nil
+    toast = nil
     commentTask?.cancel()
     commentTask = Task { @MainActor [weak self] in
       do {
@@ -676,8 +687,9 @@ final class RelationshipModel {
         self.clearUnknownCommentOutcome()
         self.commentSubmissionSnapshot = nil
         self.manualRetryDraftContext = nil
-        self.commentNoticeScoreChangeID = scoreChangeID
-        self.commentNoticeMessage = "댓글을 남겼어요."
+        self.commentNoticeScoreChangeID = nil
+        self.commentNoticeMessage = nil
+        self.toast = "댓글을 남겼어요."
       } catch is CancellationError {
         guard let self, self.commentWriteGeneration == writeGeneration else { return }
         self.commentTask = nil
@@ -894,6 +906,26 @@ final class RelationshipModel {
     }
   }
 
+  func dismissToast() {
+    toast = nil
+  }
+
+  func commentDraft(scoreChangeID: Int64) -> String {
+    commentDrafts[scoreChangeID] ?? ""
+  }
+
+  func updateCommentDraft(scoreChangeID: Int64, content: String) {
+    if content.isEmpty {
+      commentDrafts.removeValue(forKey: scoreChangeID)
+    } else {
+      commentDrafts[scoreChangeID] = content
+    }
+  }
+
+  func discardCommentDraft(scoreChangeID: Int64) {
+    commentDrafts.removeValue(forKey: scoreChangeID)
+  }
+
   func clear() {
     dataGeneration &+= 1
     threadGeneration &+= 1
@@ -925,6 +957,8 @@ final class RelationshipModel {
     rejectedMediaMutation = nil
     authenticationRequired = false
     notice = nil
+    toast = nil
+    commentDrafts.removeAll()
     archiveNotice = nil
     lastSuccessfulScoreChangeID = nil
     lastSuccessfulCommentScoreChangeID = nil

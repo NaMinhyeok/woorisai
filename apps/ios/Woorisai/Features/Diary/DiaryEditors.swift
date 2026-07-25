@@ -68,14 +68,9 @@ struct DiaryCommentEditor: View {
     NavigationStack {
       WarmBackground {
         ScrollView {
+          // No hero card in an editor: the navigation title already names the task, and the card
+          // pushed the field the user came to type in below the fold.
           VStack(alignment: .leading, spacing: WoorisaiSpacing.regular) {
-            DiaryHero(
-              eyebrow: "EDIT REPLY",
-              title: "댓글 다듬기",
-              message: "마음을 다시 읽어 보고 천천히 고쳐 보세요.",
-              symbol: "bubble.left.and.text.bubble.right.fill"
-            )
-
             if let mutationMessage {
               DiaryMutationStatusCard(
                 message: mutationMessage,
@@ -115,10 +110,10 @@ struct DiaryCommentEditor: View {
           .frame(maxWidth: 680)
           .padding(WoorisaiSpacing.screenGutter)
           .frame(maxWidth: .infinity)
+          .dismissesKeyboardOnBackgroundTap()
         }
         .scrollDismissesKeyboard(.interactively)
       }
-      .keyboardDoneToolbar()
       .safeAreaInset(edge: .bottom, spacing: 0) {
         stickySubmitBar
       }
@@ -328,13 +323,6 @@ struct DiaryEntryComposer: View {
       WarmBackground {
         ScrollView {
           LazyVStack(alignment: .leading, spacing: WoorisaiSpacing.regular) {
-            DiaryHero(
-              eyebrow: "SHARE A STORY",
-              title: title,
-              message: "지금 나누고 싶은 순간이나 마음을 천천히 적어 주세요.",
-              symbol: "square.and.pencil"
-            )
-
             if let mutationMessage {
               DiaryMutationStatusCard(
                 message: mutationMessage,
@@ -365,10 +353,10 @@ struct DiaryEntryComposer: View {
           .padding(.top, WoorisaiSpacing.medium)
           .padding(.bottom, WoorisaiSpacing.xLarge)
           .frame(maxWidth: .infinity)
+          .dismissesKeyboardOnBackgroundTap()
         }
         .scrollDismissesKeyboard(.interactively)
       }
-      .keyboardDoneToolbar()
       .safeAreaInset(edge: .bottom, spacing: 0) {
         stickyActionBar
       }
@@ -448,9 +436,9 @@ struct DiaryEntryComposer: View {
     }
   }
 
-  // Keyboard dismissal lives in the shared keyboard toolbar (`keyboardDoneToolbar`), not in an
-  // inline chip: the chip reflowed this heading on every focus change and sat at the top of the
-  // card, far from the keyboard.
+  // Keyboard dismissal is a background tap (`dismissesKeyboardOnBackgroundTap`), not an inline chip:
+  // the chip reflowed this heading on every focus change and sat at the top of the card, far from the
+  // keyboard.
   private var contentHeading: some View {
     contentTitleAndCount
   }
