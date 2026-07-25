@@ -130,10 +130,11 @@ struct DiaryDetailView: View {
           mediaSessionCoordinator.unregisterTransient(entryEditMediaModel)
         }
       }
-      .onChange(of: model.selectedEntryID) { oldValue, newValue in
-        if oldValue == entryID, newValue == nil, model.mutationNotice == "일기를 삭제했어요." {
-          dismiss()
-        }
+      .onChange(of: model.lastMutationCompletion) { _, completion in
+        guard case .entryDeleted(let deletedEntryID) = completion?.outcome,
+          deletedEntryID == entryID
+        else { return }
+        dismiss()
       }
   }
 
@@ -311,7 +312,7 @@ struct DiaryDetailView: View {
         submitEntryEdit()
       }
     )
-    .presentationDetents(entryEditorDetents)
+    .presentationDetents([.large])
     .interactiveDismissDisabled(
       model.mutationState == .submitting || isEntryEditDraftDirty
         || hasUnknownEntryEditOutcome
@@ -369,7 +370,7 @@ struct DiaryDetailView: View {
         )
       }
     )
-    .presentationDetents(commentEditorDetents)
+    .presentationDetents([.large])
     .interactiveDismissDisabled(
       model.mutationState == .submitting || commentEditContent != comment.content
         || hasUnknownCommentEditOutcome(commentID: comment.id)
@@ -444,14 +445,9 @@ struct DiaryDetailView: View {
       ScrollViewReader { proxy in
         ScrollView {
           if let detail = model.selectedDetail {
+            // No hero card here: the navigation title already says 일기 대화, and a repeated
+            // marketing card pushed the actual entry below the fold on every open.
             LazyVStack(alignment: .leading, spacing: WoorisaiSpacing.regular) {
-              DiaryHero(
-                eyebrow: "DIARY TALK",
-                title: "이 이야기에 대한 대화",
-                message: "함께 남긴 순간에 천천히 답장을 건네 보세요.",
-                symbol: "bubble.left.and.text.bubble.right.fill"
-              )
-
               diaryOriginCard(detail.entry)
 
               WoorisaiSectionHeading(
@@ -488,10 +484,10 @@ struct DiaryDetailView: View {
             .padding(.top, WoorisaiSpacing.medium)
             .padding(.bottom, WoorisaiSpacing.xLarge)
             .frame(maxWidth: .infinity)
+            .dismissesKeyboardOnBackgroundTap()
           }
         }
         .scrollDismissesKeyboard(.interactively)
-        .keyboardDoneToolbar()
         .refreshable {
           await model.refreshDetail(entryID: entryID)
         }
@@ -514,7 +510,9 @@ struct DiaryDetailView: View {
           else {
             return
           }
-          if model.mutationNotice == "댓글을 남겼어요." {
+          // Jump only for a comment I just sent. One that arrived from the other participant must
+          // not steal the reading position — it gets the "새 댓글 보기" button instead.
+          if newID == lastSentCommentID {
             pendingNewCommentID = nil
             scrollToComment(newID, using: proxy)
           } else {
@@ -544,21 +542,46 @@ struct DiaryDetailView: View {
     .safeAreaInset(edge: .bottom, spacing: 0) {
       commentComposerBar
     }
-    .onChange(of: model.mutationNotice) { _, notice in
-      if notice == "댓글을 남겼어요." {
+    .woorisaiToast(
+      model.mutationToast,
+      reduceMotion: reduceMotion,
+      onDismiss: model.dismissToast
+    )
+    // Scoped to this entry: the diary list stays mounted behind this pushed detail, so an unscoped
+    // trigger would fire the same haptic twice.
+    .sensoryFeedback(trigger: model.lastMutationCompletion) { _, completion in
+      guard let completion, completion.outcome.entryID == entryID else { return nil }
+      return .success
+    }
+    .onChange(of: model.lastMutationCompletion) { _, completion in
+      guard let outcome = completion?.outcome else { return }
+      switch outcome {
+      case .commentCreated(let completionEntryID, _) where completionEntryID == entryID:
         // The field disables while submitting (dropping focus); restore it so consecutive
         // replies do not require re-tapping the input.
         focusedField = .comment
-      }
-      if notice == "일기를 수정했어요." {
+      case .entryUpdated(let completionEntryID) where completionEntryID == entryID:
         isEditingEntry = false
-      }
-      if notice == "댓글을 수정했어요." {
+      case .commentUpdated(let completionEntryID, _) where completionEntryID == entryID:
         commentEditContent = ""
         editingComment = nil
+      case .entryCreated, .entryUpdated, .entryDeleted, .commentCreated, .commentUpdated,
+        .commentDeleted:
+        break
       }
     }
     .accessibilityIdentifier("diary.detail.loaded")
+  }
+
+  /// The comment this screen just sent, if any. Replaces a `mutationNotice` string comparison: the
+  /// notice could still read "댓글을 남겼어요." from an earlier send while a remote comment arrives,
+  /// which would scroll the reader away from where they were.
+  private var lastSentCommentID: Int64? {
+    guard case .commentCreated(let completionEntryID, let commentID) =
+      model.lastMutationCompletion?.outcome,
+      completionEntryID == entryID
+    else { return nil }
+    return commentID
   }
 
   private var chronologicalComments: [DiaryComment] {
@@ -1305,12 +1328,6 @@ struct DiaryDetailView: View {
     WarmBackground {
       ScrollView {
         VStack(spacing: WoorisaiSpacing.regular) {
-          DiaryHero(
-            eyebrow: "DIARY TALK",
-            title: "이 이야기에 대한 대화",
-            message: "함께 남긴 순간에 천천히 답장을 건네 보세요.",
-            symbol: "bubble.left.and.text.bubble.right.fill"
-          )
           content()
         }
         .frame(maxWidth: 680)
@@ -1376,14 +1393,6 @@ struct DiaryDetailView: View {
         }
       }
     }
-  }
-
-  private var entryEditorDetents: Set<PresentationDetent> {
-    dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large]
-  }
-
-  private var commentEditorDetents: Set<PresentationDetent> {
-    dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large]
   }
 }
 

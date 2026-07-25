@@ -657,7 +657,8 @@ struct RelationshipModelTests {
         == 0
     )
     #expect(model.lastSuccessfulCommentScoreChangeID == RelationshipFixtures.change.id)
-    #expect(model.commentNotice(for: RelationshipFixtures.change.id) == "댓글을 남겼어요.")
+    #expect(model.toast == "댓글을 남겼어요.")
+    #expect(model.commentNotice(for: RelationshipFixtures.change.id) == nil)
     #expect(model.commentNotice(for: RelationshipFixtures.createdChange.id) == nil)
   }
 
@@ -741,7 +742,8 @@ struct RelationshipModelTests {
 
     #expect(model.selectedThread?.change.commentCount == 2)
     #expect(model.selectedThread?.comments.map(\.id) == [301, 302])
-    #expect(model.commentNotice(for: RelationshipFixtures.change.id) == "댓글을 남겼어요.")
+    #expect(model.toast == "댓글을 남겼어요.")
+    #expect(model.commentNotice(for: RelationshipFixtures.change.id) == nil)
     #expect(await service.commentRequestCount == 1)
   }
 
@@ -797,7 +799,8 @@ struct RelationshipModelTests {
     #expect(
       model.changes.first(where: { $0.id == RelationshipFixtures.change.id })?.commentCount == 2
     )
-    #expect(model.commentNotice(for: RelationshipFixtures.change.id) == "댓글을 남겼어요.")
+    #expect(model.toast == "댓글을 남겼어요.")
+    #expect(model.commentNotice(for: RelationshipFixtures.change.id) == nil)
   }
 
   @Test
@@ -998,6 +1001,35 @@ struct RelationshipModelTests {
           value: "다른 댓글 저장이 끝날 때까지 기다려 주세요"
         )
     )
+  }
+
+  @Test
+  func threadCommentDraftsAreKeptPerScoreChangeSoLeavingTheThreadNeedsNoExitLock() {
+    let model = RelationshipModel(service: RelationshipServiceFake())
+
+    model.updateCommentDraft(scoreChangeID: 11, content: "쓰다 만 답장")
+    #expect(model.commentDraft(scoreChangeID: 11) == "쓰다 만 답장")
+    // Scoped per thread: another score change must not inherit this draft.
+    #expect(model.commentDraft(scoreChangeID: 12) == "")
+
+    // Emptying the field drops the entry instead of leaving a blank draft behind.
+    model.updateCommentDraft(scoreChangeID: 11, content: "")
+    #expect(model.commentDrafts.isEmpty)
+
+    model.updateCommentDraft(scoreChangeID: 11, content: "다시 쓴 답장")
+    model.discardCommentDraft(scoreChangeID: 11)
+    #expect(model.commentDraft(scoreChangeID: 11) == "")
+  }
+
+  @Test
+  func endingTheSessionDropsEveryThreadCommentDraft() {
+    let model = RelationshipModel(service: RelationshipServiceFake())
+
+    model.updateCommentDraft(scoreChangeID: 11, content: "남은 초안")
+    model.updateCommentDraft(scoreChangeID: 12, content: "다른 초안")
+    model.clear()
+
+    #expect(model.commentDrafts.isEmpty)
   }
 }
 

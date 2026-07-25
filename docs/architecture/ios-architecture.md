@@ -83,6 +83,27 @@ idempotency가 없는 write는 transport outcome이 불명확하거나 409인 �
 잠그는 상태를 추가할 때는 같은 화면에 오프라인에서도 눌리는 명시적 탈출 액션이 있는지 함께
 검증한다.
 
+### 성공 신호와 문제 신호를 분리한다
+
+Model은 사용자가 처리해야 하는 문제(`notice`/`mutationNotice`)와 스스로 사라지는 성공 확인
+(`toast`/`mutationToast`)을 서로 다른 property로 노출한다. 성공은 자동 소멸 toast로 띄우고, 실패와
+결과 불명 메시지는 사용자가 읽고 조치할 때까지 화면에 남긴다 — 눌러야 할 메시지는 시간이 지나
+사라져선 안 된다. Toast의 소멸 시점은 view가 소유해 model의 mutation test가 timer에 의존하지
+않게 하고, VoiceOver에서는 focus를 훔치지 않고 announcement로 알리며 더 길게 유지한다.
+
+화면 전환, 포커스 복원과 sheet 닫기는 표시 문구가 아니라 typed mutation event
+(`DiaryModel.MutationCompletion`)로 결정한다. 한국어 message 문자열을 비교해 navigation을 정하면
+문구만 다듬어도 화면이 조용히 깨진다. Event는 대상 ID를 실어 화면이 자기 것만 반응하게 하고
+(pushed detail 뒤에서 list가 그대로 mount돼 있으므로 scope 없는 반응은 두 번 발동한다), 연속된
+같은 결과도 구분되도록 sequence를 함께 stamp한다.
+
+### 쓰기 잠금은 쓰기만 잠근다
+
+동시 쓰기와 결과 불명 재전송은 model(`canBeginMutation`, `canCreateScoreChange`)이 막고, 각 화면은
+자기 입력·제출 control을 비활성화한다. 진행 중인 write 때문에 app 전체(tab 전환, scroll, 읽기)를
+비활성화하지 않는다 — 느린 network에서 설명 없이 멈춘 app으로 읽힌다. 전체 화면 비활성화는 상호작용
+자체가 의미 없는 session teardown에만 쓰고 진행 상태를 함께 표시한다.
+
 ## Media
 
 1. API에서 upload URL과 UUID를 받는다.
@@ -149,6 +170,13 @@ Diary 첫 화면은 최근 기록을 polaroid형 feed로 보여 주고 작성·�
 Refresh는 이미 표시된 dashboard, feed와 detail을 비우거나 scroll 위치를 강제로 옮기지 않고
 최신 snapshot으로 교체한다. 새로 도착한 상대 댓글도 읽던 위치를 빼앗지 않으며 사용자가 직접
 최신 댓글로 이동한다. 자신이 방금 보낸 댓글만 commit 확인 후 입력을 비우고 최신 위치로 이동한다.
+"내가 보낸 것"의 판별은 표시 문구가 아니라 typed event가 실어 주는 comment ID로 한다.
+
+대화형 comment 초안은 화면 state가 아니라 model이 scoreChange/entry 단위로 보관한다. 그래서
+글을 쓰다 나가도 초안이 남고, 한 글자 입력했다는 이유로 뒤로가기와 스와이프 백을 없애지
+않는다. 화면 이탈을 잠그는 것은 제출 중, 결과 불명, 그리고 아직 보내지 않은 media가 있을 때뿐이다
+— media는 나가면 upload ownership이 붕 뜨기 때문이다. 이때 제공하는 탈출 action은 첨부만 버리고
+글은 보관하며, dialog 문구도 실제로 지워지는 대상만 말한다.
 
 Score, diary와 comment create/update/delete는 idempotency key가 없는 write이므로 transport 단절
 뒤 자동 재전송하지 않는다. Response를 받지 못해 commit 여부가 불명확하면 같은 mutation과 다른
@@ -199,14 +227,40 @@ semantic palette로 유지한다. Text, surface, control border, status와 accen
 `.systemBackground` 같은 system semantic color가 아니라 brand palette를 쓴다 — system color는
 다크에서 순검정 플래시로 나타나 브랜드 배경과 이질적이다.
 
-모든 text input은 `FocusState`로 화면 lifecycle과 제출·취소 시점을 통제한다. Keyboard 닫기는
-화면당 한 번 부착하는 공용 `keyboardDoneToolbar()`(keyboard 위 `완료` toolbar)가 표준이고,
-scroll container는 interactive dismissal을 지원한다. 포커스에 따라 나타났다 사라지는 인라인
-dismiss control은 layout을 흔들므로 만들지 않는다. Multiline field의 return key는 줄바꿈에
-남겨 둔다. 거부된 PIN은 keyboard를 유지해 재입력에 추가 탭이 필요 없게 하고, 대화형 comment
-전송 성공 후에는 포커스를 복원해 연속 답장이 끊기지 않게 한다. Light/dark system appearance
-전파와 number-pad dismissal은 simulator UI test로 검증하고, 색상 token의 text/control 대비는
-deterministic test로 검증한다.
+모든 text input은 `FocusState`로 화면 lifecycle과 제출·취소 시점을 통제한다.
+
+Keyboard 닫기는 messenger 관례를 따른다: 카드 주변 빈 영역을 탭하면 닫히고
+(`dismissesKeyboardOnBackgroundTap()`), scroll container는 interactive dismissal을 지원한다.
+Keyboard 위에 `완료` toolbar를 두지 않는다 — 모든 입력 화면은 이미 자신의 action bar를
+`safeAreaInset(edge: .bottom)`으로 keyboard 바로 위에 고정하므로, system toolbar는 composer와
+keyboard 사이에 세 번째 chrome 줄만 쌓았다.
+
+이 탭 제스처는 `ScrollView`의 **content**에, content의 가장 바깥
+`.frame(maxWidth: .infinity)` 뒤에 붙여 gutter까지 포함한 전체 폭을 탭 영역으로 만든다. 두 가지
+함정이 있다: 콘텐츠 **뒤에** 깔아 둔 layer는 터치를 받지 못하고(`ScrollView`는 `UIScrollView`이며
+`UIView.hitTest`는 배경색과 무관하게 자기 bounds 안의 터치를 가져간다), `ScrollView` 자체에 붙이는
+것으로도 부족하다(배경 없는 `VStack`은 hit 영역을 만들지 않아 여백 탭이 아무것도 match하지 못한다).
+그래서 `contentShape`를 명시한다.
+
+SwiftUI는 조상 제스처보다 자식 제스처에 우선권을 주므로 내부의 버튼, 링크와 입력 필드는 자기 탭을
+유지한다 — `전송`은 keyboard를 내리지 않아야 한다(대화 화면은 다음 답장을 위해 포커스를 유지한다).
+콘텐츠 위를 덮는 탭 layer는 그 의도를 조용히 깨뜨리므로 만들지 않는다. 포커스에 따라 나타났다
+사라지는 인라인 dismiss control도 layout을 흔들므로 만들지 않는다. Multiline field의 return key는
+줄바꿈에 남겨 둔다.
+
+네 자리 PIN은 다섯 번째 숫자를 받지 않으므로 네 번째 입력이 곧 제출 의도다. `.enteringPIN`에서는
+자동 제출해 로그인마다 keyboard 내리기와 scroll을 요구하지 않는다. `.unavailable`/`.failed`는
+결과 불명을 자동 재전송하지 않겠다는 약속이므로 자동 제출하지 않고 명시적 `다시 시도` 버튼을
+유지한다. 거부된 PIN은 keyboard를 유지해 재입력에 추가 탭이 필요 없게 하고, 대화형 comment
+전송 성공 후에는 포커스를 복원해 연속 답장이 끊기지 않게 한다.
+
+작성 화면의 sheet는 `.large` detent로 고정한다. `.medium`은 text editor와 keyboard가 함께
+올라오면 본문이 거의 보이지 않는다. 반복 카피 hero card는 목록 root에만 두고 detail과 editor에는
+두지 않는다 — navigation title이 이미 화면을 지칭하고, hero는 사용자가 보러 온 본문과 입력란을
+화면 밖으로 밀어낸다.
+
+Light/dark system appearance 전파, 배경 탭 keyboard dismissal과 number-pad dismissal은 simulator
+UI test로 검증하고, 색상 token의 text/control 대비는 deterministic test로 검증한다.
 
 ## Local data와 privacy
 

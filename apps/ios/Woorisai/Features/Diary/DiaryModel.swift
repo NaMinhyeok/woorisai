@@ -28,6 +28,38 @@ final class DiaryModel {
     case failed
   }
 
+  /// What a committed mutation actually did. Views drive focus, scroll and sheet dismissal off this
+  /// — never off `mutationToast`/`mutationNotice`, whose text is display copy that must stay free to
+  /// reword. Screens used to compare those Korean strings to decide navigation, so editing a message
+  /// silently broke the screen.
+  enum MutationOutcome: Equatable, Sendable {
+    case entryCreated(entryID: Int64)
+    case entryUpdated(entryID: Int64)
+    case entryDeleted(entryID: Int64)
+    case commentCreated(entryID: Int64, commentID: Int64)
+    case commentUpdated(entryID: Int64, commentID: Int64)
+    case commentDeleted(entryID: Int64, commentID: Int64)
+
+    /// The entry this outcome belongs to. Screens use it to react only to their own entry — the list
+    /// stays mounted behind a pushed detail, so an unscoped reaction fires on both at once.
+    var entryID: Int64 {
+      switch self {
+      case .entryCreated(let entryID), .entryUpdated(let entryID), .entryDeleted(let entryID):
+        return entryID
+      case .commentCreated(let entryID, _), .commentUpdated(let entryID, _),
+        .commentDeleted(let entryID, _):
+        return entryID
+      }
+    }
+  }
+
+  /// A committed mutation stamped with a sequence, so two identical outcomes in a row (two comments,
+  /// say) still register as distinct `onChange` events.
+  struct MutationCompletion: Equatable, Sendable {
+    let outcome: MutationOutcome
+    let sequence: UInt
+  }
+
   enum ReconciliationState: Equatable, Sendable {
     case idle
     case loading
@@ -100,7 +132,12 @@ final class DiaryModel {
   private(set) var lastConflictEditorInvalidation: Conflict?
   private(set) var authenticationRequired = false
   private(set) var listNotice: String?
+  /// Problems and instructions that must stay on screen until the user resolves or dismisses them.
   private(set) var mutationNotice: String?
+  /// Transient success confirmation. The toast view owns the dismissal timing and calls
+  /// `dismissToast()` — keeping the timer out of the model keeps mutation tests deterministic.
+  private(set) var mutationToast: String?
+  private(set) var lastMutationCompletion: MutationCompletion?
   private(set) var lastCreatedEntryID: Int64?
   private(set) var lastUpdatedEntryID: Int64?
   private(set) var commentDrafts: [Int64: String] = [:]
@@ -147,6 +184,9 @@ final class DiaryModel {
 
   @ObservationIgnored
   private var mutationGeneration: UInt = 0
+
+  @ObservationIgnored
+  private var mutationCompletionSequence: UInt = 0
 
   init(service: any DiaryServing) {
     self.service = service
@@ -423,7 +463,7 @@ final class DiaryModel {
         self.currentPage = max(self.currentPage, 1)
         self.listState = .loaded
         self.lastCreatedEntryID = entry.id
-        self.finishMutation(message: "새 일기를 남겼어요.")
+        self.finishMutation(.entryCreated(entryID: entry.id), message: "새 일기를 남겼어요.")
       } catch {
         self?.finishMutationFailure(
           error,
@@ -474,7 +514,7 @@ final class DiaryModel {
         self.invalidateReads(afterMutationFor: entryID)
         self.replaceEntry(entry)
         self.lastUpdatedEntryID = entry.id
-        self.finishMutation(message: "일기를 수정했어요.")
+        self.finishMutation(.entryUpdated(entryID: entry.id), message: "일기를 수정했어요.")
       } catch {
         self?.finishMutationFailure(
           error,
@@ -508,7 +548,7 @@ final class DiaryModel {
           self.detailState = .idle
         }
         self.commentDrafts.removeValue(forKey: entryID)
-        self.finishMutation(message: "일기를 삭제했어요.")
+        self.finishMutation(.entryDeleted(entryID: entryID), message: "일기를 삭제했어요.")
       } catch {
         self?.finishMutationFailure(
           error,
@@ -542,7 +582,10 @@ final class DiaryModel {
         guard let self, self.mutationGeneration == generation else { return }
         self.invalidateReads(afterMutationFor: entryID)
         self.applyCreatedComment(comment, entryID: entryID)
-        self.finishMutation(message: "댓글을 남겼어요.")
+        self.finishMutation(
+          .commentCreated(entryID: entryID, commentID: comment.id),
+          message: "댓글을 남겼어요."
+        )
       } catch {
         self?.finishMutationFailure(
           error,
@@ -587,7 +630,10 @@ final class DiaryModel {
           let comments = detail.comments.map { $0.id == commentID ? comment : $0 }
           self.selectedDetail = DiaryEntryDetail(entry: detail.entry, comments: comments)
         }
-        self.finishMutation(message: "댓글을 수정했어요.")
+        self.finishMutation(
+          .commentUpdated(entryID: entryID, commentID: commentID),
+          message: "댓글을 수정했어요."
+        )
       } catch {
         self?.finishMutationFailure(
           error,
@@ -611,7 +657,10 @@ final class DiaryModel {
         guard let self, self.mutationGeneration == generation else { return }
         self.invalidateReads(afterMutationFor: entryID)
         self.applyDeletedComment(commentID: commentID, entryID: entryID)
-        self.finishMutation(message: "댓글을 삭제했어요.")
+        self.finishMutation(
+          .commentDeleted(entryID: entryID, commentID: commentID),
+          message: "댓글을 삭제했어요."
+        )
       } catch {
         self?.finishMutationFailure(
           error,
@@ -656,9 +705,14 @@ final class DiaryModel {
     }
   }
 
+  func dismissToast() {
+    mutationToast = nil
+  }
+
   func dismissNotices() {
     listNotice = nil
     mutationNotice = nil
+    mutationToast = nil
   }
 
   func commentDraft(entryID: Int64) -> String {
@@ -831,6 +885,8 @@ final class DiaryModel {
     authenticationRequired = false
     listNotice = nil
     mutationNotice = nil
+    mutationToast = nil
+    lastMutationCompletion = nil
     lastCreatedEntryID = nil
     lastUpdatedEntryID = nil
     commentDrafts.removeAll()
@@ -850,6 +906,7 @@ final class DiaryModel {
     mutationGeneration &+= 1
     mutationState = .submitting
     mutationNotice = nil
+    mutationToast = nil
     rejectedMediaMutation = nil
     lastConflictEditorInvalidation = nil
     lastCreatedEntryID = nil
@@ -863,10 +920,19 @@ final class DiaryModel {
     reconciliationContentUnavailable = false
   }
 
-  private func finishMutation(message: String) {
+  private func finishMutation(_ outcome: MutationOutcome, message: String) {
     mutationTask = nil
     mutationState = .idle
-    mutationNotice = message
+    // Success is transient and must not linger above the composer, so it goes to the toast and the
+    // persistent notice is cleared. Problems keep using `mutationNotice`, which the user resolves or
+    // dismisses explicitly.
+    mutationNotice = nil
+    mutationToast = message
+    mutationCompletionSequence &+= 1
+    lastMutationCompletion = MutationCompletion(
+      outcome: outcome,
+      sequence: mutationCompletionSequence
+    )
     mutationOutcomeRequiresConfirmation = false
     unknownMutationContext = nil
     inspectedUnknownMutationContext = nil
@@ -1028,6 +1094,8 @@ final class DiaryModel {
     conflict = nil
     listNotice = nil
     mutationNotice = nil
+    mutationToast = nil
+    lastMutationCompletion = nil
     lastCreatedEntryID = nil
     lastUpdatedEntryID = nil
     commentDrafts.removeAll()

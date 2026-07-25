@@ -7,7 +7,6 @@ struct ScoreChangeThreadView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var model: RelationshipModel
   @State private var commentMediaModel: MediaAttachmentComposerModel
-  @State private var comment = ""
   @State private var showsMediaTray = false
   @State private var latestScrollRequest = 0
   @State private var confirmsDraftDiscard = false
@@ -65,12 +64,14 @@ struct ScoreChangeThreadView: View {
     }
     .navigationTitle("점수 대화")
     .navigationBarTitleDisplayMode(.inline)
+    // Typed text no longer locks the exit: the draft lives in the model, so leaving and returning
+    // restores it. Only a pending upload does, because leaving would strand media ownership.
     .navigationBarBackButtonHidden(
       currentCommentSubmissionState == .submitting || hasUnknownCommentOutcome
-        || isCommentDraftDirty
+        || hasPendingCommentMedia
     )
     .toolbar {
-      if isCommentDraftDirty,
+      if hasPendingCommentMedia,
         currentCommentSubmissionState != .submitting,
         !hasUnknownCommentOutcome
       {
@@ -85,14 +86,17 @@ struct ScoreChangeThreadView: View {
       }
     }
     .confirmationDialog(
-      "작성 중인 댓글을 지우고 나갈까요?",
+      "첨부한 사진·영상을 지우고 나갈까요?",
       isPresented: $confirmsDraftDiscard,
       titleVisibility: .visible
     ) {
-      Button("댓글 초안 지우고 나가기", role: .destructive, action: discardDraftAndDismiss)
+      Button("첨부 지우고 나가기", role: .destructive, action: discardMediaAndDismiss)
       Button("계속 작성하기", role: .cancel) {}
     } message: {
-      Text("입력한 글과 아직 보내지 않은 사진·영상이 사라집니다.")
+      Text("아직 보내지 않은 사진·영상이 사라집니다. 입력한 글은 그대로 보관해요.")
+    }
+    .sensoryFeedback(trigger: model.lastSuccessfulCommentScoreChangeID) { _, successfulID in
+      successfulID == scoreChangeID ? .success : nil
     }
     .task(id: scoreChangeID) {
       model.loadThread(scoreChangeID: scoreChangeID)
@@ -104,7 +108,7 @@ struct ScoreChangeThreadView: View {
       isCommentFocused = false
       model.cancelThreadReadForScreenExit(scoreChangeID: scoreChangeID)
       if currentCommentSubmissionState != .submitting && !hasUnknownCommentOutcome
-        && !isCommentDraftDirty
+        && !hasPendingCommentMedia
       {
         model.updateLocalCommentDraftProtection(
           scoreChangeID: scoreChangeID,
@@ -139,7 +143,7 @@ struct ScoreChangeThreadView: View {
     .onChange(of: model.lastSuccessfulCommentScoreChangeID) { _, successfulID in
       guard successfulID == scoreChangeID else { return }
       commentMediaModel.consumeReadyUploads()
-      comment = ""
+      model.discardCommentDraft(scoreChangeID: scoreChangeID)
       showsMediaTray = false
       // Keep the conversation flowing: restore focus after a successful send (the field drops it
       // while disabled during the submit) instead of forcing a re-tap for the next reply.
@@ -147,7 +151,7 @@ struct ScoreChangeThreadView: View {
       latestScrollRequest &+= 1
       syncCommentDraftProtection()
     }
-    .onChange(of: comment, initial: true) { _, _ in
+    .onChange(of: commentContent, initial: true) { _, _ in
       syncCommentDraftProtection()
     }
     .onChange(of: commentMediaModel.uploads.map(\.id), initial: true) { _, _ in
@@ -195,10 +199,10 @@ struct ScoreChangeThreadView: View {
             .padding(.top, WoorisaiSpacing.medium)
             .padding(.bottom, WoorisaiSpacing.regular)
             .frame(maxWidth: .infinity)
+            .dismissesKeyboardOnBackgroundTap()
           }
         }
         .scrollDismissesKeyboard(.interactively)
-        .keyboardDoneToolbar()
         .safeAreaInset(edge: .bottom, spacing: 0) {
           commentComposerBar
         }
@@ -211,6 +215,11 @@ struct ScoreChangeThreadView: View {
         }
       }
     }
+    .woorisaiToast(
+      model.toast,
+      reduceMotion: reduceMotion,
+      onDismiss: model.dismissToast
+    )
     .accessibilityIdentifier("relationship.thread.loaded")
   }
 
@@ -325,7 +334,11 @@ struct ScoreChangeThreadView: View {
   }
 
   private var commentTextField: some View {
-    TextField("답장을 쓰거나 사진·영상을 남겨 보세요.", text: $comment, axis: .vertical)
+    TextField(
+      "답장을 쓰거나 사진·영상을 남겨 보세요.",
+      text: commentContentBinding,
+      axis: .vertical
+    )
       .lineLimit(1...4)
       .focused($isCommentFocused)
       .foregroundStyle(WoorisaiPalette.ink)
@@ -417,12 +430,27 @@ struct ScoreChangeThreadView: View {
       )
   }
 
+  private var commentContent: String {
+    model.commentDraft(scoreChangeID: scoreChangeID)
+  }
+
+  private var commentContentBinding: Binding<String> {
+    Binding(
+      get: { model.commentDraft(scoreChangeID: scoreChangeID) },
+      set: { model.updateCommentDraft(scoreChangeID: scoreChangeID, content: $0) }
+    )
+  }
+
   private var trimmedComment: String {
-    WoorisaiTextInput.normalized(comment)
+    WoorisaiTextInput.normalized(commentContent)
   }
 
   private var commentCodePointCount: Int {
-    WoorisaiTextInput.normalizedCodePointCount(comment)
+    WoorisaiTextInput.normalizedCodePointCount(commentContent)
+  }
+
+  private var hasPendingCommentMedia: Bool {
+    !commentMediaModel.uploads.isEmpty || commentMediaModel.isImporting
   }
 
   private var commentIsWithinLimit: Bool {
@@ -446,10 +474,10 @@ struct ScoreChangeThreadView: View {
     model.commentOutcomeRequiresConfirmation(for: scoreChangeID)
   }
 
+  /// Drives push-driven navigation deferral (not the exit lock): a half-written reply should not be
+  /// yanked away by an arriving notification either.
   private var isCommentDraftDirty: Bool {
-    !trimmedComment.isEmpty
-      || !commentMediaModel.uploads.isEmpty
-      || commentMediaModel.isImporting
+    !trimmedComment.isEmpty || hasPendingCommentMedia
   }
 
   private var isDraftEditingLocked: Bool {
@@ -476,7 +504,7 @@ struct ScoreChangeThreadView: View {
     let uploadIDs = commentMediaModel.readyUploadIDs
     let accepted = model.createComment(
       scoreChangeID: scoreChangeID,
-      content: comment,
+      content: commentContent,
       mediaUploadIDs: uploadIDs
     )
     if accepted {
@@ -494,7 +522,7 @@ struct ScoreChangeThreadView: View {
       return
     }
     commentMediaModel.consumeReadyUploads()
-    comment = ""
+    model.discardCommentDraft(scoreChangeID: scoreChangeID)
     showsMediaTray = false
     isCommentFocused = false
     syncCommentDraftProtection()
@@ -511,13 +539,15 @@ struct ScoreChangeThreadView: View {
       return
     }
     commentMediaModel.consumeReadyUploads()
-    comment = ""
+    model.discardCommentDraft(scoreChangeID: scoreChangeID)
     showsMediaTray = false
     isCommentFocused = false
     syncCommentDraftProtection()
   }
 
-  private func discardDraftAndDismiss() {
+  /// Discards only the pending media and leaves, keeping the typed text — that is what the dialog
+  /// promises, and the text is safe to keep because the model owns it across navigation.
+  private func discardMediaAndDismiss() {
     isCommentFocused = false
     model.updateLocalCommentDraftProtection(scoreChangeID: scoreChangeID, isProtected: false)
     model.releaseManualRetryDraftProtection(.comment(scoreChangeID: scoreChangeID))
@@ -526,7 +556,6 @@ struct ScoreChangeThreadView: View {
     }
     commentMediaModel.clear()
     mediaSessionCoordinator.unregisterTransient(commentMediaModel)
-    comment = ""
     showsMediaTray = false
     dismiss()
   }

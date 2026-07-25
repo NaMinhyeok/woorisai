@@ -19,6 +19,7 @@ enum DiaryConflictEditorDisposition: Equatable, Sendable {
 }
 
 struct DiaryView: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @State private var model: DiaryModel
   @State private var newEntryMediaModel: MediaAttachmentComposerModel
@@ -128,7 +129,9 @@ struct DiaryView: View {
           onDiscard: discardNewEntryDraft,
           onSubmit: submitNewEntry
         )
-        .presentationDetents(entryComposerDetents)
+        // Always full height: a `.medium` sheet holding a 190pt text editor plus the keyboard left
+        // almost none of the story visible.
+        .presentationDetents([.large])
         .interactiveDismissDisabled(
           model.mutationState == .submitting || isNewEntryDraftDirty
             || hasUnknownNewEntryOutcome
@@ -276,6 +279,17 @@ struct DiaryView: View {
         await model.refresh()
       }
     }
+    .woorisaiToast(
+      model.mutationToast,
+      reduceMotion: reduceMotion,
+      onDismiss: model.dismissToast
+    )
+    // Only entry creation is this screen's own act; comment and edit outcomes belong to the detail
+    // screen, which stays pushed on top and confirms them itself.
+    .sensoryFeedback(trigger: model.lastMutationCompletion) { _, completion in
+      guard case .entryCreated = completion?.outcome else { return nil }
+      return .success
+    }
     .accessibilityIdentifier("diary.loaded")
   }
 
@@ -365,10 +379,6 @@ struct DiaryView: View {
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier("diary.empty")
     }
-  }
-
-  private var entryComposerDetents: Set<PresentationDetent> {
-    dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large]
   }
 
   private var isNewEntryDraftDirty: Bool {

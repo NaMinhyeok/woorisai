@@ -96,7 +96,7 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertEqual(colorScheme.label, expectedColorScheme)
   }
 
-  func testRelationshipReasonKeyboardHasExplicitDismissAction() {
+  func testRelationshipReasonKeyboardDismissesOnBackgroundTap() {
     let app = launch(scenario: "relationship")
     enterPIN("0123", participantSlot: 1, in: app)
     XCTAssertTrue(element("relationship.loaded", in: app).waitForExistence(timeout: 5))
@@ -112,7 +112,7 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertTrue(reason.exists)
   }
 
-  func testDiaryEditorKeyboardHasExplicitDismissAction() {
+  func testDiaryEditorKeyboardDismissesOnBackgroundTap() {
     let app = launch(scenario: "emptyContent")
     enterPIN("0123", participantSlot: 1, in: app)
     XCTAssertTrue(element("relationship.loaded", in: app).waitForExistence(timeout: 5))
@@ -217,6 +217,8 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertTrue(element("relationship.loaded", in: app).waitForExistence(timeout: 10))
   }
 
+  /// The number pad has no return key, so the background tap is its only dismissal. An incomplete
+  /// PIN must survive it: dismissing is not submitting, and auto-submit must not fire below 4 digits.
   func testNumberPadCanBeDismissedWithoutSubmitting() {
     let app = launch(scenario: "success")
     let participant = element("loginOptions.participant.1", in: app)
@@ -227,12 +229,11 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertTrue(pin.waitForExistence(timeout: 5))
     scrollToHittable(pin, in: app, maximumSwipes: 3)
     pin.tap()
+    pin.typeText("012")
 
     let keyboard = app.keyboards.firstMatch
     XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
-    let dismissKeyboard = element("keyboard.dismiss", in: app)
-    XCTAssertTrue(dismissKeyboard.waitForExistence(timeout: 5))
-    dismissKeyboard.tap()
+    tapWarmBackground(in: app)
 
     let keyboardDismissed = XCTNSPredicateExpectation(
       predicate: NSPredicate(format: "exists == false"),
@@ -241,6 +242,31 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [keyboardDismissed], timeout: 5), .completed)
     XCTAssertTrue(element("authentication.pinEntry", in: app).exists)
     XCTAssertFalse(element("relationship.loaded", in: app).exists)
+  }
+
+  /// Tapping a control while the keyboard is up must reach that control, not be eaten by the
+  /// background dismissal. The conversation composer relies on this: 전송 keeps focus for the next
+  /// reply, so a background tap layer in front of the content would silently break consecutive sends.
+  func testBackgroundKeyboardDismissalDoesNotSwallowComposerTaps() {
+    let app = launch(scenario: "diaryCRUD")
+    enterPIN("0123", participantSlot: 1, in: app)
+    openDiaryTab(in: app)
+    openDiaryDetail(entryID: 501, in: app)
+
+    let input = element("diary.comment.input", in: app)
+    XCTAssertTrue(input.waitForExistence(timeout: 10))
+    scrollToHittable(input, in: app, maximumSwipes: 20)
+    input.tap()
+    input.typeText("배경 탭 회귀 확인")
+    XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+
+    let send = element("diary.comment.create", in: app)
+    XCTAssertTrue(waitForEnabled(send))
+    send.tap()
+
+    // The send landed and the keyboard stayed up for the next reply.
+    XCTAssertTrue(element("diary.comment.903", in: app).waitForExistence(timeout: 10))
+    XCTAssertTrue(app.keyboards.firstMatch.exists)
   }
 
   func testAccessibilityPINActionsStackVertically() {
@@ -1286,31 +1312,16 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertTrue(element("relationship.composer", in: app).waitForNonExistence(timeout: 5))
   }
 
+  /// A complete 4-digit PIN submits itself, so there is no keyboard dismissal and no button tap
+  /// here — the fourth keystroke IS the submit. Asserting on the keyboard would race the rejection
+  /// path, which deliberately brings the keyboard straight back for the retype, so callers assert
+  /// whatever their scenario expects next instead.
   private func submitPIN(_ value: String, in app: XCUIApplication) {
     let pin = element("authentication.pin", in: app)
     XCTAssertTrue(pin.waitForExistence(timeout: 5))
     scrollToHittable(pin, in: app, maximumSwipes: 20)
     pin.tap()
     pin.typeText(value)
-
-    if app.keyboards.firstMatch.exists {
-      let keyboard = app.keyboards.firstMatch
-      let dismissKeyboard = element("keyboard.dismiss", in: app)
-      if dismissKeyboard.waitForExistence(timeout: 2) {
-        XCTAssertTrue(waitForHittable(dismissKeyboard, timeout: 5))
-        dismissKeyboard.tap()
-      }
-      XCTAssertTrue(keyboard.waitForNonExistence(timeout: 10))
-    }
-
-    let submit = element("authentication.submit", in: app)
-    if !submit.exists {
-      app.swipeUp()
-    }
-    XCTAssertTrue(submit.waitForExistence(timeout: 5))
-    XCTAssertTrue(waitForEnabled(submit))
-    scrollToHittable(submit, in: app, maximumSwipes: 20)
-    submit.tap()
   }
 
   private func waitForEnabled(_ target: XCUIElement, timeout: TimeInterval = 10) -> Bool {
@@ -1375,15 +1386,19 @@ final class WoorisaiLaunchTests: XCTestCase {
     }
   }
 
+  /// Messenger-style dismissal: tap the warm background in the gutter beside the content column.
+  /// Cards, buttons and the composer keep their own taps, so this point stays outside the content
+  /// column (inset by `WoorisaiSpacing.screenGutter`), below any navigation bar, and well above the
+  /// keyboard — which grows tall enough at accessibility text sizes to swallow a mid-screen tap.
+  private func tapWarmBackground(in app: XCUIApplication) {
+    app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.22)).tap()
+  }
+
   private func dismissKeyboard(in app: XCUIApplication) {
     let keyboard = app.keyboards.firstMatch
     XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
-    let dismissKeyboard = element("keyboard.dismiss", in: app)
-    XCTAssertTrue(dismissKeyboard.waitForExistence(timeout: 5))
-    XCTAssertTrue(waitForHittable(dismissKeyboard, timeout: 5))
-    dismissKeyboard.tap()
+    tapWarmBackground(in: app)
     XCTAssertTrue(keyboard.waitForNonExistence(timeout: 10))
-    XCTAssertFalse(element("keyboard.dismiss", in: app).exists)
   }
 
   private func scrollToVisible(

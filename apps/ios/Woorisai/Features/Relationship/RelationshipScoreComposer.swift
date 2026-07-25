@@ -50,9 +50,9 @@ struct ScoreComposerSheet: View {
           .padding(.top, WoorisaiSpacing.regular)
           .padding(.bottom, WoorisaiSpacing.large)
           .frame(maxWidth: .infinity)
+          .dismissesKeyboardOnBackgroundTap()
         }
         .scrollDismissesKeyboard(.interactively)
-        .keyboardDoneToolbar()
       }
       .safeAreaInset(edge: .bottom, spacing: 0) {
         stickySubmit

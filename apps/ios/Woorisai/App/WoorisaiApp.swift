@@ -365,7 +365,12 @@ private struct AppRootView: View {
       }
       .tag(AuthenticatedTab.settings)
     }
-    .disabled(isEndingSession || isWriteInFlight)
+    // Only the session teardown blanks the app, and it says so with the overlay below. An in-flight
+    // write must NOT: concurrent writes and resends are already fenced in the models
+    // (`canBeginMutation`, `canCreateScoreChange`) and each screen disables its own controls, so
+    // disabling the whole TabView additionally froze scrolling and reading with no explanation —
+    // on a slow network that reads as a hung app.
+    .disabled(isEndingSession)
     .overlay {
       if isEndingSession {
         ProgressView("안전하게 나가는 중이에요.")
