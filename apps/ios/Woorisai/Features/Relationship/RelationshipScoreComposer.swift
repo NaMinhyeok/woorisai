@@ -275,7 +275,7 @@ struct ScoreComposerSheet: View {
           .overlay {
             RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
               .stroke(
-                reasonIsWithinLimit ? WoorisaiColor.Stroke.neutralWeak : WoorisaiColor.Fg.critical, lineWidth: 1)
+                reasonIsWithinLimit ? WoorisaiColor.Stroke.neutralWeak : WoorisaiColor.Stroke.critical, lineWidth: 1)
           }
           .accessibilityIdentifier("relationship.reason")
 
@@ -472,7 +472,7 @@ private struct RelationshipUnknownOutcomeRecovery: View {
         .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
       }
       .buttonStyle(.borderedProminent)
-      .tint(WoorisaiColor.Fg.brand)
+      .tint(WoorisaiColor.Bg.brandSolid)
       .disabled(inspectionState == .loading)
       .accessibilityIdentifier("relationship.mutation.openRecovery")
     }

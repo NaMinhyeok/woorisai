@@ -530,7 +530,7 @@ struct DiaryDetailView: View {
                 .foregroundStyle(WoorisaiColor.Fg.brandContrast)
                 .padding(.horizontal, WoorisaiSpacing.medium)
                 .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
-                .background(WoorisaiColor.Fg.brand, in: Capsule())
+                .background(WoorisaiColor.Bg.brandSolid, in: Capsule())
             }
             .buttonStyle(.plain)
             .padding(WoorisaiSpacing.screenGutter)

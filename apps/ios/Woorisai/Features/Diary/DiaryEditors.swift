@@ -673,7 +673,7 @@ struct DiaryUnknownOutcomeRecovery: View {
         .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
       }
       .buttonStyle(.borderedProminent)
-      .tint(WoorisaiColor.Fg.brand)
+      .tint(WoorisaiColor.Bg.brandSolid)
       .disabled(inspectionState == .loading)
       .accessibilityIdentifier("diary.mutation.openRecovery")
 
@@ -731,7 +731,7 @@ struct DiaryUnknownOutcomeRecovery: View {
         onConfirmManualRetry()
       }
       .buttonStyle(.borderedProminent)
-      .tint(WoorisaiColor.Fg.brand)
+      .tint(WoorisaiColor.Bg.brandSolid)
       .disabled(!canResolve || !allowsManualRetry)
       .accessibilityIdentifier("diary.mutation.confirmRetry")
 

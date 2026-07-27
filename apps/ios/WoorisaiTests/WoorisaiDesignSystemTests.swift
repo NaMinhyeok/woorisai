@@ -56,8 +56,14 @@ struct WoorisaiDesignSystemTests {
 
   /// 브랜드 솔리드 면 위의 라벨.
   ///
-  /// `Fg.brandVivid`(coral)를 배경 삼아 흰 글자를 올리면 다크모드에서 2.2:1까지 떨어진다.
-  /// 흰 글자를 얹는 면은 반드시 `Bg.brandSolid` 계열이어야 한다는 것을 고정한다.
+  /// **아래 목록이 흰 글자를 받을 수 있는 브랜드 면의 전부다.** 새로 배경을 칠할 일이 생기면
+  /// 여기에 넣고 통과하는지 먼저 볼 것.
+  ///
+  /// `Fg` 축의 브랜드 색을 배경으로 돌리면 다크모드에서 무너진다(`brandVivid` 2.2:1,
+  /// `brand` 1.8:1). 실제로 그렇게 쓰인 곳이 일곱 군데 있었고 — `.background(Fg.brand,
+  /// in: Capsule())` 하나와 `.buttonStyle(.borderedProminent)` + `.tint(Fg.brand)` 여섯 —
+  /// 이 테스트는 토큰 짝만 보기 때문에 그걸 잡지 못했다. 호출부가 어느 축의 토큰을 어디에
+  /// 넘기는지는 컴파일러도 테스트도 막지 못하므로, 방어는 결국 이름과 doc comment에 있다.
   @Test(arguments: interfaceStyles)
   func brandSolidSurfacesCarryReadableLabels(style: UIUserInterfaceStyle) {
     for background in [

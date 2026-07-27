@@ -97,8 +97,11 @@ enum WoorisaiColor {
     static let brandSubtle = WoorisaiPalette.coralSoft.opacity(0.34)
     /// 브랜드 솔리드 배경. 위에 올릴 것은 ``Fg/brandContrast``.
     ///
-    /// ``Fg/brandVivid``(coral)와 혼동하지 말 것. 그쪽은 흰 글자 대비가 다크모드에서 2.2:1까지
-    /// 떨어져 배경으로 쓸 수 없다. 이 색은 5.2:1 이상을 유지한다.
+    /// **흰 글자를 얹는 브랜드 면은 반드시 이 토큰이다.** `Fg` 축의 브랜드 색들은 글자·아이콘용
+    /// 이라 배경으로 돌리면 흰 글자와의 대비가 무너진다 — ``Fg/brandVivid``는 다크모드에서
+    /// 2.2:1, ``Fg/brand``는 1.8:1까지 떨어진다. 이 색은 라이트 5.18:1, 다크 5.60:1을 지킨다.
+    ///
+    /// `.buttonStyle(.borderedProminent)`의 `.tint(_:)`도 배경을 칠하므로 여기에 해당한다.
     static let brandSolid = WoorisaiPalette.primaryButtonStart
     /// 비활성 컨트롤의 배경.
     static let disabled = WoorisaiPalette.primaryButtonDisabled
@@ -133,12 +136,15 @@ enum WoorisaiColor {
     static let placeholder = WoorisaiPalette.muted
 
     /// 브랜드 색 텍스트·아이콘. 대비를 확보한 진한 톤이라 글자에 써도 된다.
+    ///
+    /// **배경으로는 쓰지 않는다.** 다크모드에서 이 색은 밝은 살구빛(255,170,153)으로 뒤집히므로
+    /// 위에 흰 글자를 올리면 1.8:1까지 떨어진다. 브랜드 면은 ``Bg/brandSolid``.
     static let brand = WoorisaiPalette.coralDark
     /// 아이콘·틴트 전용의 선명한 브랜드 톤.
     ///
-    /// **본문 텍스트에도, 배경에도 쓰지 않는다.** 크림 배경 위 3.3:1(본문 기준 미달)이고,
-    /// 이 색을 배경 삼아 흰 글자를 올리면 다크모드에서 2.2:1까지 떨어진다. 글자에는 ``brand``,
-    /// 배경에는 ``Bg/brandSolid``를 쓸 것.
+    /// **본문 텍스트에도, 배경에도 쓰지 않는다.** 크림 배경 위 3.57:1(아이콘은 되지만 본문
+    /// 기준 4.5:1 미달)이고, 이 색을 배경 삼아 흰 글자를 올리면 다크모드에서 2.2:1까지 떨어진다.
+    /// 글자에는 ``brand``, 배경에는 ``Bg/brandSolid``를 쓸 것.
     static let brandVivid = WoorisaiPalette.coral
     /// 2톤 심볼(`foregroundStyle(_:_:)`)의 보조 톤. 주 톤은 ``brandVivid``.
     static let brandWeak = WoorisaiPalette.coralSoft
@@ -362,12 +368,11 @@ enum WoorisaiColor {
 
 /// 그림자 3단. 값이 흩어지지 않도록 색·반경·오프셋을 한 묶음으로 둔다.
 ///
-/// 다크 모드에서 순검정 그림자는 따뜻한 어두운 배경에 묻혀 모든 카드가 납작해지므로,
-/// `WoorisaiPalette.shadow`가 은은한 웜 글로우로 뒤집힌다.
-/// 그림자 3단. 값이 흩어지지 않도록 색·반경·오프셋을 한 묶음으로 둔다.
-///
 /// 호출부에 흩어져 있던 네 조합(`0.08/10/4`, `0.12/12/6`, `0.16/12/4`, `0.2/12/6`)을 세 단으로
 /// 접었다. 위로 갈수록 짙고 넓고 멀어지도록 단조롭게 맞춘 것이라 `0.16/12/4`만 s2로 흡수됐다.
+///
+/// 다크 모드에서 순검정 그림자는 따뜻한 어두운 배경에 묻혀 모든 카드가 납작해지므로,
+/// 색이 은은한 웜 글로우로 뒤집힌다.
 enum WoorisaiElevation {
   /// 카드·표면.
   case s1

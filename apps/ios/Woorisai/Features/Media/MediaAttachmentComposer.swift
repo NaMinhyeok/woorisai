@@ -2156,7 +2156,7 @@ private struct PrivateVideoViewer: View {
                 .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
             }
             .buttonStyle(.borderedProminent)
-            .tint(WoorisaiColor.Fg.brand)
+            .tint(WoorisaiColor.Bg.brandSolid)
             .foregroundStyle(WoorisaiColor.Fg.staticWhite)
             .accessibilityIdentifier("media.videoViewer.retry")
           }
@@ -2187,7 +2187,7 @@ private struct PrivateVideoViewer: View {
                 .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
               }
               .buttonStyle(.borderedProminent)
-              .tint(WoorisaiColor.Fg.brand)
+              .tint(WoorisaiColor.Bg.brandSolid)
               .foregroundStyle(WoorisaiColor.Fg.staticWhite)
               .accessibilityLabel(isPlaying ? "동영상 일시 정지" : "동영상 재생")
               .accessibilityIdentifier("media.videoViewer.playPause")

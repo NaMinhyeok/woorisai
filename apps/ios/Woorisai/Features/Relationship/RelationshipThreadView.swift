@@ -352,7 +352,7 @@ struct ScoreChangeThreadView: View {
       )
       .overlay {
         RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous)
-          .stroke(commentIsWithinLimit ? WoorisaiColor.Stroke.neutralWeak : WoorisaiColor.Fg.critical, lineWidth: 1)
+          .stroke(commentIsWithinLimit ? WoorisaiColor.Stroke.neutralWeak : WoorisaiColor.Stroke.critical, lineWidth: 1)
       }
       .accessibilityIdentifier("relationship.thread.commentInput")
       .disabled(isDraftEditingLocked)
@@ -648,7 +648,7 @@ private struct RelationshipCommentUnknownOutcomeRecovery: View {
         .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
       }
       .buttonStyle(.borderedProminent)
-      .tint(WoorisaiColor.Fg.brand)
+      .tint(WoorisaiColor.Bg.brandSolid)
       .disabled(inspectionState == .loading)
       .accessibilityIdentifier("relationship.commentMutation.openRecovery")
     }
