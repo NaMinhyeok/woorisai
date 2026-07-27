@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Photos
 import SwiftUI
 import UIKit
 import WoorisaiAPI
@@ -740,6 +741,115 @@ final class PrivateMediaPreviewModel {
       return .unavailable
     default:
       return .failed
+    }
+  }
+}
+
+/// Copies an already-previewed attachment into the photo library.
+///
+/// This is the one path that hands private media to storage the app does not control. Everywhere
+/// else the bytes stay inside ``ProtectedTemporaryMediaPreview``, which is wiped on sign-out and
+/// excluded from backup; a saved asset outlives the session and may sync to iCloud.
+/// `docs/domain/media-lifecycle.md` owns why that trade is accepted for these two participants.
+///
+/// Saving reuses the lease's local file rather than re-issuing a download grant, so the bytes
+/// written to the library are exactly the bytes the viewer verified.
+@MainActor
+@Observable
+final class MediaLibrarySaveModel {
+  enum State: Equatable, Sendable {
+    case idle
+    case saving
+    case saved
+    case permissionDenied
+    case failed
+  }
+
+  private(set) var state: State = .idle
+
+  @ObservationIgnored
+  private let authorize: @Sendable () async -> PHAuthorizationStatus
+
+  @ObservationIgnored
+  private let write: @Sendable (URL, Bool) async throws -> Void
+
+  @ObservationIgnored
+  private var task: Task<Void, Never>?
+
+  init(
+    authorize: @escaping @Sendable () async -> PHAuthorizationStatus = {
+      await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+    },
+    write: @escaping @Sendable (URL, Bool) async throws -> Void =
+      MediaLibrarySaveModel.writeToLibrary
+  ) {
+    self.authorize = authorize
+    self.write = write
+  }
+
+  func save(fileURL: URL, isImage: Bool) {
+    guard state != .saving else { return }
+    task?.cancel()
+    state = .saving
+    let authorize = authorize
+    let write = write
+    task = Task { @MainActor [weak self] in
+      let status = await authorize()
+      guard let self, !Task.isCancelled else { return }
+      guard Self.allowsSaving(status) else {
+        self.task = nil
+        self.state = .permissionDenied
+        return
+      }
+      do {
+        try await write(fileURL, isImage)
+        guard !Task.isCancelled else { return }
+        self.task = nil
+        self.state = .saved
+      } catch {
+        guard !Task.isCancelled else { return }
+        self.task = nil
+        self.state = .failed
+      }
+    }
+  }
+
+  /// Returns the model to idle once the outcome has been shown, so the next tap can report again.
+  func acknowledge() {
+    state = .idle
+  }
+
+  func cancel() {
+    task?.cancel()
+    task = nil
+    state = .idle
+  }
+
+  /// `.limited` is a read-scope answer and never gates add-only writes, but Photos still reports
+  /// it when the user has previously restricted library reads, so it counts as permission to add.
+  static func allowsSaving(_ status: PHAuthorizationStatus) -> Bool {
+    switch status {
+    case .authorized, .limited:
+      return true
+    case .denied, .restricted, .notDetermined:
+      return false
+    @unknown default:
+      return false
+    }
+  }
+
+  private static let writeToLibrary: @Sendable (URL, Bool) async throws -> Void = {
+    fileURL,
+    isImage in
+    try await PHPhotoLibrary.shared().performChanges {
+      let request = PHAssetCreationRequest.forAsset()
+      let options = PHAssetResourceCreationOptions()
+      options.shouldMoveFile = false
+      request.addResource(
+        with: isImage ? .photo : .video,
+        fileURL: fileURL,
+        options: options
+      )
     }
   }
 }

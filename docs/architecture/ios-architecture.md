@@ -136,22 +136,44 @@ state를 먼저 비우고 새 preview load를 막은 뒤 진행 중 작업, cach
 VoiceOver adjustable action으로 확대한다. 회전과 확대 배율 변경 때 pan offset을 다시 제한해
 사진이 화면 밖에 남지 않게 한다. 이 presentation 선택은 wire 계약이나 attachment cardinality를
 바꾸지 않는다. Video는 feed traversal 중 자동 download하지 않고 사용자가 16:9 tile을 누를 때만
-준비한다. 준비된 파일은 공유 action이나 temporary filename을 노출하는 system preview 대신 앱이
-소유한 `AVPlayer`/`AVPlayerLayer` full-screen viewer에서 원본 비율로 재생한다. 재생·일시 정지,
-현재/전체 길이를 말하는 VoiceOver 진행값과 명시적인 닫기 action만 제공하며 공유 action은 두지
-않는다. 진행 상태 갱신은 재생 중에만 수행하고 Scene이 active가 아니면 즉시 멈춰 privacy cover
-아래에 유지한다. Decoder가 파일을 열지 못하면 검은 화면에 머물지 않고 오류와 닫기, 파일 다시
+준비한다. 준비된 파일은 temporary filename을 노출하는 system preview 대신 앱이 소유한
+`AVPlayer`/`AVPlayerLayer` full-screen viewer에서 원본 비율로 재생한다. 재생·일시 정지,
+현재/전체 길이를 말하는 VoiceOver 진행값, 명시적인 닫기와 사진 앱 저장 action을 제공하고 임의
+목적지로 내보내는 공유 시트는 두지 않는다. 진행 상태 갱신은 재생 중에만 수행하고 Scene이
+active가 아니면 즉시 멈춰 privacy cover 아래에 유지한다. Decoder가 파일을 열지 못하면 검은 화면에 머물지 않고 오류와 닫기, 파일 다시
 받기를 제공한다. 다시 받기는 손상된 session cache lease의 discard가 끝난 뒤 새 download를
 시작해 같은 파일을 재사용하는 경합을 막는다.
 
-Photos picker의 image와 video는 provider file metadata에서 regular file, symbolic link 여부와
-byte size를 먼저 검증한다. Image는 10MB 상한보다 큰 파일을 읽기 전에 거절하고 제한된 byte
+첨부 source는 사진 보관함(Photos picker), 카메라 촬영과 파일 앱 세 가지이며 하나의 paperclip
+menu 뒤에 둔다. 세 source는 같은 준비 경로와 같은 정책 검증을 통과한다 — 입구만 늘리고 허용
+kind/size/cardinality 판단을 복제하지 않아야 "보관함은 막히는데 파일 앱은 통과하는" 차이가
+생기지 않는다. Camera는 simulator에서 사용할 수 없으므로 menu 항목 자체를 숨긴다.
+
+Photos picker와 파일 앱의 image, video는 provider file metadata에서 regular file, symbolic link
+여부와 byte size를 먼저 검증한다. Image는 10MB 상한보다 큰 파일을 읽기 전에 거절하고 제한된 byte
 reader로만 `Data`를 만든다. HEIF 변환은 main actor 밖에서 ImageIO downsample을 사용해 decode
 축과 JPEG output 크기를 제한한다. 최대 100MB인 video는 app 전용 protected temporary file로
 복사하고 file-backed URLSession upload를 사용한다. 이 파일과 directory는 backup 대상에서
 제외하며 upload 성공, 취소, session lock 또는 selection 폐기 시 정확히 한 번 지운다. 실패 뒤
 명시적 retry가 가능한 동안에는 파일을 유지하고, 이전 process가 남긴 upload file은 다음 launch의
 scoped purge로 정리한다.
+
+Camera 촬영본만 상한을 넘겨도 거절하지 않고 4096px과 품질 축소 loop로 다시 encode한다. 선택된
+파일이 상한을 넘는 것은 사용자가 고른 대상이 정책 밖이라는 뜻이므로 조용히 축소하면 무엇을
+올렸는지 감춘다. 반면 촬영본은 앱이 방금 만든 것이라 거절할 원본 의도가 없다. Encode는 raw
+`CGImage`가 아니라 표시 크기로 다시 그려 `imageOrientation`을 굽는다 — 그러지 않으면 회전
+정보가 사라져 옆으로 누운 사진이 올라간다.
+
+Full-screen viewer는 사진 앱 저장 action을 제공한다. 앱이 통제하지 않는 저장소로 private
+media를 내보내는 유일한 경로이며, 저장된 asset은 session을 넘어 남고 iCloud로 동기화될 수
+있다. 두 participant가 서로의 사진을 이미 볼 수 있는 관계라 여기서 막는 것이 지키는 위협은
+없고, 반대로 함께 남긴 기록을 각자 기기에 보관하지 못하는 제약은 제품 목적과 어긋난다. 이
+결정은 [media lifecycle](../domain/media-lifecycle.md)이 함께 소유한다. 저장은 새 download
+grant를 발급하지 않고 viewer가 이미 검증한 lease file을 그대로 쓰며, `addOnly` 권한만 요청해
+보관함 읽기 권한은 얻지 않는다. iOS는 한 번 거부된 권한을 다시 묻지 못하게 하므로 거부 상태는
+원인을 밝히고 Settings 경로를 제시한 뒤 사용자가 조치할 때까지 화면에 남긴다. 임의 목적지로
+내보내는 공유 시트는 두지 않는다 — 저장 목적지가 사용자 자신의 보관함으로 한정될 때와 달리
+어디로 나갈지 앱이 알 수 없다.
 
 ## Presentation과 navigation
 

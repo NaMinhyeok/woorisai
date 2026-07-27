@@ -1,5 +1,6 @@
 import Foundation
 import ImageIO
+import Photos
 import SwiftUI
 import Testing
 import UIKit
@@ -1311,6 +1312,177 @@ struct MediaAttachmentComposerTests {
         $0.accessibilityIdentifier == AppSnapshotPrivacyShield.accessibilityIdentifier
       }
     )
+  }
+
+  @Test
+  func cameraCaptureIsReencodedWithinBoundsAndBakesInTheCaptureOrientation() throws {
+    let landscapePixels = try #require(
+      syntheticImage(size: CGSize(width: 2_400, height: 1_200)).cgImage
+    )
+    let captured = UIImage(cgImage: landscapePixels, scale: 1, orientation: .right)
+
+    let data = try #require(
+      BoundedCameraImageEncoder.encodeToJPEG(captured, maximumPixelSize: 600)
+    )
+    let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+    let properties = try #require(
+      CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+    )
+    let width = try #require(properties[kCGImagePropertyPixelWidth] as? Int)
+    let height = try #require(properties[kCGImagePropertyPixelHeight] as? Int)
+
+    #expect(max(width, height) <= 600)
+    #expect(Int64(data.count) <= MediaUploadDraft.maximumImageByteSize)
+    // `.right` swaps the displayed axes. Encoding the underlying CGImage instead of redrawing
+    // would keep these pixels landscape and upload a sideways photo.
+    #expect(height > width)
+    #expect(
+      BoundedCameraImageEncoder.encodeToJPEG(
+        captured,
+        maximumPixelSize: 600,
+        maximumByteSize: 1
+      ) == nil
+    )
+  }
+
+  @Test
+  func filesImportProducesAnAttachmentThroughTheSharedPreparationPath() async throws {
+    let directory = try composerTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let imageURL = directory.appendingPathComponent("memory.jpg")
+    try #require(
+      syntheticImage(size: CGSize(width: 64, height: 64)).jpegData(compressionQuality: 0.9)
+    ).write(to: imageURL)
+
+    let model = MediaAttachmentComposerModel(
+      purpose: .diaryEntry,
+      service: ComposerMediaServiceFake(),
+      uploader: ComposerSuspendedUploader()
+    )
+
+    model.importFileURLs([imageURL])
+    await composerExpectEventually { model.uploads.count == 1 }
+
+    let upload = try #require(model.uploads.first)
+    #expect(upload.kind == .image)
+    #expect(upload.fileName.hasPrefix("photo-"))
+    #expect(upload.previewImage != nil)
+    #expect(model.importFailure == nil)
+    model.clear()
+  }
+
+  @Test
+  func filesImportEnforcesTheSameAttachmentPolicyAsThePhotoPicker() async throws {
+    let directory = try composerTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let imageData = try #require(
+      syntheticImage(size: CGSize(width: 32, height: 32)).jpegData(compressionQuality: 0.9)
+    )
+    let firstURL = directory.appendingPathComponent("first.jpg")
+    let secondURL = directory.appendingPathComponent("second.jpg")
+    try imageData.write(to: firstURL)
+    try imageData.write(to: secondURL)
+
+    let model = MediaAttachmentComposerModel(
+      purpose: .scoreChange,
+      service: ComposerMediaServiceFake(),
+      uploader: ComposerSuspendedUploader()
+    )
+
+    model.importFileURLs([firstURL, secondURL])
+    await composerExpectEventually { model.importFailure != nil }
+
+    #expect(model.uploads.count == 1)
+    #expect(model.importFailure == .rule(.tooManyImages(maximum: 1)))
+    model.clear()
+  }
+
+  @Test
+  func filesImportRejectsATypeTheUploadPolicyDoesNotAllow() async throws {
+    let directory = try composerTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let textURL = directory.appendingPathComponent("note.txt")
+    try Data("우리 사이".utf8).write(to: textURL)
+
+    let model = MediaAttachmentComposerModel(
+      purpose: .diaryEntry,
+      service: ComposerMediaServiceFake(),
+      uploader: ComposerSuspendedUploader()
+    )
+
+    model.importFileURLs([textURL])
+    await composerExpectEventually { model.importFailure != nil }
+
+    #expect(model.importFailure == .unsupportedType)
+    #expect(model.uploads.isEmpty)
+    model.clear()
+  }
+
+  @Test
+  func libraryAddAccessIsRequiredBeforeAnyAttachmentLeavesTheApp() {
+    #expect(MediaLibrarySaveModel.allowsSaving(.authorized))
+    #expect(MediaLibrarySaveModel.allowsSaving(.limited))
+    #expect(!MediaLibrarySaveModel.allowsSaving(.denied))
+    #expect(!MediaLibrarySaveModel.allowsSaving(.restricted))
+    #expect(!MediaLibrarySaveModel.allowsSaving(.notDetermined))
+  }
+
+  @Test
+  func deniedLibraryPermissionIsReportedWithoutWritingAnything() async {
+    let spy = MediaLibraryWriteSpy()
+    let model = MediaLibrarySaveModel(
+      authorize: { .denied },
+      write: { _, _ in await spy.record() }
+    )
+
+    model.save(fileURL: URL(fileURLWithPath: "/dev/null"), isImage: true)
+    await composerExpectEventually { model.state == .permissionDenied }
+
+    #expect(await spy.writeCount == 0)
+  }
+
+  @Test
+  func grantedLibraryPermissionWritesTheLeasedFileOnce() async {
+    let spy = MediaLibraryWriteSpy()
+    let fileURL = URL(fileURLWithPath: "/dev/null")
+    let model = MediaLibrarySaveModel(
+      authorize: { .authorized },
+      write: { url, isImage in await spy.record(url: url, isImage: isImage) }
+    )
+
+    model.save(fileURL: fileURL, isImage: false)
+    await composerExpectEventually { model.state == .saved }
+
+    #expect(await spy.writeCount == 1)
+    #expect(await spy.lastURL == fileURL)
+    #expect(await spy.lastIsImage == false)
+
+    model.acknowledge()
+    #expect(model.state == .idle)
+  }
+}
+
+private func composerTemporaryDirectory() throws -> URL {
+  let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+    "composer-source-test-\(UUID().uuidString)",
+    isDirectory: true
+  )
+  try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+  return directory
+}
+
+private actor MediaLibraryWriteSpy {
+  private(set) var writeCount = 0
+  private(set) var lastURL: URL?
+  private(set) var lastIsImage: Bool?
+
+  func record(url: URL? = nil, isImage: Bool? = nil) {
+    writeCount += 1
+    lastURL = url
+    lastIsImage = isImage
   }
 }
 
