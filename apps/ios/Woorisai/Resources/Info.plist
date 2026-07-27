@@ -26,8 +26,12 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>사진을 찍어 기록이나 댓글에 첨부합니다.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>우리사이 잠금을 Face ID로 해제합니다.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>주고받은 사진과 동영상을 사진 앱에 저장합니다.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

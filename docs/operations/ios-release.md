@@ -169,6 +169,8 @@ smoke는 승인된 account와 최소 범위로 수행하고 private payload를 t
 - Camera, microphone, location, tracking과 full photo-library 권한은 실제 feature 필요와 product
   privacy review 없이 추가하지 않는다.
 - PhotosPicker처럼 system picker로 충분하면 broad library permission을 요청하지 않는다.
+- 현재 요청하는 권한은 Face ID, 촬영 첨부용 camera와 viewer 저장용 photo-library `addOnly`뿐이다.
+  보관함 읽기와 파일 앱 접근은 out-of-process picker가 처리하므로 권한을 요청하지 않는다.
 - App Privacy, privacy policy, retention, third-party SDK와 required privacy manifest를 release마다
   검토한다.
 

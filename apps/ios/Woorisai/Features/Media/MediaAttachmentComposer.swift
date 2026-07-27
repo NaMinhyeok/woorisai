@@ -301,6 +301,71 @@ enum BoundedPickerHEIFConverter {
   }
 }
 
+/// Carries one camera capture from the picker controller to the encoding task. `UIImage` is
+/// documented as immutable and readable from any thread but is not marked `Sendable`, so the box
+/// states that guarantee explicitly instead of forcing the encode onto the main actor.
+struct CapturedPhoto: @unchecked Sendable {
+  let image: UIImage
+}
+
+enum BoundedCameraImageEncoder {
+  /// Re-encodes a camera capture into a JPEG that fits the upload limit.
+  ///
+  /// ``BoundedPickerHEIFConverter`` refuses source data above the limit on purpose: a picker or
+  /// Files selection that large is already outside policy and silently shrinking it would hide
+  /// that. A camera original has no such contract because this app produced it, so this encoder
+  /// starts from the captured pixels and shrinks until the encoded bytes fit.
+  static func encodeToJPEG(
+    _ image: UIImage,
+    maximumPixelSize: Int = BoundedPickerHEIFConverter.maximumDecodedPixelSize,
+    maximumByteSize: Int64 = MediaUploadDraft.maximumImageByteSize
+  ) -> Data? {
+    guard maximumPixelSize > 0, maximumByteSize > 0 else { return nil }
+    let longestPixelSide = max(image.size.width, image.size.height) * image.scale
+    guard longestPixelSide >= 1 else { return nil }
+
+    var candidatePixelSize = min(maximumPixelSize, Int(longestPixelSide.rounded()))
+    let minimumPixelSize = min(1_200, candidatePixelSize)
+    while candidatePixelSize >= minimumPixelSize {
+      guard let redrawn = redrawn(image, maximumPixelSize: candidatePixelSize) else {
+        return nil
+      }
+      for quality in [0.9, 0.75, 0.6, 0.45] as [CGFloat] {
+        guard let data = redrawn.jpegData(compressionQuality: quality), !data.isEmpty else {
+          continue
+        }
+        if Int64(data.count) <= maximumByteSize { return data }
+      }
+
+      guard candidatePixelSize > minimumPixelSize else { break }
+      candidatePixelSize = max(minimumPixelSize, candidatePixelSize * 3 / 4)
+    }
+    return nil
+  }
+
+  /// Redraws at the target size, which also bakes in `imageOrientation`. Encoding the underlying
+  /// `CGImage` directly would drop the rotation the camera recorded and upload a sideways photo.
+  private static func redrawn(_ image: UIImage, maximumPixelSize: Int) -> UIImage? {
+    let pixelWidth = image.size.width * image.scale
+    let pixelHeight = image.size.height * image.scale
+    let longestSide = max(pixelWidth, pixelHeight)
+    guard longestSide >= 1 else { return nil }
+
+    let ratio = min(1, CGFloat(maximumPixelSize) / longestSide)
+    let targetSize = CGSize(
+      width: max(1, (pixelWidth * ratio).rounded()),
+      height: max(1, (pixelHeight * ratio).rounded())
+    )
+
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    format.opaque = true
+    return UIGraphicsImageRenderer(size: targetSize, format: format).image { _ in
+      image.draw(in: CGRect(origin: .zero, size: targetSize))
+    }
+  }
+}
+
 enum MediaAttachmentRuleViolation: Error, Equatable, Sendable {
   case videoNotAllowed
   case tooManyImages(maximum: Int)
@@ -439,7 +504,27 @@ final class MediaAttachmentComposerModel {
   }
 
   func importPickerItems(_ pickerItems: [PhotosPickerItem]) {
-    guard !pickerItems.isEmpty else { return }
+    startImport(pickerItems, prepare: Self.preparePickerItem)
+  }
+
+  /// Imports selections made in the Files app. Unsupported or oversized files surface the same
+  /// import failure as the photo picker so one policy explains every source.
+  func importFileURLs(_ urls: [URL]) {
+    startImport(urls, prepare: Self.prepareFileURL)
+  }
+
+  func importCapturedPhoto(_ photo: CapturedPhoto) {
+    startImport([photo], prepare: Self.prepareCapturedPhoto)
+  }
+
+  /// Runs one import batch regardless of where the selection came from. Every source funnels
+  /// through the same generation guard, failure mapping and policy validation, so the picker,
+  /// the camera and the Files app can never drift apart on what is accepted.
+  private func startImport<Source: Sendable>(
+    _ sources: [Source],
+    prepare: @escaping @Sendable (Source) async throws -> PreparedPickerItem
+  ) {
+    guard !sources.isEmpty else { return }
     importGeneration &+= 1
     let generation = importGeneration
     importTask?.cancel()
@@ -448,11 +533,11 @@ final class MediaAttachmentComposerModel {
 
     importTask = Task { @MainActor [weak self] in
       guard let self else { return }
-      for pickerItem in pickerItems {
+      for source in sources {
         guard !Task.isCancelled, self.importGeneration == generation else { return }
         var preparedKind: MediaKind?
         do {
-          let prepared = try await Self.preparePickerItem(pickerItem)
+          let prepared = try await prepare(source)
           preparedKind = prepared.kind
           guard !Task.isCancelled, self.importGeneration == generation else { return }
           switch prepared.payload {
@@ -606,6 +691,12 @@ final class MediaAttachmentComposerModel {
     importFailure = nil
   }
 
+  /// Reports a selection the app never got to read, such as a Files provider that failed to hand
+  /// back a URL. Surfacing it as an import failure keeps every source on one error affordance.
+  func reportUnreadableSelection() {
+    importFailure = .unreadableSelection
+  }
+
   /// Marks every READY upload as owned by an issued parent mutation and returns its ordered IDs.
   ///
   /// Once marked, view cleanup must not race the parent transaction by discarding these uploads.
@@ -713,62 +804,122 @@ final class MediaAttachmentComposerModel {
 
     if let advertisedType = supportedTypes.first(where: isSupportedPickerImageType) {
       let transfer = try await loadBoundedImage(from: item)
-      let type = try resolvedPickerType(
-        actualIdentifier: transfer.typeIdentifier,
-        advertisedType: advertisedType,
-        isAllowed: isSupportedPickerImageType
-      )
-
-      if isHEIFType(type) {
-        guard let converted = await convertHEIFToJPEG(transfer.data) else {
-          throw PickerPreparationError.imageConversionFailed
-        }
-        return PreparedPickerItem(
-          kind: .image,
-          fileName: generatedFileName(kind: .image, type: .jpeg, contentType: "image/jpeg"),
-          contentType: "image/jpeg",
-          payload: .data(converted.data),
-          previewCGImage: converted.previewCGImage
-        )
-      }
-
-      guard let contentType = type.preferredMIMEType?.lowercased(),
-        allowedImageMIMETypes.contains(contentType)
-      else {
-        throw PickerPreparationError.unsupportedType
-      }
-      return PreparedPickerItem(
-        kind: .image,
-        fileName: generatedFileName(kind: .image, type: type, contentType: contentType),
-        contentType: contentType,
-        payload: .data(transfer.data),
-        previewCGImage: await thumbnailCGImage(from: transfer.data)
-      )
+      return try await preparedImage(transfer: transfer, advertisedType: advertisedType)
     }
 
-    if let advertisedType = supportedTypes.first(where: {
-      guard let contentType = $0.preferredMIMEType?.lowercased() else { return false }
-      return allowedVideoMIMETypes.contains(contentType)
-    }) {
+    if let advertisedType = supportedTypes.first(where: isSupportedPickerVideoType) {
       let transfer = try await loadBoundedVideo(from: item)
-      let type = try resolvedPickerType(
-        actualIdentifier: transfer.typeIdentifier,
-        advertisedType: advertisedType,
-        isAllowed: isSupportedPickerVideoType
-      )
-      guard let contentType = type.preferredMIMEType?.lowercased() else {
-        throw PickerPreparationError.unsupportedType
-      }
-      return PreparedPickerItem(
-        kind: .video,
-        fileName: generatedFileName(kind: .video, type: type, contentType: contentType),
-        contentType: contentType,
-        payload: .file(transfer.file),
-        previewCGImage: nil
-      )
+      return try preparedVideo(transfer: transfer, advertisedType: advertisedType)
     }
 
     throw PickerPreparationError.unsupportedType
+  }
+
+  /// Prepares a file chosen in the Files app. `fileImporter` hands back security-scoped URLs, so
+  /// the scope stays open for the whole read and the bytes are copied into app-owned storage
+  /// before the provider can revoke access.
+  private static func prepareFileURL(_ url: URL) async throws -> PreparedPickerItem {
+    let hasScopedAccess = url.startAccessingSecurityScopedResource()
+    defer {
+      if hasScopedAccess { url.stopAccessingSecurityScopedResource() }
+    }
+
+    guard
+      let advertisedType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType
+    else {
+      throw PickerPreparationError.unsupportedType
+    }
+
+    if isSupportedPickerImageType(advertisedType) {
+      let transfer = try BoundedPickerImageTransfer.importingFile(at: url)
+      return try await preparedImage(transfer: transfer, advertisedType: advertisedType)
+    }
+
+    if isSupportedPickerVideoType(advertisedType) {
+      let transfer = try BoundedPickerVideoTransfer.importingFile(at: url)
+      return try preparedVideo(transfer: transfer, advertisedType: advertisedType)
+    }
+
+    throw PickerPreparationError.unsupportedType
+  }
+
+  /// Prepares a freshly captured photo. The camera has no source file to inspect, so the capture
+  /// is re-encoded to a bounded JPEG here rather than trusted like a picker or Files selection.
+  private static func prepareCapturedPhoto(_ photo: CapturedPhoto) async throws
+    -> PreparedPickerItem
+  {
+    guard
+      let data = await Task.detached(priority: .userInitiated, operation: {
+        BoundedCameraImageEncoder.encodeToJPEG(photo.image)
+      }).value
+    else {
+      throw PickerPreparationError.imageConversionFailed
+    }
+    return PreparedPickerItem(
+      kind: .image,
+      fileName: generatedFileName(kind: .image, type: .jpeg, contentType: "image/jpeg"),
+      contentType: "image/jpeg",
+      payload: .data(data),
+      previewCGImage: await thumbnailCGImage(from: data)
+    )
+  }
+
+  private static func preparedImage(
+    transfer: BoundedPickerImageTransfer,
+    advertisedType: UTType
+  ) async throws -> PreparedPickerItem {
+    let type = try resolvedPickerType(
+      actualIdentifier: transfer.typeIdentifier,
+      advertisedType: advertisedType,
+      isAllowed: isSupportedPickerImageType
+    )
+
+    if isHEIFType(type) {
+      guard let converted = await convertHEIFToJPEG(transfer.data) else {
+        throw PickerPreparationError.imageConversionFailed
+      }
+      return PreparedPickerItem(
+        kind: .image,
+        fileName: generatedFileName(kind: .image, type: .jpeg, contentType: "image/jpeg"),
+        contentType: "image/jpeg",
+        payload: .data(converted.data),
+        previewCGImage: converted.previewCGImage
+      )
+    }
+
+    guard let contentType = type.preferredMIMEType?.lowercased(),
+      allowedImageMIMETypes.contains(contentType)
+    else {
+      throw PickerPreparationError.unsupportedType
+    }
+    return PreparedPickerItem(
+      kind: .image,
+      fileName: generatedFileName(kind: .image, type: type, contentType: contentType),
+      contentType: contentType,
+      payload: .data(transfer.data),
+      previewCGImage: await thumbnailCGImage(from: transfer.data)
+    )
+  }
+
+  private static func preparedVideo(
+    transfer: BoundedPickerVideoTransfer,
+    advertisedType: UTType
+  ) throws -> PreparedPickerItem {
+    let type = try resolvedPickerType(
+      actualIdentifier: transfer.typeIdentifier,
+      advertisedType: advertisedType,
+      isAllowed: isSupportedPickerVideoType
+    )
+    guard let contentType = type.preferredMIMEType?.lowercased() else {
+      throw PickerPreparationError.unsupportedType
+    }
+    return PreparedPickerItem(
+      kind: .video,
+      fileName: generatedFileName(kind: .video, type: type, contentType: contentType),
+      contentType: contentType,
+      payload: .file(transfer.file),
+      previewCGImage: nil
+    )
   }
 
   private static func thumbnailCGImage(from data: Data) async -> CGImage? {
@@ -989,9 +1140,65 @@ final class TopLevelMediaSessionCoordinator {
   }
 }
 
+/// Wraps `UIImagePickerController` because SwiftUI still ships no first-party capture view. The
+/// controller is pinned to a single unedited still photo so the capture matches what the image
+/// policy accepts; video capture would need its own duration and size bounds.
+struct CameraCaptureView: UIViewControllerRepresentable {
+  let onCapture: (CapturedPhoto) -> Void
+  let onCancel: () -> Void
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator(onCapture: onCapture, onCancel: onCancel)
+  }
+
+  func makeUIViewController(context: Context) -> UIImagePickerController {
+    let controller = UIImagePickerController()
+    controller.sourceType = .camera
+    controller.cameraCaptureMode = .photo
+    controller.mediaTypes = [UTType.image.identifier]
+    controller.allowsEditing = false
+    controller.delegate = context.coordinator
+    return controller
+  }
+
+  func updateUIViewController(_ controller: UIImagePickerController, context: Context) {}
+
+  final class Coordinator: NSObject, UIImagePickerControllerDelegate,
+    UINavigationControllerDelegate
+  {
+    private let onCapture: (CapturedPhoto) -> Void
+    private let onCancel: () -> Void
+
+    init(
+      onCapture: @escaping (CapturedPhoto) -> Void,
+      onCancel: @escaping () -> Void
+    ) {
+      self.onCapture = onCapture
+      self.onCancel = onCancel
+    }
+
+    func imagePickerController(
+      _ picker: UIImagePickerController,
+      didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+    ) {
+      guard let image = info[.originalImage] as? UIImage else {
+        onCancel()
+        return
+      }
+      onCapture(CapturedPhoto(image: image))
+    }
+
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+      onCancel()
+    }
+  }
+}
+
 struct MediaAttachmentComposer: View {
   @State private var model: MediaAttachmentComposerModel
   @State private var pickerItems: [PhotosPickerItem] = []
+  @State private var isCameraPresented = false
+  @State private var isFileImporterPresented = false
 
   @MainActor
   init(model: MediaAttachmentComposerModel) {
@@ -999,22 +1206,9 @@ struct MediaAttachmentComposer: View {
   }
 
   var body: some View {
-    let pickerLabel = model.policy.allowsVideo ? "사진 또는 동영상 첨부" : "사진 첨부"
     VStack(alignment: .leading, spacing: WoorisaiSpacing.medium) {
       HStack {
-        PhotosPicker(
-          selection: $pickerItems,
-          maxSelectionCount: model.pickerSelectionLimit,
-          selectionBehavior: .ordered,
-          matching: model.policy.allowsVideo ? .any(of: [.images, .videos]) : .images,
-          preferredItemEncoding: .current
-        ) {
-          Label(pickerLabel, systemImage: "paperclip")
-            .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
-        }
-        .disabled(!model.canSelectMore)
-        .accessibilityLabel(pickerLabel)
-        .accessibilityHint(pickerAccessibilityHint)
+        attachmentSourceMenu
 
         Spacer()
 
@@ -1067,7 +1261,87 @@ struct MediaAttachmentComposer: View {
       model.importPickerItems(selectedItems)
       pickerItems = []
     }
+    .fullScreenCover(isPresented: $isCameraPresented) {
+      CameraCaptureView(
+        onCapture: { photo in
+          isCameraPresented = false
+          model.importCapturedPhoto(photo)
+        },
+        onCancel: { isCameraPresented = false }
+      )
+      .ignoresSafeArea()
+    }
+    .fileImporter(
+      isPresented: $isFileImporterPresented,
+      allowedContentTypes: importableContentTypes,
+      allowsMultipleSelection: model.pickerSelectionLimit > 1
+    ) { result in
+      switch result {
+      case .success(let urls):
+        model.importFileURLs(Array(urls.prefix(model.pickerSelectionLimit)))
+      case .failure:
+        model.reportUnreadableSelection()
+      }
+    }
     .accessibilityElement(children: .contain)
+  }
+
+  /// Groups the three sources behind one paperclip so the attach affordance stays a single tap
+  /// target regardless of how many sources the current policy allows.
+  private var attachmentSourceMenu: some View {
+    Menu {
+      PhotosPicker(
+        selection: $pickerItems,
+        maxSelectionCount: model.pickerSelectionLimit,
+        selectionBehavior: .ordered,
+        matching: model.policy.allowsVideo ? .any(of: [.images, .videos]) : .images,
+        preferredItemEncoding: .current
+      ) {
+        Label("사진 보관함", systemImage: "photo.on.rectangle")
+      }
+
+      if Self.isCameraAvailable {
+        Button {
+          isCameraPresented = true
+        } label: {
+          Label("사진 촬영", systemImage: "camera")
+        }
+      }
+
+      Button {
+        isFileImporterPresented = true
+      } label: {
+        Label("파일 선택", systemImage: "folder")
+      }
+    } label: {
+      Label(attachmentMenuLabel, systemImage: "paperclip")
+        .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
+    }
+    .disabled(!model.canSelectMore)
+    .accessibilityLabel(attachmentMenuLabel)
+    .accessibilityHint(pickerAccessibilityHint)
+    .accessibilityIdentifier("media.attachMenu")
+  }
+
+  private var attachmentMenuLabel: String {
+    model.policy.allowsVideo ? "사진 또는 동영상 첨부" : "사진 첨부"
+  }
+
+  /// Simulators report no camera, so the capture entry is hidden rather than shown broken.
+  private static var isCameraAvailable: Bool {
+    UIImagePickerController.isSourceTypeAvailable(.camera)
+  }
+
+  /// Mirrors the server's allowed MIME types. Listing them explicitly keeps the Files browser from
+  /// offering formats that would only fail after the user picked them.
+  private var importableContentTypes: [UTType] {
+    var types: [UTType] = [.jpeg, .png, .webP]
+    guard model.policy.allowsVideo else { return types }
+    types.append(contentsOf: [.mpeg4Movie, .quickTimeMovie])
+    if let webmType = UTType(filenameExtension: "webm", conformingTo: .movie) {
+      types.append(webmType)
+    }
+    return types
   }
 
   private var pickerAccessibilityHint: String {
@@ -1968,6 +2242,14 @@ struct MediaAttachmentPreview: View {
           .accessibilityIdentifier("media.viewer")
         }
       }
+      .overlay(alignment: .topLeading) {
+        if let localURL = model.localURL,
+          MediaLibrarySaveModel.supportsPhotoLibrary(contentType: contentType)
+        {
+          MediaLibrarySaveControl(fileURL: localURL, isImage: true)
+            .padding(WoorisaiSpacing.regular)
+        }
+      }
       .overlay(alignment: .topTrailing) {
         Button {
           isImageViewerPresented = false
@@ -2002,6 +2284,7 @@ struct MediaAttachmentPreview: View {
         PrivateVideoViewer(
           url: localURL,
           fileName: fileName,
+          contentType: contentType,
           onRetry: {
             shouldReloadVideoAfterDismiss = true
             isVideoViewerPresented = false
@@ -2103,6 +2386,107 @@ struct MediaAttachmentPreview: View {
 }
 
 @MainActor
+/// Save affordance shared by the image and video viewers.
+///
+/// The control keeps its own outcome copy instead of routing through `WoorisaiToast`: the toast is
+/// success-only by design (it hardcodes a checkmark), and a blocked permission is exactly the case
+/// the user must be told about.
+private struct MediaLibrarySaveControl: View {
+  @State private var model = MediaLibrarySaveModel()
+
+  let fileURL: URL
+  let isImage: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
+      Button {
+        model.save(fileURL: fileURL, isImage: isImage)
+      } label: {
+        Group {
+          if model.state == .saving {
+            ProgressView()
+              .tint(WoorisaiColor.Fg.staticWhite)
+          } else {
+            Image(systemName: "arrow.down.to.line")
+              .font(.body.weight(.bold))
+              .foregroundStyle(WoorisaiColor.Fg.staticWhite)
+          }
+        }
+        .frame(
+          width: WoorisaiControlMetric.minimumTapTarget,
+          height: WoorisaiControlMetric.minimumTapTarget
+        )
+        .background(WoorisaiColor.Bg.scrim, in: Circle())
+      }
+      .buttonStyle(.plain)
+      .disabled(model.state == .saving)
+      .accessibilityLabel(isImage ? "사진을 사진 앱에 저장" : "동영상을 사진 앱에 저장")
+      .accessibilityIdentifier("media.viewer.save")
+
+      if let outcome = outcomeMessage {
+        VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
+          Text(outcome.message)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(WoorisaiColor.Fg.staticWhite)
+            .fixedSize(horizontal: false, vertical: true)
+
+          if outcome.offersSettingsLink, let settingsURL = Self.settingsURL {
+            Link("설정 열기", destination: settingsURL)
+              .font(.footnote.weight(.bold))
+              .foregroundStyle(WoorisaiColor.Fg.staticWhite)
+              .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
+              .accessibilityIdentifier("media.viewer.save.settings")
+          }
+        }
+        .padding(.horizontal, WoorisaiSpacing.regular)
+        .padding(.vertical, WoorisaiSpacing.small)
+        .background(
+          WoorisaiColor.Bg.scrimStrong,
+          in: RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
+        )
+        .frame(maxWidth: 260, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("media.viewer.save.outcome")
+        .task(id: outcome.message) {
+          AccessibilityNotification.Announcement(outcome.message).post()
+          // A blocked permission needs a decision from the user, so it stays until dismissed.
+          guard !outcome.offersSettingsLink else { return }
+          try? await Task.sleep(for: .seconds(2.4))
+          guard !Task.isCancelled else { return }
+          model.acknowledge()
+        }
+      }
+    }
+    .onDisappear { model.cancel() }
+  }
+
+  private var outcomeMessage: (message: String, offersSettingsLink: Bool)? {
+    switch model.state {
+    case .idle, .saving:
+      return nil
+    case .saved:
+      return (isImage ? "사진 앱에 저장했어요." : "동영상을 사진 앱에 저장했어요.", false)
+    case .failed:
+      return ("저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.", false)
+    case .permissionDenied:
+      return Self.permissionDeniedFeedback
+    }
+  }
+
+  /// What the viewer shows when the user has blocked photo-library additions.
+  ///
+  /// iOS refuses to re-prompt for a permission the user already denied, so this state is one the
+  /// app cannot clear on its own — the message names the cause and links out to Settings, and it
+  /// stays put instead of auto-dismissing because the user has to act elsewhere to resolve it.
+  private static let permissionDeniedFeedback: (message: String, offersSettingsLink: Bool) = (
+    "사진 접근 권한이 꺼져 있어 저장하지 못했어요.", true
+  )
+
+  private static var settingsURL: URL? {
+    URL(string: UIApplication.openSettingsURLString)
+  }
+}
+
 private struct PrivateVideoViewer: View {
   @Environment(\.scenePhase) private var scenePhase
   @State private var player: AVPlayer
@@ -2112,18 +2496,23 @@ private struct PrivateVideoViewer: View {
   @State private var hasReachedEnd = false
   @State private var playbackFailureMessage: String?
 
+  let fileURL: URL
   let fileName: String
+  let contentType: String
   let onRetry: () -> Void
   let onClose: () -> Void
 
   init(
     url: URL,
     fileName: String,
+    contentType: String,
     onRetry: @escaping () -> Void,
     onClose: @escaping () -> Void
   ) {
     _player = State(initialValue: AVPlayer(url: url))
+    fileURL = url
     self.fileName = fileName
+    self.contentType = contentType
     self.onRetry = onRetry
     self.onClose = onClose
   }
@@ -2198,6 +2587,14 @@ private struct PrivateVideoViewer: View {
       .padding(WoorisaiSpacing.regular)
       .background(WoorisaiColor.Bg.scrimStrong, in: RoundedRectangle(cornerRadius: WoorisaiRadius.medium))
       .padding(WoorisaiSpacing.regular)
+    }
+    .overlay(alignment: .topLeading) {
+      if playbackFailureMessage == nil,
+        MediaLibrarySaveModel.supportsPhotoLibrary(contentType: contentType)
+      {
+        MediaLibrarySaveControl(fileURL: fileURL, isImage: false)
+          .padding(WoorisaiSpacing.regular)
+      }
     }
     .overlay(alignment: .topTrailing) {
       Button(action: onClose) {
