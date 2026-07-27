@@ -825,8 +825,23 @@ final class MediaLibrarySaveModel {
     state = .idle
   }
 
-  /// `.limited` is a read-scope answer and never gates add-only writes, but Photos still reports
-  /// it when the user has previously restricted library reads, so it counts as permission to add.
+  /// Whether Photos can represent this content type as an asset.
+  ///
+  /// The upload policy accepts WebP and WebM, but neither becomes a library asset, so the save
+  /// would fail every time. Callers hide the affordance instead of surfacing a retry prompt for a
+  /// failure that can never succeed.
+  static func supportsPhotoLibrary(contentType: String) -> Bool {
+    switch contentType.lowercased() {
+    case "image/jpeg", "image/png", "video/mp4", "video/quicktime":
+      return true
+    default:
+      return false
+    }
+  }
+
+  /// `.limited` is a read-scope answer that add-only requests are not expected to return, but
+  /// treating it as permission is still correct: limited access restricts which assets an app may
+  /// read, never whether it may add one.
   static func allowsSaving(_ status: PHAuthorizationStatus) -> Bool {
     switch status {
     case .authorized, .limited:

@@ -1422,6 +1422,20 @@ struct MediaAttachmentComposerTests {
   }
 
   @Test
+  func saveIsOfferedOnlyForTypesPhotosCanStoreAsAnAsset() {
+    #expect(MediaLibrarySaveModel.supportsPhotoLibrary(contentType: "image/jpeg"))
+    #expect(MediaLibrarySaveModel.supportsPhotoLibrary(contentType: "image/png"))
+    #expect(MediaLibrarySaveModel.supportsPhotoLibrary(contentType: "video/mp4"))
+    #expect(MediaLibrarySaveModel.supportsPhotoLibrary(contentType: "video/quicktime"))
+    #expect(MediaLibrarySaveModel.supportsPhotoLibrary(contentType: "IMAGE/JPEG"))
+    // The upload policy accepts these, but Photos cannot store them — offering a save that always
+    // fails would tell the user to retry something that can never work.
+    #expect(!MediaLibrarySaveModel.supportsPhotoLibrary(contentType: "image/webp"))
+    #expect(!MediaLibrarySaveModel.supportsPhotoLibrary(contentType: "video/webm"))
+    #expect(!MediaLibrarySaveModel.supportsPhotoLibrary(contentType: "application/pdf"))
+  }
+
+  @Test
   func libraryAddAccessIsRequiredBeforeAnyAttachmentLeavesTheApp() {
     #expect(MediaLibrarySaveModel.allowsSaving(.authorized))
     #expect(MediaLibrarySaveModel.allowsSaving(.limited))

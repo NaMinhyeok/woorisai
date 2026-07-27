@@ -2243,7 +2243,9 @@ struct MediaAttachmentPreview: View {
         }
       }
       .overlay(alignment: .topLeading) {
-        if let localURL = model.localURL {
+        if let localURL = model.localURL,
+          MediaLibrarySaveModel.supportsPhotoLibrary(contentType: contentType)
+        {
           MediaLibrarySaveControl(fileURL: localURL, isImage: true)
             .padding(WoorisaiSpacing.regular)
         }
@@ -2282,6 +2284,7 @@ struct MediaAttachmentPreview: View {
         PrivateVideoViewer(
           url: localURL,
           fileName: fileName,
+          contentType: contentType,
           onRetry: {
             shouldReloadVideoAfterDismiss = true
             isVideoViewerPresented = false
@@ -2495,18 +2498,21 @@ private struct PrivateVideoViewer: View {
 
   let fileURL: URL
   let fileName: String
+  let contentType: String
   let onRetry: () -> Void
   let onClose: () -> Void
 
   init(
     url: URL,
     fileName: String,
+    contentType: String,
     onRetry: @escaping () -> Void,
     onClose: @escaping () -> Void
   ) {
     _player = State(initialValue: AVPlayer(url: url))
     fileURL = url
     self.fileName = fileName
+    self.contentType = contentType
     self.onRetry = onRetry
     self.onClose = onClose
   }
@@ -2583,7 +2589,9 @@ private struct PrivateVideoViewer: View {
       .padding(WoorisaiSpacing.regular)
     }
     .overlay(alignment: .topLeading) {
-      if playbackFailureMessage == nil {
+      if playbackFailureMessage == nil,
+        MediaLibrarySaveModel.supportsPhotoLibrary(contentType: contentType)
+      {
         MediaLibrarySaveControl(fileURL: fileURL, isImage: false)
           .padding(WoorisaiSpacing.regular)
       }

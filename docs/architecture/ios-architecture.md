@@ -175,6 +175,10 @@ grant를 발급하지 않고 viewer가 이미 검증한 lease file을 그대로 
 내보내는 공유 시트는 두지 않는다 — 저장 목적지가 사용자 자신의 보관함으로 한정될 때와 달리
 어디로 나갈지 앱이 알 수 없다.
 
+Upload policy가 허용하는 WebP과 WebM은 Photos가 asset으로 저장하지 못하므로 그 두 type에서는
+저장 action 자체를 숨긴다. 항상 실패하는 버튼을 두고 재시도를 권하는 것보다 없는 편이 정확하다.
+Upload 허용 type과 저장 가능 type이 갈라지는 지점이므로 둘 중 하나가 바뀌면 함께 확인한다.
+
 ## Presentation과 navigation
 
 Relationship 첫 화면은 현재 양방향 점수와 최근 기록을 짧게 훑는 dashboard다. 점수 변경의
