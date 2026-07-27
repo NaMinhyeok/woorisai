@@ -14,6 +14,7 @@
 		08BA050338A7087392F35FA5 /* WoorisaiMediaAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE95E8D90CD2C5CE8E6D059 /* WoorisaiMediaAPI.swift */; };
 		0CD093B4BC667804EF42EA0A /* WoorisaiNotificationAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7DF92B71ECF71DB02663BEB /* WoorisaiNotificationAPITests.swift */; };
 		0E453322DB5433D050CA53DF /* WoorisaiDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E977F9625B38730AA0754F6E /* WoorisaiDesignSystem.swift */; };
+		0E453322DB5433D050CA53E0 /* WoorisaiColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E977F9625B38730AA0754F70 /* WoorisaiColor.swift */; };
 		17CB643E5A7D2A5A4391ACCD /* BiometricAuthentication.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF8D69BC54C7F2F3C3FEE477 /* BiometricAuthentication.swift */; };
 		18332D71FADB81EC4FD4EBA0 /* RelationshipScoreComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8249C3565178262DFEAA88F9 /* RelationshipScoreComposer.swift */; };
 		1B310268E530569EB0538E6A /* openapi.yaml in Resources */ = {isa = PBXBuildFile; fileRef = A8914F28C22B6C25363853A4 /* openapi.yaml */; };
@@ -228,6 +229,7 @@
 		E662786A1559E2619E0A1727 /* WoorisaiLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiLaunchTests.swift; sourceTree = "<group>"; };
 		E7DF92B71ECF71DB02663BEB /* WoorisaiNotificationAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiNotificationAPITests.swift; sourceTree = "<group>"; };
 		E977F9625B38730AA0754F6E /* WoorisaiDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiDesignSystem.swift; sourceTree = "<group>"; };
+		E977F9625B38730AA0754F70 /* WoorisaiColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WoorisaiColor.swift; sourceTree = "<group>"; };
 		EF8D69BC54C7F2F3C3FEE477 /* BiometricAuthentication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricAuthentication.swift; sourceTree = "<group>"; };
 		F2C69F2AE9BECCB22CE5D5C5 /* DiaryEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryEditors.swift; sourceTree = "<group>"; };
 		FB4220607E2A6EF277F9E469 /* MediaGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaGallery.swift; sourceTree = "<group>"; };
@@ -442,6 +444,7 @@
 				9838A7619AE4DB6AA9775BC6 /* WoorisaiApp.swift */,
 				70CC22C8885B027430F25295 /* WoorisaiAppDelegate.swift */,
 				E977F9625B38730AA0754F6E /* WoorisaiDesignSystem.swift */,
+				E977F9625B38730AA0754F70 /* WoorisaiColor.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -774,6 +777,7 @@
 				EA0AF0C3B7628520CC9B0B88 /* WoorisaiApp.swift in Sources */,
 				87BB05E526F68B2DE14BC2D3 /* WoorisaiAppDelegate.swift in Sources */,
 				0E453322DB5433D050CA53DF /* WoorisaiDesignSystem.swift in Sources */,
+				0E453322DB5433D050CA53E0 /* WoorisaiColor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

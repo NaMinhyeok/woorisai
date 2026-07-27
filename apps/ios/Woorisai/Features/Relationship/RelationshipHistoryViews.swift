@@ -60,10 +60,10 @@ struct RelationshipHistoryArchiveView: View {
               .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
             }
             .font(.subheadline.weight(.bold))
-            .foregroundStyle(WoorisaiPalette.coralDark)
+            .foregroundStyle(WoorisaiColor.Fg.brand)
             .padding(.vertical, WoorisaiSpacing.xSmall)
             .background(
-              WoorisaiPalette.coralSoft,
+              WoorisaiColor.Bg.brandWeak,
               in: RoundedRectangle(cornerRadius: WoorisaiRadius.small)
             )
             .disabled(model.pagingState == .loading)
@@ -95,7 +95,7 @@ struct RelationshipHistoryArchiveView: View {
       VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
         Label(message, systemImage: "exclamationmark.triangle.fill")
           .font(.callout.weight(.semibold))
-          .foregroundStyle(WoorisaiPalette.error)
+          .foregroundStyle(WoorisaiColor.Fg.critical)
           .frame(maxWidth: .infinity, alignment: .leading)
           .accessibilityIdentifier("relationship.history.noticeMessage")
           .accessibilityFocused($isPagingNoticeFocused)
@@ -107,7 +107,7 @@ struct RelationshipHistoryArchiveView: View {
           }
         }
         .buttonStyle(.bordered)
-        .tint(WoorisaiPalette.coralDark)
+        .tint(WoorisaiColor.Fg.brand)
         .disabled(model.pagingState == .loading)
         .accessibilityIdentifier("relationship.history.retry")
       }
@@ -125,20 +125,20 @@ struct HistoryTimelineRow: View {
   let onAuthenticationRequired: @MainActor () -> Void
 
   var body: some View {
-    HStack(alignment: .top, spacing: 10) {
+    HStack(alignment: .top, spacing: WoorisaiSpacing.small) {
       VStack(spacing: 0) {
         Circle()
-          .fill(WoorisaiPalette.coral)
+          .fill(WoorisaiColor.Bg.brandVivid)
           .frame(width: 12, height: 12)
           .overlay {
             Circle()
-              .stroke(WoorisaiPalette.cream, lineWidth: 3)
+              .stroke(WoorisaiColor.Bg.layerBasement, lineWidth: 3)
           }
-          .padding(.top, 22)
+          .padding(.top, WoorisaiSpacing.large)
 
         if !isLast {
           Rectangle()
-            .fill(WoorisaiPalette.line)
+            .fill(WoorisaiColor.Stroke.neutralWeak)
             .frame(width: 1)
             .frame(maxHeight: .infinity)
         }
@@ -152,7 +152,7 @@ struct HistoryTimelineRow: View {
         reasonDisplay: .historySummary,
         navigationValue: change.id
       )
-      .padding(.bottom, isLast ? 0 : 12)
+      .padding(.bottom, isLast ? 0 : WoorisaiSpacing.medium)
     }
   }
 }
@@ -188,47 +188,36 @@ struct ScoreChangeRow: View {
   var body: some View {
     let headerLayout =
       dynamicTypeSize.isAccessibilitySize
-      ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
-      : AnyLayout(HStackLayout(alignment: .top, spacing: 10))
+      ? AnyLayout(VStackLayout(alignment: .leading, spacing: WoorisaiSpacing.small))
+      : AnyLayout(HStackLayout(alignment: .top, spacing: WoorisaiSpacing.small))
     let footerLayout =
       dynamicTypeSize.isAccessibilitySize
-      ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-      : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+      ? AnyLayout(VStackLayout(alignment: .leading, spacing: WoorisaiSpacing.small))
+      : AnyLayout(HStackLayout(alignment: .center, spacing: WoorisaiSpacing.medium))
 
     return WarmSurface {
-      VStack(alignment: .leading, spacing: 14) {
+      VStack(alignment: .leading, spacing: WoorisaiSpacing.medium) {
         headerLayout {
-          VStack(alignment: .leading, spacing: 4) {
+          VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
             Text(
               "\(change.sourceParticipant.displayName)  →  \(change.targetParticipant.displayName)"
             )
             .font(.subheadline.weight(.heavy))
-            .foregroundStyle(WoorisaiPalette.ink)
+            .foregroundStyle(WoorisaiColor.Fg.neutral)
             Text(change.createdAt.formatted(date: .abbreviated, time: .shortened))
               .font(.caption2)
-              .foregroundStyle(WoorisaiPalette.muted)
+              .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           }
           if !dynamicTypeSize.isAccessibilitySize {
-            Spacer(minLength: 8)
+            Spacer(minLength: WoorisaiSpacing.small)
           }
-          Text(change.delta > 0 ? "+\(change.delta)점" : "\(change.delta)점")
-            .font(.subheadline.weight(.heavy))
-            .foregroundStyle(
-              change.delta > 0 ? WoorisaiPalette.coralDark : WoorisaiPalette.sage
-            )
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(
-              change.delta > 0 ? WoorisaiPalette.coralSoft : WoorisaiPalette.sageSoft,
-              in: RoundedRectangle(cornerRadius: 11)
-            )
-            .fixedSize(horizontal: true, vertical: true)
+          WoorisaiDeltaBadge(change.delta)
         }
 
         if let reason = change.reason {
           Text("“\(reason)”")
             .font(.body)
-            .foregroundStyle(WoorisaiPalette.ink.opacity(0.88))
+            .foregroundStyle(WoorisaiColor.Fg.neutral.opacity(0.88))
             .lineLimit(reasonDisplay.lineLimit)
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
@@ -246,12 +235,12 @@ struct ScoreChangeRow: View {
         }
 
         Divider()
-          .overlay(WoorisaiPalette.line)
+          .overlay(WoorisaiColor.Stroke.neutralWeak)
 
         footerLayout {
           Label("변경 후 \(change.resultingScore)점", systemImage: "heart.fill")
           if !dynamicTypeSize.isAccessibilitySize {
-            Spacer(minLength: 4)
+            Spacer(minLength: WoorisaiSpacing.xSmall)
           }
           if !change.attachments.isEmpty {
             Label("첨부 \(change.attachments.count)", systemImage: "paperclip")
@@ -259,7 +248,7 @@ struct ScoreChangeRow: View {
           Label("댓글 \(change.commentCount)", systemImage: "bubble.left")
         }
         .font(.caption)
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
 
         if let navigationValue {
           NavigationLink(value: navigationValue) {
@@ -270,16 +259,18 @@ struct ScoreChangeRow: View {
                 .accessibilityHidden(true)
             }
             .font(.subheadline.weight(.bold))
-            .foregroundStyle(WoorisaiPalette.coralDark)
-            .frame(minHeight: 44)
+            .foregroundStyle(WoorisaiColor.Fg.brand)
+            .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
             .contentShape(Rectangle())
+            // 간격이 아니라 광학 정렬이다. 위 텍스트 블록의 baseline에 맞추려고 2pt 내린 것이라
+            // `WoorisaiSpacing` 스케일에 올리지 않는다.
             .padding(.top, 2)
           }
           .accessibilityIdentifier("relationship.history.\(change.id)")
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(16)
+      .padding(WoorisaiSpacing.regular)
     }
     .accessibilityElement(children: .contain)
   }

@@ -91,7 +91,7 @@ struct DiaryView: View {
         Label("새 일기", systemImage: "square.and.pencil")
       }
       .disabled(model.mutationState == .submitting || !canOpenNewEntryComposer)
-      .tint(WoorisaiPalette.coralDark)
+      .tint(WoorisaiColor.Fg.brand)
       .accessibilityIdentifier("diary.createEntry.open")
     }
   }
@@ -186,11 +186,11 @@ struct DiaryView: View {
           VStack(spacing: WoorisaiSpacing.medium) {
             ProgressView()
               .controlSize(.large)
-              .tint(WoorisaiPalette.coral)
+              .tint(WoorisaiColor.Fg.brandVivid)
               .accessibilityHidden(true)
             Text("우리 일기를 불러오고 있어요.")
               .font(.body.weight(.medium))
-              .foregroundStyle(WoorisaiPalette.muted)
+              .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           }
           .accessibilityElement(children: .combine)
           .accessibilityLabel("일기를 불러오고 있어요.")
@@ -253,15 +253,15 @@ struct DiaryView: View {
             } label: {
               Label("이전 일기 더 보기", systemImage: "arrow.down.circle")
                 .font(.callout.weight(.semibold))
-                .foregroundStyle(WoorisaiPalette.coralDark)
+                .foregroundStyle(WoorisaiColor.Fg.brand)
                 .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.primaryHeight)
-                .background(WoorisaiPalette.surface)
+                .background(WoorisaiColor.Bg.layerDefault)
                 .clipShape(
                   RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
                 )
                 .overlay {
                   RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
-                    .stroke(WoorisaiPalette.line, lineWidth: 1)
+                    .stroke(WoorisaiColor.Stroke.neutralWeak, lineWidth: 1)
                 }
             }
             .buttonStyle(.plain)
@@ -322,11 +322,11 @@ struct DiaryView: View {
     VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
       Text("\(participant.displayName)님의 오늘은 어땠나요?")
         .font(.headline)
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
         .fixedSize(horizontal: false, vertical: true)
       Text(isNewEntryDraftDirty ? "작성 중인 이야기가 있어요." : "우리 둘만 보는 기록을 남겨요.")
         .font(.footnote)
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         .fixedSize(horizontal: false, vertical: true)
     }
   }
@@ -340,13 +340,13 @@ struct DiaryView: View {
         systemImage: isNewEntryDraftDirty ? "pencil.line" : "square.and.pencil"
       )
       .font(.subheadline.weight(.bold))
-      .foregroundStyle(WoorisaiPalette.primaryButtonLabel)
+      .foregroundStyle(WoorisaiColor.Fg.brandContrast)
       .frame(
         maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil,
         minHeight: WoorisaiControlMetric.minimumTapTarget
       )
       .padding(.horizontal, WoorisaiSpacing.regular)
-      .background(WoorisaiPalette.primaryButtonStart, in: Capsule())
+      .background(WoorisaiColor.Bg.brandSolid, in: Capsule())
     }
     .buttonStyle(.plain)
     .disabled(model.mutationState == .submitting || !canOpenNewEntryComposer)
@@ -358,21 +358,21 @@ struct DiaryView: View {
       VStack(spacing: WoorisaiSpacing.medium) {
         Image(systemName: "heart.text.square")
           .font(.system(size: 32, weight: .semibold))
-          .foregroundStyle(WoorisaiPalette.coral)
+          .foregroundStyle(WoorisaiColor.Fg.brandVivid)
           .accessibilityHidden(true)
         Text("아직 일기가 없어요")
           .font(.title3.bold())
-          .foregroundStyle(WoorisaiPalette.ink)
+          .foregroundStyle(WoorisaiColor.Fg.neutral)
         Text("지금 나누고 싶은 이야기를 첫 글로 남겨 보세요.")
           .font(.callout)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           .multilineTextAlignment(.center)
         Button("첫 이야기 남기기") {
           isCreatingEntry = true
         }
         .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
         .buttonStyle(.bordered)
-        .tint(WoorisaiPalette.coralDark)
+        .tint(WoorisaiColor.Fg.brand)
         .disabled(!canOpenNewEntryComposer)
         .accessibilityIdentifier("diary.empty.create")
       }
@@ -468,22 +468,22 @@ struct DiaryView: View {
         VStack(spacing: WoorisaiSpacing.medium) {
           Image(systemName: "book.closed")
             .font(.system(size: 32, weight: .semibold))
-            .foregroundStyle(WoorisaiPalette.coral)
+            .foregroundStyle(WoorisaiColor.Fg.brandVivid)
             .accessibilityHidden(true)
           Text("일기를 열 수 없어요")
             .font(.title3.bold())
-            .foregroundStyle(WoorisaiPalette.ink)
+            .foregroundStyle(WoorisaiColor.Fg.neutral)
           Text(message)
             .font(.callout)
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
             .multilineTextAlignment(.center)
           Button("다시 시도") {
             model.reload()
           }
           .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
           .buttonStyle(.borderedProminent)
-          .tint(WoorisaiPalette.primaryButtonStart)
-          .foregroundStyle(WoorisaiPalette.primaryButtonLabel)
+          .tint(WoorisaiColor.Bg.brandSolid)
+          .foregroundStyle(WoorisaiColor.Fg.brandContrast)
           .accessibilityIdentifier("diary.retry")
         }
         .accessibilityElement(children: .contain)

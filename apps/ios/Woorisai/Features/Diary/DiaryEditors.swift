@@ -89,16 +89,16 @@ struct DiaryCommentEditor: View {
                   .frame(minHeight: 160)
                   .focused($isFocused)
                   .scrollContentBackground(.hidden)
-                  .foregroundStyle(WoorisaiPalette.ink)
-                  .tint(WoorisaiPalette.coralDark)
+                  .foregroundStyle(WoorisaiColor.Fg.neutral)
+                  .tint(WoorisaiColor.Fg.brand)
                   .padding(WoorisaiSpacing.small)
-                  .background(WoorisaiPalette.field)
+                  .background(WoorisaiColor.Bg.layerFill)
                   .clipShape(
                     RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
                   )
                   .overlay {
                     RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
-                      .stroke(WoorisaiPalette.line, lineWidth: 1)
+                      .stroke(WoorisaiColor.Stroke.neutralWeak, lineWidth: 1)
                   }
                   .accessibilityLabel("댓글 내용")
                   .accessibilityIdentifier("diary.comment.edit.input")
@@ -160,13 +160,13 @@ struct DiaryCommentEditor: View {
     HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
       Text("댓글")
         .font(.headline)
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
       Spacer(minLength: WoorisaiSpacing.small)
       Text("\(codePointCount)/\(DiaryCommentDraft.maximumContentCharacterCount)")
         .font(.caption.monospacedDigit())
         .foregroundStyle(
           codePointCount > DiaryCommentDraft.maximumContentCharacterCount
-            ? WoorisaiPalette.error : WoorisaiPalette.muted
+            ? WoorisaiColor.Fg.critical : WoorisaiColor.Fg.neutralMuted
         )
     }
   }
@@ -190,7 +190,7 @@ struct DiaryCommentEditor: View {
     .padding(.vertical, WoorisaiSpacing.small)
     .background(.regularMaterial)
     .overlay(alignment: .top) {
-      Divider().overlay(WoorisaiPalette.line)
+      Divider().overlay(WoorisaiColor.Stroke.neutralWeak)
     }
   }
 
@@ -372,7 +372,7 @@ struct DiaryEntryComposer: View {
                 canKeepDraft: canKeepDraft
               )
             )
-            .tint(WoorisaiPalette.coralDark)
+            .tint(WoorisaiColor.Fg.brand)
         }
       }
       .confirmationDialog(
@@ -416,21 +416,21 @@ struct DiaryEntryComposer: View {
           .frame(minHeight: 190)
           .focused($isContentFocused)
           .scrollContentBackground(.hidden)
-          .foregroundStyle(WoorisaiPalette.ink)
-          .tint(WoorisaiPalette.coralDark)
+          .foregroundStyle(WoorisaiColor.Fg.neutral)
+          .tint(WoorisaiColor.Fg.brand)
           .padding(WoorisaiSpacing.small)
-          .background(WoorisaiPalette.field)
+          .background(WoorisaiColor.Bg.layerFill)
           .clipShape(RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous))
           .overlay {
             RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
-              .stroke(WoorisaiPalette.line, lineWidth: 1)
+              .stroke(WoorisaiColor.Stroke.neutralWeak, lineWidth: 1)
           }
           .accessibilityLabel("일기 내용")
           .accessibilityIdentifier("diary.entry.content")
 
         Label("이 글은 우리 둘에게만 보여요.", systemImage: "lock.fill")
           .font(.footnote)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
       }
       .padding(WoorisaiSpacing.regular)
     }
@@ -447,13 +447,13 @@ struct DiaryEntryComposer: View {
     HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
       Text("우리에게 남길 이야기")
         .font(.headline)
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
       Spacer(minLength: WoorisaiSpacing.small)
       Text("\(contentCodePointCount)/\(DiaryEntryCreateDraft.maximumContentCharacterCount)")
         .font(.caption.monospacedDigit())
         .foregroundStyle(
           contentCodePointCount > DiaryEntryCreateDraft.maximumContentCharacterCount
-            ? WoorisaiPalette.error : WoorisaiPalette.muted
+            ? WoorisaiColor.Fg.critical : WoorisaiColor.Fg.neutralMuted
         )
     }
   }
@@ -485,12 +485,12 @@ struct DiaryEntryComposer: View {
             } label: {
               Image(systemName: "trash.fill")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(WoorisaiColor.Fg.staticWhite)
                 .frame(
                   width: WoorisaiControlMetric.minimumTapTarget,
                   height: WoorisaiControlMetric.minimumTapTarget
                 )
-                .background(.black.opacity(0.58), in: Circle())
+                .background(WoorisaiColor.Bg.scrim, in: Circle())
             }
             .buttonStyle(.plain)
             .padding(WoorisaiSpacing.xSmall)
@@ -517,7 +517,7 @@ struct DiaryEntryComposer: View {
         if attachments.isEmpty {
           Label("서버의 최신 일기에는 첨부가 없어요.", systemImage: "photo.badge.minus")
             .font(.callout)
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         } else {
           DiaryAttachmentGallery(
             attachments: attachments,
@@ -533,7 +533,7 @@ struct DiaryEntryComposer: View {
         .font(.caption)
         .foregroundStyle(
           presentation.allowsResolveAsSaved || presentation.allowsManualRetry
-            ? WoorisaiPalette.muted : WoorisaiPalette.error
+            ? WoorisaiColor.Fg.neutralMuted : WoorisaiColor.Fg.critical
         )
       }
       .padding(WoorisaiSpacing.regular)
@@ -567,7 +567,7 @@ struct DiaryEntryComposer: View {
         MediaAttachmentComposer(model: mediaModel)
         Text("사진은 최대 4장, 영상은 1개까지 첨부할 수 있어요.")
           .font(.footnote)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
       }
       .padding(WoorisaiSpacing.regular)
     }
@@ -592,7 +592,7 @@ struct DiaryEntryComposer: View {
           systemImage: "pencil.line"
         )
         .font(.caption)
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
       }
       PrimaryHeartButton(
         submitTitle,
@@ -606,7 +606,7 @@ struct DiaryEntryComposer: View {
     .padding(.vertical, WoorisaiSpacing.small)
     .background(.regularMaterial)
     .overlay(alignment: .top) {
-      Divider().overlay(WoorisaiPalette.line)
+      Divider().overlay(WoorisaiColor.Stroke.neutralWeak)
     }
   }
 
@@ -661,7 +661,7 @@ struct DiaryUnknownOutcomeRecovery: View {
     VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
       Text(recoveryMessage)
         .font(.caption)
-        .foregroundStyle(WoorisaiPalette.error)
+        .foregroundStyle(WoorisaiColor.Fg.critical)
       Button {
         showsRecoveryActions.toggle()
       } label: {
@@ -673,7 +673,7 @@ struct DiaryUnknownOutcomeRecovery: View {
         .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
       }
       .buttonStyle(.borderedProminent)
-      .tint(WoorisaiPalette.coralDark)
+      .tint(WoorisaiColor.Bg.brandSolid)
       .disabled(inspectionState == .loading)
       .accessibilityIdentifier("diary.mutation.openRecovery")
 
@@ -708,7 +708,7 @@ struct DiaryUnknownOutcomeRecovery: View {
     VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
       Text("저장 결과를 어떻게 확인했나요?")
         .font(.caption.weight(.bold))
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
 
       Button("최신 내용 불러오기") {
         showsRecoveryActions = false
@@ -731,7 +731,7 @@ struct DiaryUnknownOutcomeRecovery: View {
         onConfirmManualRetry()
       }
       .buttonStyle(.borderedProminent)
-      .tint(WoorisaiPalette.coralDark)
+      .tint(WoorisaiColor.Bg.brandSolid)
       .disabled(!canResolve || !allowsManualRetry)
       .accessibilityIdentifier("diary.mutation.confirmRetry")
 
@@ -783,7 +783,7 @@ struct DiaryMutationStatusCard: View {
     HStack(alignment: .center, spacing: WoorisaiSpacing.small) {
       Label(message, systemImage: "heart.text.square.fill")
         .font(.callout.weight(.semibold))
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
         .frame(maxWidth: .infinity, alignment: .leading)
       Button(action: onDismiss) {
         Image(systemName: "xmark")
@@ -794,13 +794,13 @@ struct DiaryMutationStatusCard: View {
           )
       }
       .buttonStyle(.plain)
-      .foregroundStyle(WoorisaiPalette.coralDark)
+      .foregroundStyle(WoorisaiColor.Fg.brand)
       .accessibilityLabel("알림 닫기")
     }
     .padding(.leading, WoorisaiSpacing.regular)
     .padding(.vertical, WoorisaiSpacing.xSmall)
     .padding(.trailing, WoorisaiSpacing.xSmall)
-    .background(WoorisaiPalette.coralSoft.opacity(0.68))
+    .background(WoorisaiColor.Bg.brandWeakAlpha)
     .clipShape(RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous))
     .accessibilityElement(children: .contain)
     .accessibilityFocused($isAccessibilityFocused)
@@ -819,13 +819,13 @@ private struct DiaryReconciliationCard: View {
       VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
         Label(presentation.title, systemImage: "arrow.triangle.2.circlepath")
           .font(.headline)
-          .foregroundStyle(WoorisaiPalette.coralDark)
+          .foregroundStyle(WoorisaiColor.Fg.brand)
         if let latestServerContent = presentation.latestServerContent,
           presentation.state == .loaded
         {
           Text(latestServerContent)
             .font(.callout)
-            .foregroundStyle(WoorisaiPalette.ink)
+            .foregroundStyle(WoorisaiColor.Fg.neutral)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
         } else if presentation.state == .failed {
@@ -834,21 +834,21 @@ private struct DiaryReconciliationCard: View {
             systemImage: "exclamationmark.triangle.fill"
           )
           .font(.callout)
-          .foregroundStyle(WoorisaiPalette.error)
+          .foregroundStyle(WoorisaiColor.Fg.critical)
         } else if presentation.state == .loaded {
           Label(
             "서버에서 이 내용을 찾을 수 없어요. 초안을 복사해 둔 뒤 편집기를 닫아 주세요.",
             systemImage: "doc.on.clipboard"
           )
           .font(.callout)
-          .foregroundStyle(WoorisaiPalette.error)
+          .foregroundStyle(WoorisaiColor.Fg.critical)
         } else {
           ProgressView("최신 내용을 불러오고 있어요.")
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         }
         Text("아래 편집란에는 작성하던 초안이 그대로 남아 있어요.")
           .font(.caption)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
       }
       .padding(WoorisaiSpacing.regular)
     }

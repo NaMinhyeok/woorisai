@@ -80,11 +80,11 @@ struct DiaryDetailView: View {
             VStack(spacing: WoorisaiSpacing.medium) {
               ProgressView()
                 .controlSize(.large)
-                .tint(WoorisaiPalette.coral)
+                .tint(WoorisaiColor.Fg.brandVivid)
                 .accessibilityHidden(true)
               Text("일기를 여는 중이에요.")
                 .font(.body.weight(.medium))
-                .foregroundStyle(WoorisaiPalette.muted)
+                .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
             }
             .accessibilityElement(children: .combine)
           }
@@ -527,10 +527,10 @@ struct DiaryDetailView: View {
             } label: {
               Label("새 댓글 보기", systemImage: "arrow.down.circle.fill")
                 .font(.callout.weight(.bold))
-                .foregroundStyle(WoorisaiPalette.primaryButtonLabel)
+                .foregroundStyle(WoorisaiColor.Fg.brandContrast)
                 .padding(.horizontal, WoorisaiSpacing.medium)
                 .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
-                .background(WoorisaiPalette.coralDark, in: Capsule())
+                .background(WoorisaiColor.Bg.brandSolid, in: Capsule())
             }
             .buttonStyle(.plain)
             .padding(WoorisaiSpacing.screenGutter)
@@ -605,14 +605,14 @@ struct DiaryDetailView: View {
       VStack(spacing: WoorisaiSpacing.small) {
         Image(systemName: "bubble.left")
           .font(.title2)
-          .foregroundStyle(WoorisaiPalette.sage)
+          .foregroundStyle(WoorisaiColor.Fg.calm)
           .accessibilityHidden(true)
         Text("아직 댓글이 없어요.")
           .font(.headline)
-          .foregroundStyle(WoorisaiPalette.ink)
+          .foregroundStyle(WoorisaiColor.Fg.neutral)
         Text("아래에서 먼저 다정한 이야기를 건네 보세요.")
           .font(.callout)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           .multilineTextAlignment(.center)
       }
       .frame(maxWidth: .infinity)
@@ -628,7 +628,7 @@ struct DiaryDetailView: View {
 
         Text(entry.content)
           .font(.body)
-          .foregroundStyle(WoorisaiPalette.ink)
+          .foregroundStyle(WoorisaiColor.Fg.neutral)
           .lineSpacing(5)
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -643,7 +643,7 @@ struct DiaryDetailView: View {
 
         if entry.isMine {
           Divider()
-            .overlay(WoorisaiPalette.line)
+            .overlay(WoorisaiColor.Stroke.neutralWeak)
           if dynamicTypeSize.isAccessibilitySize {
             VStack(spacing: WoorisaiSpacing.small) {
               diaryActionButtons(entry)
@@ -664,7 +664,7 @@ struct DiaryDetailView: View {
     .overlay {
       RoundedRectangle(cornerRadius: WoorisaiRadius.large, style: .continuous)
         .stroke(
-          entry.isMine ? WoorisaiPalette.coral.opacity(0.24) : WoorisaiPalette.line,
+          WoorisaiColor.stroke(.init(isMine: entry.isMine)),
           lineWidth: 1
         )
     }
@@ -680,7 +680,7 @@ struct DiaryDetailView: View {
         if entry.updatedAt != nil {
           Text("수정됨")
             .font(.caption2)
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         }
       }
     } else {
@@ -691,7 +691,7 @@ struct DiaryDetailView: View {
         if entry.updatedAt != nil {
           Text("수정됨")
             .font(.caption2)
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         }
       }
     }
@@ -702,20 +702,20 @@ struct DiaryDetailView: View {
       HStack(spacing: WoorisaiSpacing.small) {
         Text(entry.author.displayName)
           .font(.headline)
-          .foregroundStyle(WoorisaiPalette.ink)
+          .foregroundStyle(WoorisaiColor.Fg.neutral)
           .fixedSize(horizontal: false, vertical: true)
         if entry.isMine {
           Text("내 기록")
             .font(.caption2.bold())
-            .foregroundStyle(WoorisaiPalette.coralDark)
+            .foregroundStyle(WoorisaiColor.Fg.brand)
             .padding(.horizontal, WoorisaiSpacing.small)
             .padding(.vertical, WoorisaiSpacing.xSmall)
-            .background(WoorisaiPalette.coralSoft, in: Capsule())
+            .background(WoorisaiColor.Bg.brandWeak, in: Capsule())
         }
       }
       Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
         .font(.caption)
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
     }
   }
 
@@ -728,7 +728,7 @@ struct DiaryDetailView: View {
         .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
     }
     .buttonStyle(.bordered)
-    .tint(WoorisaiPalette.coralDark)
+    .tint(WoorisaiColor.Fg.brand)
     .disabled(
       model.mutationState == .submitting || model.mutationOutcomeRequiresConfirmation
     )
@@ -772,13 +772,13 @@ struct DiaryDetailView: View {
       HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
         Text("댓글 달기")
           .font(.subheadline.weight(.bold))
-          .foregroundStyle(WoorisaiPalette.ink)
+          .foregroundStyle(WoorisaiColor.Fg.neutral)
         Spacer(minLength: WoorisaiSpacing.small)
         Text("\(commentCodePointCount)/\(DiaryCommentDraft.maximumContentCharacterCount)")
           .font(.caption.monospacedDigit())
           .foregroundStyle(
             commentCodePointCount > DiaryCommentDraft.maximumContentCharacterCount
-              ? WoorisaiPalette.error : WoorisaiPalette.muted
+              ? WoorisaiColor.Fg.critical : WoorisaiColor.Fg.neutralMuted
           )
       }
 
@@ -801,7 +801,7 @@ struct DiaryDetailView: View {
     .background(.regularMaterial)
     .overlay(alignment: .top) {
       Divider()
-        .overlay(WoorisaiPalette.line)
+        .overlay(WoorisaiColor.Stroke.neutralWeak)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("diary.comment.composer")
@@ -811,15 +811,15 @@ struct DiaryDetailView: View {
     TextField("이 일기에 답장을 남겨 보세요", text: commentContentBinding, axis: .vertical)
       .lineLimit(1...4)
       .focused($focusedField, equals: .comment)
-      .foregroundStyle(WoorisaiPalette.ink)
-      .tint(WoorisaiPalette.coralDark)
+      .foregroundStyle(WoorisaiColor.Fg.neutral)
+      .tint(WoorisaiColor.Fg.brand)
       .padding(.horizontal, WoorisaiSpacing.medium)
       .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
-      .background(WoorisaiPalette.field)
+      .background(WoorisaiColor.Bg.layerFill)
       .clipShape(RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous))
       .overlay {
         RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
-          .stroke(WoorisaiPalette.line, lineWidth: 1)
+          .stroke(WoorisaiColor.Stroke.neutralWeak, lineWidth: 1)
       }
       .accessibilityIdentifier("diary.comment.input")
       .disabled(isInlineDraftEditingLocked)
@@ -833,11 +833,11 @@ struct DiaryDetailView: View {
       Group {
         if model.mutationState == .submitting {
           ProgressView()
-            .tint(.white)
+            .tint(WoorisaiColor.Fg.staticWhite)
         } else {
           Image(systemName: "arrow.up")
             .font(.body.weight(.bold))
-            .foregroundStyle(.white)
+            .foregroundStyle(WoorisaiColor.Fg.staticWhite)
         }
       }
       .frame(
@@ -846,7 +846,7 @@ struct DiaryDetailView: View {
       )
       .background(
         commentCanSubmit
-          ? WoorisaiPalette.primaryButtonStart : WoorisaiPalette.primaryButtonDisabled,
+          ? WoorisaiColor.Bg.brandSolid : WoorisaiColor.Bg.disabled,
         in: Circle()
       )
     }
@@ -1344,22 +1344,22 @@ struct DiaryDetailView: View {
         VStack(spacing: WoorisaiSpacing.medium) {
           Image(systemName: "book.closed")
             .font(.system(size: 32, weight: .semibold))
-            .foregroundStyle(WoorisaiPalette.coral)
+            .foregroundStyle(WoorisaiColor.Fg.brandVivid)
             .accessibilityHidden(true)
           Text("일기를 열 수 없어요")
             .font(.title3.bold())
-            .foregroundStyle(WoorisaiPalette.ink)
+            .foregroundStyle(WoorisaiColor.Fg.neutral)
           Text(message)
             .font(.callout)
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
             .multilineTextAlignment(.center)
           Button("다시 시도") {
             model.loadDetail(entryID: entryID)
           }
           .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
           .buttonStyle(.borderedProminent)
-          .tint(WoorisaiPalette.primaryButtonStart)
-          .foregroundStyle(WoorisaiPalette.primaryButtonLabel)
+          .tint(WoorisaiColor.Bg.brandSolid)
+          .foregroundStyle(WoorisaiColor.Fg.brandContrast)
           .accessibilityIdentifier("diary.detail.retry")
         }
       }
@@ -1372,14 +1372,14 @@ struct DiaryDetailView: View {
         VStack(spacing: WoorisaiSpacing.medium) {
           Image(systemName: "book.closed.fill")
             .font(.system(size: 32, weight: .semibold))
-            .foregroundStyle(WoorisaiPalette.coral)
+            .foregroundStyle(WoorisaiColor.Fg.brandVivid)
             .accessibilityHidden(true)
           Text("이 일기는 더 이상 없어요")
             .font(.title3.bold())
-            .foregroundStyle(WoorisaiPalette.ink)
+            .foregroundStyle(WoorisaiColor.Fg.neutral)
           Text("상대가 삭제했거나 목록이 바뀌었을 수 있어요.")
             .font(.callout)
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
             .multilineTextAlignment(.center)
           Button("최신 목록으로 돌아가기") {
             model.reload()
@@ -1387,8 +1387,8 @@ struct DiaryDetailView: View {
           }
           .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
           .buttonStyle(.borderedProminent)
-          .tint(WoorisaiPalette.primaryButtonStart)
-          .foregroundStyle(WoorisaiPalette.primaryButtonLabel)
+          .tint(WoorisaiColor.Bg.brandSolid)
+          .foregroundStyle(WoorisaiColor.Fg.brandContrast)
           .accessibilityIdentifier("diary.detail.backToList")
         }
       }
@@ -1405,19 +1405,17 @@ private struct DiaryCommentBubble: View {
 
   var body: some View {
     HStack(alignment: .bottom, spacing: WoorisaiSpacing.small) {
-      if comment.isMine && !dynamicTypeSize.isAccessibilitySize {
-        Spacer(minLength: 44)
-      } else if !comment.isMine && !dynamicTypeSize.isAccessibilitySize {
+      BubbleOppositeGutter(comment.isMine)
+      if !comment.isMine, !dynamicTypeSize.isAccessibilitySize {
         ParticipantAvatar(name: comment.author.displayName, size: 30)
       }
 
       commentBody
 
-      if comment.isMine && !dynamicTypeSize.isAccessibilitySize {
+      if comment.isMine, !dynamicTypeSize.isAccessibilitySize {
         ParticipantAvatar(name: comment.author.displayName, size: 30)
-      } else if !comment.isMine && !dynamicTypeSize.isAccessibilitySize {
-        Spacer(minLength: 44)
       }
+      BubbleOppositeGutter(!comment.isMine)
     }
     .frame(maxWidth: .infinity)
     .accessibilityElement(children: .contain)
@@ -1429,18 +1427,18 @@ private struct DiaryCommentBubble: View {
 
       Text(comment.content)
         .font(.body)
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
         .multilineTextAlignment(.leading)
         .lineSpacing(3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, WoorisaiSpacing.regular)
         .padding(.vertical, WoorisaiSpacing.medium)
-        .background(comment.isMine ? WoorisaiPalette.coralSoft : WoorisaiPalette.surface)
+        .background(comment.isMine ? WoorisaiColor.Bg.brandWeak : WoorisaiColor.Bg.layerDefault)
         .clipShape(RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous))
         .overlay {
           RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous)
             .stroke(
-              comment.isMine ? WoorisaiPalette.coral.opacity(0.2) : WoorisaiPalette.line,
+              WoorisaiColor.stroke(.init(isMine: comment.isMine)),
               lineWidth: 1
             )
         }
@@ -1471,14 +1469,14 @@ private struct DiaryCommentBubble: View {
   private var commentAuthor: some View {
     Text(comment.isMine ? "나" : comment.author.displayName)
       .font(.caption.weight(.bold))
-      .foregroundStyle(WoorisaiPalette.ink)
+      .foregroundStyle(WoorisaiColor.Fg.neutral)
       .fixedSize(horizontal: false, vertical: true)
   }
 
   private var commentTimestamp: some View {
     Text(comment.createdAt.formatted(date: .omitted, time: .shortened))
       .font(.caption2)
-      .foregroundStyle(WoorisaiPalette.muted)
+      .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
       .fixedSize(horizontal: true, vertical: true)
   }
 
@@ -1491,7 +1489,7 @@ private struct DiaryCommentBubble: View {
       } label: {
         Image(systemName: "ellipsis")
           .font(.caption.weight(.bold))
-          .foregroundStyle(WoorisaiPalette.coralDark)
+          .foregroundStyle(WoorisaiColor.Fg.brand)
           .frame(
             width: WoorisaiControlMetric.minimumTapTarget,
             height: WoorisaiControlMetric.minimumTapTarget

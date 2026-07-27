@@ -111,11 +111,11 @@ struct MediaTileSurface<Content: View>: View {
   var body: some View {
     content
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(WoorisaiPalette.creamDeep)
+      .background(WoorisaiColor.Bg.layerSunken)
       .clipShape(RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous))
       .overlay {
         RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
-          .stroke(WoorisaiPalette.line, lineWidth: 1)
+          .stroke(WoorisaiColor.Stroke.neutralWeak, lineWidth: 1)
       }
       .contentShape(RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous))
   }
