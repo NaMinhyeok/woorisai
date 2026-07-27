@@ -210,10 +210,10 @@ struct RelationshipView: View {
       relationshipStateCard(identifier: "relationship.loading") {
         ProgressView()
           .controlSize(.large)
-          .tint(WoorisaiPalette.coral)
+          .tint(WoorisaiColor.Fg.brandVivid)
           .accessibilityHidden(true)
         Text("점수와 기록을 불러오고 있어요.")
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
       }
     case .unavailable:
       relationshipError(
@@ -283,20 +283,20 @@ struct RelationshipView: View {
       VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
         Text("\(participant.displayName)님의 마음 공간")
           .font(.caption.weight(.bold))
-          .foregroundStyle(WoorisaiPalette.coralDark)
+          .foregroundStyle(WoorisaiColor.Fg.brand)
         Text("오늘의 우리 사이")
           .font(.system(.title2, design: .rounded, weight: .bold))
-          .foregroundStyle(WoorisaiPalette.ink)
+          .foregroundStyle(WoorisaiColor.Fg.neutral)
         Text("서로 다른 두 마음을 나란히 살펴봐요.")
           .font(.subheadline)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
       }
       if !dynamicTypeSize.isAccessibilitySize {
         Spacer(minLength: WoorisaiSpacing.small)
       }
       Image(systemName: "heart.circle.fill")
         .font(.system(.largeTitle, design: .rounded, weight: .semibold))
-        .foregroundStyle(WoorisaiPalette.coral, WoorisaiPalette.coralSoft)
+        .foregroundStyle(WoorisaiColor.Fg.brandVivid, WoorisaiColor.Fg.brandWeak)
         .accessibilityHidden(true)
     }
     .padding(.vertical, WoorisaiSpacing.small)
@@ -371,7 +371,7 @@ struct RelationshipView: View {
         HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
           Text(eyebrow)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           Spacer(minLength: WoorisaiSpacing.xSmall)
           if isMine {
             scoreOwnershipBadge
@@ -381,20 +381,20 @@ struct RelationshipView: View {
         HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.xSmall) {
           Text("\(score)")
             .font(.system(.title, design: .rounded, weight: .bold))
-            .foregroundStyle(WoorisaiPalette.ink)
+            .foregroundStyle(WoorisaiColor.Fg.neutral)
           Text("점")
             .font(.subheadline.weight(.bold))
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         }
 
         Text("\(sourceName) → \(targetName)")
           .font(.caption.weight(.semibold))
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           .lineLimit(2)
           .fixedSize(horizontal: false, vertical: true)
 
         ProgressView(value: Double(score), total: 100)
-          .tint(isMine ? WoorisaiPalette.coral : WoorisaiPalette.sage)
+          .tint(WoorisaiColor.fg(.init(isMine: isMine)))
           .accessibilityHidden(true)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -409,10 +409,10 @@ struct RelationshipView: View {
   private var scoreOwnershipBadge: some View {
     Text("내 점수")
       .font(.caption2.weight(.heavy))
-      .foregroundStyle(WoorisaiPalette.coralDark)
-      .padding(.horizontal, 8)
-      .padding(.vertical, 4)
-      .background(WoorisaiPalette.coralSoft, in: Capsule())
+      .foregroundStyle(WoorisaiColor.Fg.brand)
+      .padding(.horizontal, WoorisaiSpacing.small)
+      .padding(.vertical, WoorisaiSpacing.xSmall)
+      .background(WoorisaiColor.Bg.brandWeak, in: Capsule())
       .fixedSize(horizontal: true, vertical: true)
   }
 
@@ -444,17 +444,17 @@ struct RelationshipView: View {
 
       if model.changes.isEmpty {
         BrandedStateCard {
-          VStack(spacing: 10) {
+          VStack(spacing: WoorisaiSpacing.small) {
             Image(systemName: "heart")
               .font(.title2)
-              .foregroundStyle(WoorisaiPalette.coral)
+              .foregroundStyle(WoorisaiColor.Fg.brandVivid)
               .accessibilityHidden(true)
             Text("아직 점수 기록이 없어요.")
               .font(.headline)
-              .foregroundStyle(WoorisaiPalette.ink)
+              .foregroundStyle(WoorisaiColor.Fg.neutral)
             Text("첫 마음을 남기면 여기에 차곡차곡 쌓여요.")
               .font(.subheadline)
-              .foregroundStyle(WoorisaiPalette.muted)
+              .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
               .multilineTextAlignment(.center)
           }
         }
@@ -487,10 +487,10 @@ struct RelationshipView: View {
           .contentShape(Rectangle())
         }
         .font(.subheadline.weight(.bold))
-        .foregroundStyle(WoorisaiPalette.coralDark)
+        .foregroundStyle(WoorisaiColor.Fg.brand)
         .padding(.horizontal, WoorisaiSpacing.medium)
         .padding(.vertical, WoorisaiSpacing.xSmall)
-        .background(WoorisaiPalette.coralSoft, in: RoundedRectangle(cornerRadius: 14))
+        .background(WoorisaiColor.Bg.brandWeak, in: RoundedRectangle(cornerRadius: WoorisaiRadius.small))
         .accessibilityHint("모든 점수 기록을 별도 화면에서 시간순으로 살펴봅니다.")
         .accessibilityIdentifier("relationship.history.openArchive")
       }
@@ -498,12 +498,12 @@ struct RelationshipView: View {
   }
 
   private func noticeCard(_ message: String, identifier: String) -> some View {
-    WarmSurface(cornerRadius: 16) {
+    WarmSurface(cornerRadius: WoorisaiRadius.medium) {
       Label(message, systemImage: "heart.text.square")
         .font(.callout.weight(.semibold))
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
+        .padding(WoorisaiSpacing.medium)
     }
     .accessibilityIdentifier(identifier)
   }
@@ -514,11 +514,11 @@ struct RelationshipView: View {
   ) -> some View {
     WarmBackground {
       BrandedStateCard {
-        VStack(spacing: 16) {
+        VStack(spacing: WoorisaiSpacing.regular) {
           content()
         }
       }
-      .padding(20)
+      .padding(WoorisaiSpacing.regular)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(identifier)
@@ -528,21 +528,21 @@ struct RelationshipView: View {
     relationshipStateCard(identifier: identifier) {
       Image(systemName: "wifi.exclamationmark")
         .font(.system(size: 34))
-        .foregroundStyle(WoorisaiPalette.coral)
+        .foregroundStyle(WoorisaiColor.Fg.brandVivid)
         .accessibilityHidden(true)
       Text("불러오지 못했어요")
         .font(.title3.weight(.bold))
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
       Text(message)
         .font(.subheadline)
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         .multilineTextAlignment(.center)
       Button("다시 시도") {
         model.reload()
       }
       .buttonStyle(.borderedProminent)
-      .tint(WoorisaiPalette.primaryButtonStart)
-      .foregroundStyle(WoorisaiPalette.primaryButtonLabel)
+      .tint(WoorisaiColor.Bg.brandSolid)
+      .foregroundStyle(WoorisaiColor.Fg.brandContrast)
       .accessibilityIdentifier("relationship.retry")
     }
   }

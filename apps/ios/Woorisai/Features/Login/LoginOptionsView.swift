@@ -137,17 +137,17 @@ struct LoginOptionsView: View {
     VStack(spacing: dynamicTypeSize.isAccessibilitySize ? 8 : 10) {
       if !dynamicTypeSize.isAccessibilitySize {
         ZStack {
-          RoundedRectangle(cornerRadius: 24, style: .continuous)
-            .fill(WoorisaiPalette.surface)
+          RoundedRectangle(cornerRadius: WoorisaiRadius.large, style: .continuous)
+            .fill(WoorisaiColor.Bg.layerDefault)
             .overlay {
-              RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(WoorisaiPalette.coral.opacity(0.16), lineWidth: 1)
+              RoundedRectangle(cornerRadius: WoorisaiRadius.large, style: .continuous)
+                .stroke(WoorisaiColor.Stroke.brandSubtle, lineWidth: 1)
             }
-            .shadow(color: WoorisaiPalette.shadow.opacity(0.12), radius: 12, y: 6)
+            .woorisaiShadow(.s2)
 
           Image(systemName: "heart.fill")
             .font(.system(size: 32, weight: .semibold))
-            .foregroundStyle(WoorisaiPalette.coral)
+            .foregroundStyle(WoorisaiColor.Fg.brandVivid)
             .rotationEffect(.degrees(4))
         }
         .frame(width: 72, height: 72)
@@ -159,7 +159,7 @@ struct LoginOptionsView: View {
 
       Text("우리 둘만의 작은 마음 기록")
         .font(dynamicTypeSize.isAccessibilitySize ? .title2.bold() : .largeTitle.bold())
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
         .multilineTextAlignment(.center)
         .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? 440 : 300)
         .fixedSize(horizontal: false, vertical: true)
@@ -168,7 +168,7 @@ struct LoginOptionsView: View {
       if !dynamicTypeSize.isAccessibilitySize {
         Text("서로를 생각하는 마음을 차곡차곡 쌓아 보세요.")
           .font(.body)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           .multilineTextAlignment(.center)
           .frame(maxWidth: 320)
       }
@@ -187,11 +187,11 @@ struct LoginOptionsView: View {
     }
     return Label(message, systemImage: "info.circle")
     .font(.callout)
-    .foregroundStyle(WoorisaiPalette.ink)
+    .foregroundStyle(WoorisaiColor.Fg.neutral)
     .padding(WoorisaiSpacing.regular)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
-      WoorisaiPalette.coralSoft.opacity(0.5),
+      WoorisaiColor.Bg.brandWeakAlpha,
       in: RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous)
     )
     .accessibilityElement(children: .combine)
@@ -228,14 +228,14 @@ struct LoginOptionsView: View {
 
   private func progressState(message: String, identifier: String) -> some View {
     BrandedStateCard {
-      VStack(spacing: 16) {
+      VStack(spacing: WoorisaiSpacing.regular) {
         ProgressView()
           .controlSize(.large)
-          .tint(WoorisaiPalette.coralDark)
+          .tint(WoorisaiColor.Fg.brand)
           .accessibilityHidden(true)
         Text(message)
           .multilineTextAlignment(.center)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
       }
     }
     .accessibilityElement(children: .combine)
@@ -244,15 +244,15 @@ struct LoginOptionsView: View {
   }
 
   private func loadedState(options: [LoginOption]) -> some View {
-    VStack(spacing: 14) {
-      WarmSurface(cornerRadius: 22) {
-        VStack(alignment: .leading, spacing: 18) {
+    VStack(spacing: WoorisaiSpacing.medium) {
+      WarmSurface(cornerRadius: WoorisaiRadius.large) {
+        VStack(alignment: .leading, spacing: WoorisaiSpacing.regular) {
           Text("누구인가요?")
             .font(.title2.bold())
-            .foregroundStyle(WoorisaiPalette.ink)
+            .foregroundStyle(WoorisaiColor.Fg.neutral)
             .accessibilityAddTraits(.isHeader)
 
-          LazyVGrid(columns: participantColumns, spacing: 12) {
+          LazyVGrid(columns: participantColumns, spacing: WoorisaiSpacing.medium) {
             ForEach(options, id: \.slot) { option in
               participantButton(option)
             }
@@ -264,12 +264,12 @@ struct LoginOptionsView: View {
 
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(22)
+        .padding(WoorisaiSpacing.large)
       }
 
       Label("두 사람만 들어올 수 있는 비밀 공간이에요.", systemImage: "sparkles")
         .font(.footnote.weight(.medium))
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         .multilineTextAlignment(.center)
     }
     .frame(maxWidth: .infinity)
@@ -279,11 +279,11 @@ struct LoginOptionsView: View {
 
   private var participantColumns: [GridItem] {
     if dynamicTypeSize.isAccessibilitySize {
-      return [GridItem(.flexible(), spacing: 12)]
+      return [GridItem(.flexible(), spacing: WoorisaiSpacing.medium)]
     }
     return [
-      GridItem(.flexible(), spacing: 12),
-      GridItem(.flexible(), spacing: 12),
+      GridItem(.flexible(), spacing: WoorisaiSpacing.medium),
+      GridItem(.flexible(), spacing: WoorisaiSpacing.medium),
     ]
   }
 
@@ -296,34 +296,34 @@ struct LoginOptionsView: View {
         await authenticationModel.select(option)
       }
     } label: {
-      VStack(spacing: 9) {
+      VStack(spacing: WoorisaiSpacing.small) {
         ParticipantAvatar(name: option.displayName, size: 48)
 
         Text(option.displayName)
           .font(.headline)
-          .foregroundStyle(isSelected ? WoorisaiPalette.ink : WoorisaiPalette.muted)
+          .foregroundStyle(isSelected ? WoorisaiColor.Fg.neutral : WoorisaiColor.Fg.neutralMuted)
           .multilineTextAlignment(.center)
           .fixedSize(horizontal: false, vertical: true)
       }
       .frame(maxWidth: .infinity, minHeight: 92)
-      .padding(12)
+      .padding(WoorisaiSpacing.medium)
       .background(
-        isSelected ? WoorisaiPalette.selectedSurface : WoorisaiPalette.field,
-        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        isSelected ? WoorisaiColor.Bg.selected : WoorisaiColor.Bg.layerFill,
+        in: RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous)
       )
       .overlay {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
+        RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous)
           .stroke(
-            isSelected ? WoorisaiPalette.coral : WoorisaiPalette.line,
+            isSelected ? WoorisaiColor.Stroke.brandSolid : WoorisaiColor.Stroke.neutralWeak,
             lineWidth: isSelected ? 2 : 1
           )
       }
       .shadow(
-        color: isSelected ? WoorisaiPalette.coral.opacity(0.09) : .clear,
+        color: isSelected ? WoorisaiColor.Component.SelectableCard.glow : .clear,
         radius: 8,
         y: 3
       )
-      .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+      .contentShape(RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous))
     }
     .buttonStyle(.plain)
     .accessibilityLabel(option.displayName)
@@ -332,28 +332,28 @@ struct LoginOptionsView: View {
   }
 
   private func pinEntry(_ option: LoginOption) -> some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: WoorisaiSpacing.medium) {
       Text("\(option.displayName)님의 PIN")
         .font(.headline)
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
         .accessibilityAddTraits(.isHeader)
 
       if case .credentialRejected = authenticationModel.state {
         Text("PIN이 맞지 않아요. 네 자리 PIN을 다시 입력해 주세요.")
           .font(.callout)
-          .foregroundStyle(WoorisaiPalette.coralDark)
+          .foregroundStyle(WoorisaiColor.Fg.brand)
           .accessibilityFocused($isAuthenticationFailureFocused)
           .accessibilityIdentifier("authentication.rejected")
       } else if case .unavailable = authenticationModel.state {
         Text("인증 서비스를 잠시 사용할 수 없어요. 잠시 후 다시 시도해 주세요.")
           .font(.callout)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           .accessibilityFocused($isAuthenticationFailureFocused)
           .accessibilityIdentifier("authentication.unavailable")
       } else if case .failed = authenticationModel.state {
         Text("인증 결과를 확인하지 못했어요. 자동으로 다시 보내지 않았습니다.")
           .font(.callout)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           .accessibilityFocused($isAuthenticationFailureFocused)
           .accessibilityIdentifier("authentication.failed")
       }
@@ -369,17 +369,17 @@ struct LoginOptionsView: View {
         .keyboardType(.numberPad)
         .textContentType(.password)
         .font(.title3.weight(.bold))
-        .foregroundStyle(WoorisaiPalette.ink)
-        .tint(WoorisaiPalette.coralDark)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
+        .tint(WoorisaiColor.Fg.brand)
         .padding(.horizontal, WoorisaiSpacing.regular)
-        .frame(minHeight: 54)
+        .frame(minHeight: WoorisaiControlMetric.primaryHeight)
         .background(
-          WoorisaiPalette.field,
+          WoorisaiColor.Bg.layerFill,
           in: RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
         )
         .overlay {
           RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
-            .stroke(WoorisaiPalette.line, lineWidth: 1)
+            .stroke(WoorisaiColor.Stroke.neutralWeak, lineWidth: 1)
         }
         .privacySensitive()
         .disabled(authenticationModel.isValidating)
@@ -391,32 +391,32 @@ struct LoginOptionsView: View {
 
       Text("숫자 네 자리를 입력해 주세요.")
         .font(.footnote)
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
 
       if authenticationModel.canOfferRemembering {
         Toggle("다음부터 Face ID로 빠르게 열기", isOn: $authenticationModel.remembersSession)
-          .tint(WoorisaiPalette.coral)
+          .tint(WoorisaiColor.Fg.brandVivid)
           .font(.footnote.weight(.medium))
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           .accessibilityIdentifier("authentication.rememberSession")
       }
 
       if authenticationModel.isValidating {
-        HStack(spacing: 10) {
+        HStack(spacing: WoorisaiSpacing.small) {
           ProgressView()
-            .tint(WoorisaiPalette.coralDark)
+            .tint(WoorisaiColor.Fg.brand)
           Text("PIN을 확인하고 있어요.")
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("authentication.validating")
       }
 
     }
-    .padding(16)
+    .padding(WoorisaiSpacing.regular)
     .background(
-      WoorisaiPalette.coralSoft.opacity(0.34),
-      in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+      WoorisaiColor.Bg.brandSubtle,
+      in: RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous)
     )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("authentication.pinEntry")
@@ -457,16 +457,19 @@ struct LoginOptionsView: View {
       }
     }
     .font(.headline.weight(.semibold))
-    .foregroundStyle(WoorisaiPalette.coralDark)
-    .padding(.horizontal, 16)
-    .frame(maxWidth: expandsHorizontally ? .infinity : nil, minHeight: 48)
+    .foregroundStyle(WoorisaiColor.Fg.brand)
+    .padding(.horizontal, WoorisaiSpacing.regular)
+    .frame(
+      maxWidth: expandsHorizontally ? .infinity : nil,
+      minHeight: WoorisaiControlMetric.secondaryHeight
+    )
     .background(
-      WoorisaiPalette.field,
-      in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+      WoorisaiColor.Bg.layerFill,
+      in: RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .stroke(WoorisaiPalette.line, lineWidth: 1)
+      RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
+        .stroke(WoorisaiColor.Stroke.neutralWeak, lineWidth: 1)
     }
     .buttonStyle(.plain)
     .accessibilityIdentifier("authentication.cancel")
@@ -501,14 +504,14 @@ struct LoginOptionsView: View {
 
   private func retryState(message: String, identifier: String) -> some View {
     BrandedStateCard {
-      VStack(spacing: 20) {
+      VStack(spacing: WoorisaiSpacing.regular) {
         Image(systemName: "exclamationmark.icloud")
           .font(.system(size: 34))
-          .foregroundStyle(WoorisaiPalette.coralDark)
+          .foregroundStyle(WoorisaiColor.Fg.brand)
           .accessibilityHidden(true)
 
         Text(message)
-          .foregroundStyle(WoorisaiPalette.ink)
+          .foregroundStyle(WoorisaiColor.Fg.neutral)
           .multilineTextAlignment(.center)
           .accessibilityFocused($isLoginFailureFocused)
 

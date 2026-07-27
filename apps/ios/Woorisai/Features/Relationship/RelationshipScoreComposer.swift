@@ -37,10 +37,10 @@ struct ScoreComposerSheet: View {
             VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
               Text("사진 (선택)")
                 .font(.headline)
-                .foregroundStyle(WoorisaiPalette.ink)
+                .foregroundStyle(WoorisaiColor.Fg.neutral)
               Text("점수 기록에는 사진 한 장을 함께 남길 수 있어요.")
                 .font(.footnote)
-                .foregroundStyle(WoorisaiPalette.muted)
+                .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
               MediaAttachmentComposer(model: mediaModel)
             }
           }
@@ -137,10 +137,10 @@ struct ScoreComposerSheet: View {
         VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
           Text("어떤 마음을 남길까요?")
             .font(.title3.weight(.bold))
-            .foregroundStyle(WoorisaiPalette.ink)
+            .foregroundStyle(WoorisaiColor.Fg.neutral)
           Text("0점부터 100점까지 빠르게 고르고, 양옆 버튼으로 한 점씩 다듬어 보세요.")
             .font(.footnote)
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         }
 
         HStack(spacing: WoorisaiSpacing.medium) {
@@ -155,7 +155,7 @@ struct ScoreComposerSheet: View {
 
           Text("\(targetScore)점")
             .font(.system(.largeTitle, design: .rounded, weight: .bold))
-            .foregroundStyle(WoorisaiPalette.coralDark)
+            .foregroundStyle(WoorisaiColor.Fg.brand)
             .frame(maxWidth: .infinity)
             .contentTransition(.numericText())
             .accessibilityHidden(true)
@@ -171,7 +171,7 @@ struct ScoreComposerSheet: View {
         }
 
         Slider(value: scoreSliderValue, in: 0...100, step: 1)
-          .tint(WoorisaiPalette.coral)
+          .tint(WoorisaiColor.Fg.brandVivid)
           .accessibilityLabel("목표 점수")
           .accessibilityValue("\(targetScore)점")
           .accessibilityIdentifier("relationship.targetScore")
@@ -190,12 +190,12 @@ struct ScoreComposerSheet: View {
     Button(action: action) {
       Image(systemName: symbol)
         .font(.headline.weight(.bold))
-        .foregroundStyle(isEnabled ? WoorisaiPalette.coralDark : WoorisaiPalette.muted)
+        .foregroundStyle(isEnabled ? WoorisaiColor.Fg.brand : WoorisaiColor.Fg.neutralMuted)
         .frame(
           width: WoorisaiControlMetric.minimumTapTarget,
           height: WoorisaiControlMetric.minimumTapTarget
         )
-        .background(WoorisaiPalette.coralSoft, in: Circle())
+        .background(WoorisaiColor.Bg.brandWeak, in: Circle())
     }
     .buttonStyle(.plain)
     .disabled(!isEnabled)
@@ -216,29 +216,24 @@ struct ScoreComposerSheet: View {
         previewScore(label: "현재", score: currentScore)
         Image(systemName: "arrow.right")
           .font(.subheadline.weight(.bold))
-          .foregroundStyle(WoorisaiPalette.coral)
+          .foregroundStyle(WoorisaiColor.Fg.brandVivid)
           .accessibilityHidden(true)
         previewScore(label: "새 마음", score: targetScore)
       }
       if !dynamicTypeSize.isAccessibilitySize {
         Spacer(minLength: 0)
       }
-      Text(deltaLabel(delta))
-        .font(.caption.weight(.heavy))
-        .foregroundStyle(delta < 0 ? WoorisaiPalette.sage : WoorisaiPalette.coralDark)
-        .padding(.horizontal, WoorisaiSpacing.small)
-        .padding(.vertical, WoorisaiSpacing.xSmall)
-        .background(delta < 0 ? WoorisaiPalette.sageSoft : WoorisaiPalette.coralSoft, in: Capsule())
+      WoorisaiDeltaBadge(delta, prominence: .secondary)
     }
     .padding(WoorisaiSpacing.regular)
     .background(
-      WoorisaiPalette.selectedSurface,
+      WoorisaiColor.Bg.selected,
       in: RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous)
     )
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("점수 미리보기")
     .accessibilityValue(
-      "현재 \(currentScore)점, 목표 \(targetScore)점, \(deltaAccessibilityLabel(delta))"
+      "현재 \(currentScore)점, 목표 \(targetScore)점, \(WoorisaiDeltaBadge.accessibilityLabel(for: delta))"
     )
     .accessibilityIdentifier("relationship.scorePreview")
   }
@@ -247,10 +242,10 @@ struct ScoreComposerSheet: View {
     VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
       Text(label)
         .font(.caption.weight(.semibold))
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
       Text("\(score)점")
         .font(.headline.weight(.bold))
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
     }
   }
 
@@ -259,28 +254,28 @@ struct ScoreComposerSheet: View {
       HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
         Text("이유 (선택)")
           .font(.headline)
-          .foregroundStyle(WoorisaiPalette.ink)
+          .foregroundStyle(WoorisaiColor.Fg.neutral)
         Spacer(minLength: WoorisaiSpacing.small)
         Text("\(reasonCodePointCount)/\(RelationshipScoreChangeDraft.maximumReasonCharacterCount)")
           .font(.caption)
-          .foregroundStyle(reasonIsWithinLimit ? WoorisaiPalette.muted : WoorisaiPalette.error)
+          .foregroundStyle(reasonIsWithinLimit ? WoorisaiColor.Fg.neutralMuted : WoorisaiColor.Fg.critical)
       }
 
       HStack(alignment: .bottom, spacing: WoorisaiSpacing.small) {
         TextField("남기고 싶은 이유가 있다면 적어 주세요.", text: $reason, axis: .vertical)
           .lineLimit(2...5)
           .focused($isReasonFocused)
-          .foregroundStyle(WoorisaiPalette.ink)
-          .tint(WoorisaiPalette.coralDark)
+          .foregroundStyle(WoorisaiColor.Fg.neutral)
+          .tint(WoorisaiColor.Fg.brand)
           .padding(WoorisaiSpacing.medium)
           .background(
-            WoorisaiPalette.field,
+            WoorisaiColor.Bg.layerFill,
             in: RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
           )
           .overlay {
             RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
               .stroke(
-                reasonIsWithinLimit ? WoorisaiPalette.line : WoorisaiPalette.error, lineWidth: 1)
+                reasonIsWithinLimit ? WoorisaiColor.Stroke.neutralWeak : WoorisaiColor.Fg.critical, lineWidth: 1)
           }
           .accessibilityIdentifier("relationship.reason")
 
@@ -305,7 +300,7 @@ struct ScoreComposerSheet: View {
       if let validationMessage {
         Text(validationMessage)
           .font(.caption)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
       PrimaryHeartButton(
@@ -322,7 +317,7 @@ struct ScoreComposerSheet: View {
     .padding(.vertical, WoorisaiSpacing.medium)
     .background(.regularMaterial)
     .overlay(alignment: .top) {
-      Divider().overlay(WoorisaiPalette.line)
+      Divider().overlay(WoorisaiColor.Stroke.neutralWeak)
     }
   }
 
@@ -449,15 +444,6 @@ struct ScoreComposerSheet: View {
     model.updateLocalScoreDraftProtection(isProtected: isDirty)
   }
 
-  private func deltaLabel(_ delta: Int) -> String {
-    if delta == 0 { return "변화 없음" }
-    return delta > 0 ? "+\(delta)점" : "\(delta)점"
-  }
-
-  private func deltaAccessibilityLabel(_ delta: Int) -> String {
-    if delta == 0 { return "변화 없음" }
-    return delta > 0 ? "\(delta)점 올라감" : "\(-delta)점 내려감"
-  }
 }
 
 private struct RelationshipUnknownOutcomeRecovery: View {
@@ -475,7 +461,7 @@ private struct RelationshipUnknownOutcomeRecovery: View {
     VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
       Text(message)
         .font(.caption)
-        .foregroundStyle(WoorisaiPalette.error)
+        .foregroundStyle(WoorisaiColor.Fg.critical)
       Button {
         showsRecoveryActions = true
       } label: {
@@ -486,7 +472,7 @@ private struct RelationshipUnknownOutcomeRecovery: View {
         .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
       }
       .buttonStyle(.borderedProminent)
-      .tint(WoorisaiPalette.coralDark)
+      .tint(WoorisaiColor.Fg.brand)
       .disabled(inspectionState == .loading)
       .accessibilityIdentifier("relationship.mutation.openRecovery")
     }

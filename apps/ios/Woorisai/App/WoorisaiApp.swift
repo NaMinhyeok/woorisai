@@ -169,7 +169,7 @@ private struct AppPrivacyCoverView: UIViewRepresentable {
 final class AppPrivacyCoverUIView: UIView {
   override init(frame: CGRect) {
     super.init(frame: frame)
-    backgroundColor = WoorisaiPalette.creamUIColor
+    backgroundColor = WoorisaiColor.Component.UIKit.background
     isAccessibilityElement = false
     accessibilityElementsHidden = true
 
@@ -177,7 +177,7 @@ final class AppPrivacyCoverUIView: UIView {
     let mark = UIImageView(
       image: UIImage(systemName: "lock.heart", withConfiguration: markConfiguration)
     )
-    mark.tintColor = WoorisaiPalette.coralUIColor
+    mark.tintColor = WoorisaiColor.Component.UIKit.brandMark
     mark.isAccessibilityElement = false
     mark.translatesAutoresizingMaskIntoConstraints = false
     addSubview(mark)
@@ -375,7 +375,7 @@ private struct AppRootView: View {
       if isEndingSession {
         ProgressView("안전하게 나가는 중이에요.")
           .padding()
-          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: WoorisaiRadius.small))
       }
     }
     .task(id: participant.slot.rawValue) {
@@ -647,10 +647,10 @@ private struct AppSettingsView: View {
             VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
               Text(participant.displayName)
                 .font(.headline)
-                .foregroundStyle(WoorisaiPalette.ink)
+                .foregroundStyle(WoorisaiColor.Fg.neutral)
               Text("우리 둘만의 공간에 들어와 있어요")
                 .font(.footnote)
-                .foregroundStyle(WoorisaiPalette.muted)
+                .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
             }
           }
           .padding(.vertical, WoorisaiSpacing.xSmall)
@@ -665,7 +665,7 @@ private struct AppSettingsView: View {
           if notificationState == .permissionDenied {
             Text("알림을 다시 켜려면 iOS 설정에서 우리사이의 알림 권한을 허용해 주세요.")
               .font(.footnote)
-              .foregroundStyle(WoorisaiPalette.muted)
+              .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
             Button {
               guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else {
                 return
@@ -687,7 +687,7 @@ private struct AppSettingsView: View {
             Toggle(isOn: $isSessionRemembered) {
               Label("Face ID로 빠르게 열기", systemImage: "faceid")
             }
-            .tint(WoorisaiPalette.coral)
+            .tint(WoorisaiColor.Fg.brandVivid)
             .accessibilityHint("이 기기에 로그인 정보를 저장하고 다음부터 Face ID로 들어옵니다.")
             .accessibilityIdentifier("settings.rememberSession")
           }
@@ -696,7 +696,7 @@ private struct AppSettingsView: View {
             confirmsSessionLock = true
           } label: {
             Label("앱 잠그기", systemImage: "lock.fill")
-              .foregroundStyle(WoorisaiPalette.coralDark)
+              .foregroundStyle(WoorisaiColor.Fg.brand)
           }
           .accessibilityHint("작성 중인 글과 첨부를 정리하고 앱을 잠급니다.")
           .accessibilityIdentifier("settings.lock")
@@ -705,7 +705,7 @@ private struct AppSettingsView: View {
             confirmsForget = true
           } label: {
             Label("이 기기에서 로그인 정보 지우기", systemImage: "trash")
-              .foregroundStyle(WoorisaiPalette.coralDark)
+              .foregroundStyle(WoorisaiColor.Fg.brand)
           }
           .accessibilityHint("이 기기에 저장된 로그인 정보를 삭제하고 로그아웃합니다.")
           .accessibilityIdentifier("settings.forget")
@@ -716,7 +716,7 @@ private struct AppSettingsView: View {
         }
       }
       .scrollContentBackground(.hidden)
-      .background(WoorisaiPalette.cream)
+      .background(WoorisaiColor.Bg.layerBasement)
       .navigationTitle("설정")
       .navigationBarTitleDisplayMode(.inline)
       .accessibilityIdentifier("settings.screen")
@@ -2099,7 +2099,7 @@ private struct UnavailableNotificationInstallationIDProvider:
               height: size.height * 0.8
             )
           )
-          UIColor.white.setFill()
+          WoorisaiColor.Component.UIKit.staticWhite.setFill()
           context.cgContext.fillEllipse(
             in: CGRect(
               x: size.width * 0.38,

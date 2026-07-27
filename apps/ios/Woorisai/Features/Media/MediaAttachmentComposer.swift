@@ -1000,7 +1000,7 @@ struct MediaAttachmentComposer: View {
 
   var body: some View {
     let pickerLabel = model.policy.allowsVideo ? "사진 또는 동영상 첨부" : "사진 첨부"
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: WoorisaiSpacing.medium) {
       HStack {
         PhotosPicker(
           selection: $pickerItems,
@@ -1021,7 +1021,7 @@ struct MediaAttachmentComposer: View {
         if !model.uploads.isEmpty {
           Text(attachmentCountLabel)
             .font(.caption)
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
             .accessibilityLabel(attachmentCountLabel)
         }
       }
@@ -1032,10 +1032,10 @@ struct MediaAttachmentComposer: View {
       }
 
       if let failure = model.importFailure {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
           Label(importFailureMessage(failure), systemImage: "exclamationmark.triangle")
             .font(.footnote)
-            .foregroundStyle(WoorisaiPalette.error)
+            .foregroundStyle(WoorisaiColor.Fg.critical)
           Spacer()
           Button("닫기") {
             model.dismissImportFailure()
@@ -1089,14 +1089,14 @@ struct MediaAttachmentComposer: View {
         if let previewImage = item.previewImage {
           MediaFillImageSurface(image: previewImage)
         } else {
-          WoorisaiPalette.sageSoft
+          WoorisaiColor.bg(.init(isImage: item.kind != .video))
           VStack(spacing: WoorisaiSpacing.small) {
             Image(systemName: item.kind == .video ? "play.circle.fill" : "photo.fill")
               .font(.system(size: 36))
-              .foregroundStyle(item.kind == .video ? WoorisaiPalette.sage : WoorisaiPalette.coral)
+              .foregroundStyle(WoorisaiColor.fg(.init(isImage: item.kind != .video)))
             Text(item.kind == .video ? "동영상" : "사진")
               .font(.caption.weight(.semibold))
-              .foregroundStyle(WoorisaiPalette.muted)
+              .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           }
         }
 
@@ -1108,12 +1108,12 @@ struct MediaAttachmentComposer: View {
         } label: {
           Image(systemName: "xmark")
             .font(.caption.weight(.bold))
-            .foregroundStyle(.white)
+            .foregroundStyle(WoorisaiColor.Fg.staticWhite)
             .frame(
               width: WoorisaiControlMetric.minimumTapTarget,
               height: WoorisaiControlMetric.minimumTapTarget
             )
-            .background(.black.opacity(0.54), in: Circle())
+            .background(WoorisaiColor.Bg.scrim, in: Circle())
         }
         .buttonStyle(.plain)
         .padding(WoorisaiSpacing.xSmall)
@@ -1136,7 +1136,7 @@ struct MediaAttachmentComposer: View {
         Spacer()
         Text(item.byteSize.formatted(.byteCount(style: .file)))
           .font(.caption)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
       }
 
       uploadStatus(item)
@@ -1168,7 +1168,7 @@ struct MediaAttachmentComposer: View {
     }
     .padding(WoorisaiSpacing.medium)
     .background(
-      WoorisaiPalette.creamDeep.opacity(0.72),
+      WoorisaiColor.Bg.layerSunkenAlpha,
       in: RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
     )
     .accessibilityElement(children: .contain)
@@ -1180,30 +1180,30 @@ struct MediaAttachmentComposer: View {
     switch item.upload.state {
     case .idle, .initiating, .uploading, .completing:
       ProgressView()
-        .tint(.white)
+        .tint(WoorisaiColor.Fg.staticWhite)
         .padding(WoorisaiSpacing.medium)
-        .background(.black.opacity(0.44), in: Circle())
+        .background(WoorisaiColor.Bg.scrimWeak, in: Circle())
         .accessibilityHidden(true)
     case .ready:
       Image(systemName: "checkmark.circle.fill")
         .font(.title2)
-        .foregroundStyle(.white, WoorisaiPalette.success)
+        .foregroundStyle(WoorisaiColor.Fg.staticWhite, WoorisaiColor.Fg.positive)
         .padding(WoorisaiSpacing.small)
-        .background(.black.opacity(0.36), in: Circle())
+        .background(WoorisaiColor.Bg.scrimWeak, in: Circle())
         .accessibilityHidden(true)
     case .failed:
       Image(systemName: "exclamationmark.circle.fill")
         .font(.title2)
-        .foregroundStyle(.white, WoorisaiPalette.error)
+        .foregroundStyle(WoorisaiColor.Fg.staticWhite, WoorisaiColor.Fg.critical)
         .padding(WoorisaiSpacing.small)
-        .background(.black.opacity(0.36), in: Circle())
+        .background(WoorisaiColor.Bg.scrimWeak, in: Circle())
         .accessibilityHidden(true)
     case .cancelled:
       Image(systemName: "xmark.circle.fill")
         .font(.title2)
-        .foregroundStyle(.white)
+        .foregroundStyle(WoorisaiColor.Fg.staticWhite)
         .padding(WoorisaiSpacing.small)
-        .background(.black.opacity(0.44), in: Circle())
+        .background(WoorisaiColor.Bg.scrimWeak, in: Circle())
         .accessibilityHidden(true)
     }
   }
@@ -1214,7 +1214,7 @@ struct MediaAttachmentComposer: View {
     case .idle:
       Text("업로드 대기 중")
         .font(.caption)
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
     case .initiating:
       ProgressView("업로드 준비 중")
     case .uploading(let progress):
@@ -1230,16 +1230,16 @@ struct MediaAttachmentComposer: View {
     case .ready:
       Label("첨부 준비 완료", systemImage: "checkmark.circle.fill")
         .font(.caption)
-        .foregroundStyle(WoorisaiPalette.success)
+        .foregroundStyle(WoorisaiColor.Fg.positive)
     case .failed(let failure):
       Label(uploadFailureMessage(failure), systemImage: "exclamationmark.circle")
         .font(.caption)
-        .foregroundStyle(WoorisaiPalette.error)
+        .foregroundStyle(WoorisaiColor.Fg.critical)
         .accessibilityLabel("\(item.fileName) 업로드 실패. \(uploadFailureMessage(failure))")
     case .cancelled:
       Label("업로드를 취소했어요.", systemImage: "xmark.circle")
         .font(.caption)
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
     }
   }
 
@@ -1328,7 +1328,7 @@ struct MediaAspectFitImageSurface: View {
       )
 
       ZStack {
-        WoorisaiPalette.creamDeep.opacity(0.58)
+        WoorisaiColor.Bg.layerSunkenAlpha
 
         Image(uiImage: image)
           .resizable()
@@ -1897,7 +1897,7 @@ struct MediaAttachmentPreview: View {
 
           if model.state == .loading {
             ProgressView()
-              .tint(WoorisaiPalette.coralDark)
+              .tint(WoorisaiColor.Fg.brand)
               .padding(WoorisaiSpacing.small)
               .background(.ultraThinMaterial, in: Circle())
               .accessibilityHidden(true)
@@ -1913,7 +1913,7 @@ struct MediaAttachmentPreview: View {
                 }
               }
               .font(.caption.weight(.semibold))
-              .foregroundStyle(WoorisaiPalette.ink)
+              .foregroundStyle(WoorisaiColor.Fg.neutral)
               .frame(maxWidth: .infinity, alignment: .center)
               .padding(WoorisaiSpacing.small)
               .background(.regularMaterial)
@@ -1957,7 +1957,7 @@ struct MediaAttachmentPreview: View {
     }
     .fullScreenCover(isPresented: $isImageViewerPresented) {
       ZStack {
-        Color.black.ignoresSafeArea()
+        WoorisaiColor.Bg.immersive.ignoresSafeArea()
 
         if let image = model.image {
           MediaAspectFitImageSurface(
@@ -1974,12 +1974,12 @@ struct MediaAttachmentPreview: View {
         } label: {
           Image(systemName: "xmark")
             .font(.body.weight(.bold))
-            .foregroundStyle(.white)
+            .foregroundStyle(WoorisaiColor.Fg.staticWhite)
             .frame(
               width: WoorisaiControlMetric.minimumTapTarget,
               height: WoorisaiControlMetric.minimumTapTarget
             )
-            .background(.black.opacity(0.62), in: Circle())
+            .background(WoorisaiColor.Bg.scrim, in: Circle())
         }
         .buttonStyle(.plain)
         .padding(WoorisaiSpacing.regular)
@@ -2033,25 +2033,25 @@ struct MediaAttachmentPreview: View {
         .overlay(alignment: .bottomTrailing) {
           Image(systemName: "arrow.up.left.and.arrow.down.right")
             .font(.caption.weight(.bold))
-            .foregroundStyle(.white)
-            .padding(9)
-            .background(.black.opacity(0.46), in: Circle())
-            .padding(10)
+            .foregroundStyle(WoorisaiColor.Fg.staticWhite)
+            .padding(WoorisaiSpacing.small)
+            .background(WoorisaiColor.Bg.scrimWeak, in: Circle())
+            .padding(WoorisaiSpacing.small)
             .accessibilityHidden(true)
         }
     } else {
       ZStack {
-        isImage ? WoorisaiPalette.coralSoft.opacity(0.5) : WoorisaiPalette.sageSoft
+        WoorisaiColor.bg(.init(isImage: isImage))
 
-        VStack(spacing: 8) {
+        VStack(spacing: WoorisaiSpacing.small) {
           Image(systemName: isImage ? "photo.fill" : "play.circle.fill")
             .font(.system(size: isImage ? 34 : 42))
-            .foregroundStyle(isImage ? WoorisaiPalette.coral : WoorisaiPalette.sage)
+            .foregroundStyle(WoorisaiColor.fg(.init(isImage: isImage)))
           Text(fileName)
             .font(.footnote.weight(.semibold))
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
             .lineLimit(1)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, WoorisaiSpacing.medium)
         }
       }
     }
@@ -2130,7 +2130,7 @@ private struct PrivateVideoViewer: View {
 
   var body: some View {
     ZStack {
-      Color.black.ignoresSafeArea()
+      WoorisaiColor.Bg.immersive.ignoresSafeArea()
 
       PrivateVideoSurface(player: player)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -2144,11 +2144,11 @@ private struct PrivateVideoViewer: View {
           VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
             Label("동영상을 재생할 수 없어요", systemImage: "exclamationmark.triangle.fill")
               .font(.headline)
-              .foregroundStyle(.white)
+              .foregroundStyle(WoorisaiColor.Fg.staticWhite)
 
             Text(playbackFailureMessage)
               .font(.subheadline)
-              .foregroundStyle(.white.opacity(0.88))
+              .foregroundStyle(WoorisaiColor.Fg.staticWhiteMuted)
 
             Button(action: onRetry) {
               Label("파일 다시 받기", systemImage: "arrow.clockwise")
@@ -2156,8 +2156,8 @@ private struct PrivateVideoViewer: View {
                 .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
             }
             .buttonStyle(.borderedProminent)
-            .tint(WoorisaiPalette.coralDark)
-            .foregroundStyle(.white)
+            .tint(WoorisaiColor.Fg.brand)
+            .foregroundStyle(WoorisaiColor.Fg.staticWhite)
             .accessibilityIdentifier("media.videoViewer.retry")
           }
           .accessibilityElement(children: .contain)
@@ -2165,7 +2165,7 @@ private struct PrivateVideoViewer: View {
         } else {
           VStack(spacing: WoorisaiSpacing.small) {
             ProgressView(value: progressFraction)
-              .tint(WoorisaiPalette.coral)
+              .tint(WoorisaiColor.Fg.brandVivid)
               .accessibilityLabel("동영상 재생 진행")
               .accessibilityValue(progressAccessibilityValue)
               .accessibilityIdentifier("media.videoViewer.progress")
@@ -2173,7 +2173,7 @@ private struct PrivateVideoViewer: View {
             HStack(spacing: WoorisaiSpacing.regular) {
               Text("\(timeLabel(currentSeconds)) / \(timeLabel(durationSeconds))")
                 .font(.caption.monospacedDigit().weight(.semibold))
-                .foregroundStyle(.white.opacity(0.88))
+                .foregroundStyle(WoorisaiColor.Fg.staticWhiteMuted)
                 .accessibilityHidden(true)
 
               Spacer(minLength: 0)
@@ -2187,8 +2187,8 @@ private struct PrivateVideoViewer: View {
                 .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
               }
               .buttonStyle(.borderedProminent)
-              .tint(WoorisaiPalette.coralDark)
-              .foregroundStyle(.white)
+              .tint(WoorisaiColor.Fg.brand)
+              .foregroundStyle(WoorisaiColor.Fg.staticWhite)
               .accessibilityLabel(isPlaying ? "동영상 일시 정지" : "동영상 재생")
               .accessibilityIdentifier("media.videoViewer.playPause")
             }
@@ -2196,19 +2196,19 @@ private struct PrivateVideoViewer: View {
         }
       }
       .padding(WoorisaiSpacing.regular)
-      .background(.black.opacity(0.68), in: RoundedRectangle(cornerRadius: 20))
+      .background(WoorisaiColor.Bg.scrimStrong, in: RoundedRectangle(cornerRadius: WoorisaiRadius.medium))
       .padding(WoorisaiSpacing.regular)
     }
     .overlay(alignment: .topTrailing) {
       Button(action: onClose) {
         Image(systemName: "xmark")
           .font(.body.weight(.bold))
-          .foregroundStyle(.white)
+          .foregroundStyle(WoorisaiColor.Fg.staticWhite)
           .frame(
             width: WoorisaiControlMetric.minimumTapTarget,
             height: WoorisaiControlMetric.minimumTapTarget
           )
-          .background(.black.opacity(0.62), in: Circle())
+          .background(WoorisaiColor.Bg.scrim, in: Circle())
       }
       .buttonStyle(.plain)
       .padding(WoorisaiSpacing.regular)

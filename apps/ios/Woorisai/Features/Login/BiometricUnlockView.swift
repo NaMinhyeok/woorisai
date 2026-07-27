@@ -46,11 +46,11 @@ struct BiometricUnlockView: View {
     VStack(spacing: WoorisaiSpacing.small) {
       Image(systemName: "lock.heart")
         .font(.system(size: 40, weight: .semibold))
-        .foregroundStyle(WoorisaiPalette.coral)
+        .foregroundStyle(WoorisaiColor.Fg.brandVivid)
         .accessibilityHidden(true)
       Text("우리 둘만의 공간이 잠겨 있어요")
         .font(.title2.bold())
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
         .multilineTextAlignment(.center)
         .accessibilityAddTraits(.isHeader)
     }
@@ -71,7 +71,7 @@ struct BiometricUnlockView: View {
           Task { await authenticationModel.fallBackToPINLogin() }
         }
         .font(.headline.weight(.semibold))
-        .foregroundStyle(WoorisaiPalette.coralDark)
+        .foregroundStyle(WoorisaiColor.Fg.brand)
         .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
         .accessibilityIdentifier("biometricUnlock.unlocking.usePIN")
       }
@@ -88,13 +88,13 @@ struct BiometricUnlockView: View {
       if let message = failureMessage(context.lastFailure) {
         Text(message)
           .font(.callout)
-          .foregroundStyle(WoorisaiPalette.coralDark)
+          .foregroundStyle(WoorisaiColor.Fg.brand)
           .multilineTextAlignment(.center)
           .accessibilityIdentifier("biometricUnlock.failure")
       } else {
         Text("\(unlockModalityName(context.kind))로 안전하게 다시 들어오세요.")
           .font(.callout)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           .multilineTextAlignment(.center)
       }
 
@@ -107,7 +107,7 @@ struct BiometricUnlockView: View {
         Task { await authenticationModel.fallBackToPINLogin() }
       }
       .font(.headline.weight(.semibold))
-      .foregroundStyle(WoorisaiPalette.coralDark)
+      .foregroundStyle(WoorisaiColor.Fg.brand)
       .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
       .accessibilityIdentifier("biometricUnlock.usePIN")
     }
@@ -118,10 +118,10 @@ struct BiometricUnlockView: View {
       VStack(spacing: WoorisaiSpacing.regular) {
         ProgressView()
           .controlSize(.large)
-          .tint(WoorisaiPalette.coralDark)
+          .tint(WoorisaiColor.Fg.brand)
           .accessibilityHidden(true)
         Text(message)
-          .foregroundStyle(WoorisaiPalette.muted)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           .multilineTextAlignment(.center)
       }
     }

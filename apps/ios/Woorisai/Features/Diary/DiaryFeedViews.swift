@@ -16,7 +16,7 @@ struct DiaryEntryCard: View {
 
             Text(entry.content)
               .font(.body)
-              .foregroundStyle(WoorisaiPalette.ink.opacity(0.9))
+              .foregroundStyle(WoorisaiColor.Fg.neutral.opacity(0.9))
               .lineSpacing(4)
               .lineLimit(4)
               .frame(maxWidth: .infinity, alignment: .leading)
@@ -34,7 +34,7 @@ struct DiaryEntryCard: View {
         }
 
         Divider()
-          .overlay(WoorisaiPalette.line)
+          .overlay(WoorisaiColor.Stroke.neutralWeak)
 
         if dynamicTypeSize.isAccessibilitySize {
           VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
@@ -58,7 +58,7 @@ struct DiaryEntryCard: View {
     .overlay {
       if entry.isMine {
         RoundedRectangle(cornerRadius: WoorisaiRadius.large, style: .continuous)
-          .stroke(WoorisaiPalette.coral.opacity(0.24), lineWidth: 1)
+          .stroke(WoorisaiColor.stroke(.mine), lineWidth: 1)
       }
     }
     .padding(.top, WoorisaiSpacing.small)
@@ -79,7 +79,7 @@ struct DiaryEntryCard: View {
         Spacer(minLength: WoorisaiSpacing.small)
         Image(systemName: "heart.fill")
           .font(.caption)
-          .foregroundStyle(entry.isMine ? WoorisaiPalette.coral : WoorisaiPalette.sage)
+          .foregroundStyle(WoorisaiColor.fg(.init(isMine: entry.isMine)))
           .padding(.top, WoorisaiSpacing.small)
           .accessibilityHidden(true)
       }
@@ -91,20 +91,20 @@ struct DiaryEntryCard: View {
       HStack(spacing: WoorisaiSpacing.small) {
         Text(entry.author.displayName)
           .font(.headline)
-          .foregroundStyle(WoorisaiPalette.ink)
+          .foregroundStyle(WoorisaiColor.Fg.neutral)
           .fixedSize(horizontal: false, vertical: true)
         if entry.isMine {
           Text("내 기록")
             .font(.caption2.weight(.bold))
-            .foregroundStyle(WoorisaiPalette.coralDark)
+            .foregroundStyle(WoorisaiColor.Fg.brand)
             .padding(.horizontal, WoorisaiSpacing.small)
             .padding(.vertical, WoorisaiSpacing.xSmall)
-            .background(WoorisaiPalette.coralSoft, in: Capsule())
+            .background(WoorisaiColor.Bg.brandWeak, in: Capsule())
         }
       }
       Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
         .font(.caption)
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
     }
   }
 
@@ -116,14 +116,14 @@ struct DiaryEntryCard: View {
       Label("댓글 \(entry.commentCount)", systemImage: "bubble.left")
     }
     .font(.caption)
-    .foregroundStyle(WoorisaiPalette.muted)
+    .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
   }
 
   private var conversationLink: some View {
     NavigationLink(value: entry.id) {
       Label("대화 보기", systemImage: "chevron.right")
         .font(.caption.weight(.bold))
-        .foregroundStyle(WoorisaiPalette.coralDark)
+        .foregroundStyle(WoorisaiColor.Fg.brand)
         .frame(
           maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil,
           minHeight: WoorisaiControlMetric.minimumTapTarget,
@@ -161,13 +161,13 @@ struct DiaryAttachmentGallery: View {
 
 struct DiaryPaperTape: View {
   var body: some View {
-    RoundedRectangle(cornerRadius: 3, style: .continuous)
-      .fill(WoorisaiPalette.sageSoft.opacity(0.92))
+    RoundedRectangle(cornerRadius: WoorisaiRadius.xSmall, style: .continuous)
+      .fill(WoorisaiColor.Decor.tapeFill)
       .frame(width: 62, height: 16)
       .rotationEffect(.degrees(-2))
       .overlay {
         Rectangle()
-          .stroke(WoorisaiPalette.sage.opacity(0.2), style: StrokeStyle(dash: [3, 3]))
+          .stroke(WoorisaiColor.Decor.tapeEdge, style: StrokeStyle(dash: [3, 3]))
       }
       .accessibilityHidden(true)
   }
@@ -205,9 +205,12 @@ struct DiaryHero: View {
   private var heroSymbol: some View {
     Image(systemName: symbol)
       .font(.system(size: 22, weight: .semibold))
-      .foregroundStyle(WoorisaiPalette.coral)
-      .frame(width: 44, height: 44)
-      .background(WoorisaiPalette.coralSoft, in: Circle())
+      .foregroundStyle(WoorisaiColor.Fg.brandVivid)
+      .frame(
+        width: WoorisaiControlMetric.minimumTapTarget,
+        height: WoorisaiControlMetric.minimumTapTarget
+      )
+      .background(WoorisaiColor.Bg.brandWeak, in: Circle())
       .accessibilityHidden(true)
   }
 
@@ -216,10 +219,10 @@ struct DiaryHero: View {
       Eyebrow(eyebrow)
       Text(title)
         .font(.title2.weight(.bold))
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
       Text(message)
         .font(.callout)
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         .fixedSize(horizontal: false, vertical: true)
     }
   }

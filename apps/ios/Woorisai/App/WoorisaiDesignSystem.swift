@@ -1,61 +1,6 @@
 import SwiftUI
 import UIKit
 
-enum WoorisaiPalette {
-  /// UIKit-level brand colors for non-SwiftUI chrome (privacy covers). Keep in sync with `cream`
-  /// and `coral` below; system semantic colors (`.systemBackground` 등) must not replace these —
-  /// they read as a foreign black/white flash against the warm brand background.
-  static let creamUIColor = adaptiveUIColor(light: (255, 248, 241), dark: (23, 19, 18))
-  static let coralUIColor = adaptiveUIColor(light: (217, 92, 78), dark: (255, 143, 125))
-
-  static let cream = Color(uiColor: creamUIColor)
-  static let creamDeep = adaptive(light: (249, 238, 228), dark: (46, 37, 33))
-  static let surface = adaptive(light: (255, 252, 250), dark: (37, 31, 29))
-  static let field = adaptive(light: (255, 251, 248), dark: (48, 40, 37))
-  static let selectedSurface = adaptive(light: (255, 240, 236), dark: (58, 40, 37))
-  static let ink = adaptive(light: (57, 45, 42), dark: (247, 238, 234))
-  static let muted = adaptive(light: (112, 94, 88), dark: (200, 181, 172))
-  static let line = adaptive(light: (160, 139, 130), dark: (142, 114, 104))
-  static let coral = Color(uiColor: coralUIColor)
-  static let coralDark = adaptive(light: (168, 63, 53), dark: (255, 170, 153))
-  static let coralSoft = adaptive(light: (255, 224, 216), dark: (84, 48, 43))
-  static let rose = adaptive(light: (246, 181, 173), dark: (192, 120, 112))
-  static let sage = adaptive(light: (75, 113, 86), dark: (155, 201, 168))
-  static let sageSoft = adaptive(light: (228, 240, 231), dark: (43, 69, 51))
-  static let success = adaptive(light: (61, 110, 75), dark: (155, 213, 169))
-  static let error = adaptive(light: (180, 35, 24), dark: (255, 180, 171))
-  static let primaryButtonStart = adaptive(light: (193, 64, 52), dark: (183, 62, 52))
-  static let primaryButtonEnd = adaptive(light: (150, 47, 40), dark: (132, 42, 36))
-  static let primaryButtonDisabled = adaptive(light: (132, 102, 97), dark: (140, 108, 102))
-  static let primaryButtonLabel = Color.white
-  // Dark mode: a pure-black drop shadow is invisible on the warm-dark background, flattening
-  // every card. A faint warm glow reads as elevation instead. (Call sites keep their 0.08–0.2
-  // opacities.)
-  static let shadow = adaptive(light: (57, 45, 42), dark: (255, 190, 175))
-
-  private static func adaptive(
-    light: (red: Int, green: Int, blue: Int),
-    dark: (red: Int, green: Int, blue: Int)
-  ) -> Color {
-    Color(uiColor: adaptiveUIColor(light: light, dark: dark))
-  }
-
-  private static func adaptiveUIColor(
-    light: (red: Int, green: Int, blue: Int),
-    dark: (red: Int, green: Int, blue: Int)
-  ) -> UIColor {
-    UIColor { traits in
-      let components = traits.userInterfaceStyle == .dark ? dark : light
-      return UIColor(
-        red: CGFloat(components.red) / 255,
-        green: CGFloat(components.green) / 255,
-        blue: CGFloat(components.blue) / 255,
-        alpha: 1
-      )
-    }
-  }
-}
-
 enum WoorisaiSpacing {
   static let xSmall: CGFloat = 4
   static let small: CGFloat = 8
@@ -66,14 +11,29 @@ enum WoorisaiSpacing {
   static let screenGutter: CGFloat = regular
 }
 
+/// 모서리 반경 스케일.
+///
+/// 호출부에 3부터 24까지 여덟 가지 값이 흩어져 있던 것을 네 단으로 접었다. 반경이 2pt 다른 두
+/// 카드는 나란히 놓아도 구분되지 않는데, 값이 다르면 다음 사람은 그 차이에 이유가 있다고 믿게
+/// 된다.
 enum WoorisaiRadius {
+  /// 마스킹 테이프처럼 아주 작은 조각.
+  static let xSmall: CGFloat = 4
+  /// 버튼·칩.
   static let small: CGFloat = 12
+  /// 카드·필드·말풍선.
   static let medium: CGFloat = 18
+  /// 큰 카드·시트.
   static let large: CGFloat = 24
 }
 
+/// 컨트롤 높이 3단.
 enum WoorisaiControlMetric {
+  /// HIG가 요구하는 최소 탭 영역. 아이콘 버튼처럼 시각적으로 작은 컨트롤의 하한이다.
   static let minimumTapTarget: CGFloat = 44
+  /// 보조 버튼.
+  static let secondaryHeight: CGFloat = 48
+  /// 주요 액션 버튼과 텍스트 필드. 둘을 같은 높이로 두면 나란히 놓았을 때 정렬이 맞는다.
   static let primaryHeight: CGFloat = 52
   static let mediaGap: CGFloat = WoorisaiSpacing.small
 }
@@ -136,11 +96,11 @@ struct WarmBackground<Content: View>: View {
 
   var body: some View {
     ZStack {
-      WoorisaiPalette.cream
+      WoorisaiColor.Bg.layerBasement
         .ignoresSafeArea()
 
       RadialGradient(
-        colors: [WoorisaiPalette.coralSoft.opacity(0.72), .clear],
+        colors: [WoorisaiColor.Decor.ambientBrand.opacity(0.72), .clear],
         center: .topTrailing,
         startRadius: 8,
         endRadius: 360
@@ -150,9 +110,9 @@ struct WarmBackground<Content: View>: View {
 
       Canvas { context, size in
         let dots: [(CGPoint, CGFloat, Color)] = [
-          (CGPoint(x: size.width * 0.12, y: size.height * 0.16), 4, WoorisaiPalette.rose),
-          (CGPoint(x: size.width * 0.88, y: size.height * 0.28), 3, WoorisaiPalette.sage),
-          (CGPoint(x: size.width * 0.18, y: size.height * 0.78), 3, WoorisaiPalette.coral),
+          (CGPoint(x: size.width * 0.12, y: size.height * 0.16), 4, WoorisaiColor.Decor.dotWarm),
+          (CGPoint(x: size.width * 0.88, y: size.height * 0.28), 3, WoorisaiColor.Decor.dotCalm),
+          (CGPoint(x: size.width * 0.18, y: size.height * 0.78), 3, WoorisaiColor.Decor.dotBrand),
         ]
         for (point, radius, color) in dots {
           context.fill(
@@ -172,7 +132,7 @@ struct WarmBackground<Content: View>: View {
       .accessibilityHidden(true)
 
       RadialGradient(
-        colors: [WoorisaiPalette.sageSoft.opacity(0.72), .clear],
+        colors: [WoorisaiColor.Decor.ambientCalm.opacity(0.72), .clear],
         center: .bottomLeading,
         startRadius: 8,
         endRadius: 340
@@ -201,12 +161,12 @@ struct WarmSurface<Content: View>: View {
     content
       .background {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-          .fill(WoorisaiPalette.surface)
+          .fill(WoorisaiColor.Bg.layerDefault)
           .overlay {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-              .stroke(WoorisaiPalette.line, lineWidth: 1)
+              .stroke(WoorisaiColor.Stroke.neutralWeak, lineWidth: 1)
           }
-          .shadow(color: WoorisaiPalette.shadow.opacity(0.08), radius: 10, y: 4)
+          .woorisaiShadow(.s1)
       }
   }
 }
@@ -222,7 +182,7 @@ struct Eyebrow: View {
     Text(text)
       .font(.caption2.weight(.heavy))
       .tracking(2.1)
-      .foregroundStyle(WoorisaiPalette.coralDark)
+      .foregroundStyle(WoorisaiColor.Fg.brand)
       .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
       .accessibilityHidden(true)
   }
@@ -248,9 +208,9 @@ struct ParticipantAvatar: View {
       .minimumScaleFactor(0.6)
       .allowsTightening(true)
       .padding(.horizontal, size * 0.1)
-      .foregroundStyle(WoorisaiPalette.coralDark)
+      .foregroundStyle(WoorisaiColor.Fg.brand)
       .frame(width: size, height: size)
-      .background(WoorisaiPalette.coralSoft, in: Circle())
+      .background(WoorisaiColor.Bg.brandWeak, in: Circle())
       .accessibilityHidden(true)
   }
 }
@@ -278,10 +238,10 @@ struct PrimaryHeartButton: View {
 
   var body: some View {
     Button(action: action) {
-      HStack(spacing: 10) {
+      HStack(spacing: WoorisaiSpacing.small) {
         if isLoading {
           ProgressView()
-            .tint(WoorisaiPalette.primaryButtonLabel)
+            .tint(WoorisaiColor.Fg.brandContrast)
             .accessibilityHidden(true)
         } else {
           if !dynamicTypeSize.isAccessibilitySize {
@@ -300,32 +260,62 @@ struct PrimaryHeartButton: View {
         }
       }
       .font(.headline.weight(.bold))
-      .foregroundStyle(WoorisaiPalette.primaryButtonLabel)
-      .frame(maxWidth: .infinity, minHeight: 52)
-      .padding(.horizontal, 18)
-      .background(
-        LinearGradient(
-          colors: buttonIsEnabled
-            ? [WoorisaiPalette.primaryButtonStart, WoorisaiPalette.primaryButtonEnd]
-            : [WoorisaiPalette.primaryButtonDisabled],
-          startPoint: .topLeading,
-          endPoint: .bottomTrailing
-        ),
-        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-      )
-      .shadow(
-        color: WoorisaiPalette.shadow.opacity(buttonIsEnabled ? 0.2 : 0),
-        radius: 12,
-        y: 6
-      )
-      .contentShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+      .foregroundStyle(WoorisaiColor.Fg.brandContrast)
+      .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.primaryHeight)
+      .padding(.horizontal, WoorisaiSpacing.regular)
     }
-    .buttonStyle(.plain)
+    .buttonStyle(PressableSolidButtonStyle(isEnabled: buttonIsEnabled))
     .disabled(!isEnabled || isLoading)
   }
 
   private var buttonIsEnabled: Bool {
     environmentIsEnabled && isEnabled && !isLoading
+  }
+}
+
+/// 브랜드 솔리드 버튼의 눌림 반응.
+///
+/// 예전에는 `.buttonStyle(.plain)`이라 손가락을 올려도 아무 변화가 없었다. 탭이 먹혔는지 알
+/// 방법이 화면 전환뿐이어서, 느린 네트워크에서 같은 버튼을 두 번 누르게 만들었다.
+///
+/// 눌림은 두 갈래로 표현한다 — 배경이 진한 쪽으로 가라앉고, 살짝 줄어든다. 색만으로는 색각
+/// 이상이나 밝은 야외에서 놓치기 쉽고, 크기 변화는 `reduceMotion`을 켠 사람에게 부담이 된다.
+/// 둘을 겹쳐 두면 어느 한쪽이 빠져도 피드백이 남는다.
+private struct PressableSolidButtonStyle: ButtonStyle {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  let isEnabled: Bool
+
+  func makeBody(configuration: Configuration) -> some View {
+    let isPressed = configuration.isPressed && isEnabled
+    let shape = RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
+
+    return configuration.label
+      .background(background(isPressed: isPressed), in: shape)
+      // 비활성일 때는 그림자를 걷어 눌리지 않는 버튼임을 드러낸다. 눌린 동안에는 낮춰서
+      // 버튼이 표면 쪽으로 내려앉은 것처럼 보이게 한다.
+      .shadow(
+        color: isEnabled ? (isPressed ? WoorisaiElevation.s1.color : WoorisaiElevation.s3.color)
+          : .clear,
+        radius: isPressed ? WoorisaiElevation.s1.radius : WoorisaiElevation.s3.radius,
+        y: isPressed ? WoorisaiElevation.s1.offsetY : WoorisaiElevation.s3.offsetY
+      )
+      .scaleEffect(isPressed && !reduceMotion ? 0.97 : 1)
+      .animation(.easeOut(duration: 0.12), value: isPressed)
+      .contentShape(shape)
+  }
+
+  private func background(isPressed: Bool) -> LinearGradient {
+    let colors: [Color] =
+      if !isEnabled {
+        [WoorisaiColor.Bg.disabled]
+      } else if isPressed {
+        [WoorisaiColor.Component.PrimaryButton.solidPressed]
+      } else {
+        [WoorisaiColor.Bg.brandSolid, WoorisaiColor.Component.PrimaryButton.solidEnd]
+      }
+
+    return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
   }
 }
 
@@ -346,16 +336,16 @@ struct WoorisaiToast: View {
   var body: some View {
     Label(message, systemImage: "checkmark.circle.fill")
       .font(.callout.weight(.semibold))
-      .foregroundStyle(WoorisaiPalette.ink)
+      .foregroundStyle(WoorisaiColor.Fg.neutral)
       .multilineTextAlignment(.leading)
       .fixedSize(horizontal: false, vertical: true)
       .padding(.horizontal, WoorisaiSpacing.regular)
       .padding(.vertical, WoorisaiSpacing.medium)
       .background(.regularMaterial, in: Capsule())
       .overlay {
-        Capsule().stroke(WoorisaiPalette.coral.opacity(0.28), lineWidth: 1)
+        Capsule().stroke(WoorisaiColor.Stroke.brandWeak, lineWidth: 1)
       }
-      .shadow(color: WoorisaiPalette.shadow.opacity(0.16), radius: 12, y: 4)
+      .woorisaiShadow(.s2)
       .accessibilityElement(children: .combine)
       .accessibilityIdentifier("toast")
       .task(id: message) {
@@ -428,11 +418,11 @@ struct WoorisaiSectionHeading: View {
   private var titleContent: some View {
     HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
       Image(systemName: symbol)
-        .foregroundStyle(WoorisaiPalette.coral)
+        .foregroundStyle(WoorisaiColor.Fg.brandVivid)
         .accessibilityHidden(true)
       Text(title)
         .font(.title3.weight(.bold))
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
         .accessibilityAddTraits(.isHeader)
     }
   }
@@ -440,8 +430,80 @@ struct WoorisaiSectionHeading: View {
   private func detailContent(_ detail: String) -> some View {
     Text(detail)
       .font(.footnote.weight(.semibold))
-      .foregroundStyle(WoorisaiPalette.muted)
+      .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
       .fixedSize(horizontal: false, vertical: true)
+  }
+}
+
+/// 점수 변화량 배지.
+///
+/// 히스토리 행과 점수 편집 미리보기가 각자 구현하던 것을 합쳤다. 라벨 문구와 VoiceOver 표현도
+/// 여기서 만든다 — 예전에는 같은 값을 히스토리가 `"0점"`, 미리보기가 `"변화 없음"`으로 다르게
+/// 불렀다.
+struct WoorisaiDeltaBadge: View {
+  /// 배지가 그 화면에서 주요 지표인지, 곁들여진 보조 정보인지.
+  enum Prominence {
+    /// 히스토리 행처럼 그 행의 핵심 수치일 때.
+    case primary
+    /// 편집 미리보기처럼 다른 정보에 딸려 나올 때.
+    case secondary
+  }
+
+  private let value: Int
+  private let prominence: Prominence
+
+  init(_ value: Int, prominence: Prominence = .primary) {
+    self.value = value
+    self.prominence = prominence
+  }
+
+  private var delta: WoorisaiColor.Delta { WoorisaiColor.Delta(value) }
+
+  static func label(for value: Int) -> String {
+    if value == 0 { return "변화 없음" }
+    return value > 0 ? "+\(value)점" : "\(value)점"
+  }
+
+  static func accessibilityLabel(for value: Int) -> String {
+    if value == 0 { return "변화 없음" }
+    return value > 0 ? "\(value)점 올라감" : "\(-value)점 내려감"
+  }
+
+  var body: some View {
+    Text(Self.label(for: value))
+      .font(font)
+      .foregroundStyle(WoorisaiColor.fg(delta))
+      .padding(.horizontal, horizontalPadding)
+      .padding(.vertical, verticalPadding)
+      .background(WoorisaiColor.bg(delta), in: Capsule())
+      .overlay {
+        if let stroke = WoorisaiColor.stroke(delta) {
+          Capsule().stroke(stroke, lineWidth: 1)
+        }
+      }
+      .fixedSize(horizontal: true, vertical: true)
+      .accessibilityLabel(Self.accessibilityLabel(for: value))
+  }
+
+  private var font: Font {
+    switch prominence {
+    case .primary: .subheadline.weight(.heavy)
+    case .secondary: .caption.weight(.heavy)
+    }
+  }
+
+  private var horizontalPadding: CGFloat {
+    switch prominence {
+    case .primary: WoorisaiSpacing.medium
+    case .secondary: WoorisaiSpacing.small
+    }
+  }
+
+  private var verticalPadding: CGFloat {
+    switch prominence {
+    case .primary: WoorisaiSpacing.small
+    case .secondary: WoorisaiSpacing.xSmall
+    }
   }
 }
 
@@ -454,15 +516,61 @@ struct WoorisaiIconButton: View {
     Button(action: action) {
       Image(systemName: symbol)
         .font(.body.weight(.semibold))
-        .foregroundStyle(WoorisaiPalette.coralDark)
+        .foregroundStyle(WoorisaiColor.Fg.brand)
         .frame(
           width: WoorisaiControlMetric.minimumTapTarget,
           height: WoorisaiControlMetric.minimumTapTarget
         )
-        .background(WoorisaiPalette.coralSoft.opacity(0.72), in: Circle())
     }
-    .buttonStyle(.plain)
+    .buttonStyle(PressableCircleButtonStyle())
     .accessibilityLabel(accessibilityLabel)
+  }
+}
+
+/// 원형 아이콘 버튼의 눌림 반응. ``PressableSolidButtonStyle``과 같은 이유로 색과 크기를 함께 쓴다.
+private struct PressableCircleButtonStyle: ButtonStyle {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .background(
+        configuration.isPressed
+          ? WoorisaiColor.Component.IconButton.backgroundPressed
+          : WoorisaiColor.Component.IconButton.background,
+        in: Circle()
+      )
+      .scaleEffect(configuration.isPressed && !reduceMotion ? 0.92 : 1)
+      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+      .contentShape(Circle())
+  }
+}
+
+/// 대화 말풍선의 반대쪽 여백.
+///
+/// 말풍선이 화면 폭을 다 채우면 좌우 정렬만으로는 누가 말했는지 읽히지 않는다. 그래서 내 말풍선
+/// 왼쪽, 상대 말풍선 오른쪽에 최소 여백을 세운다.
+///
+/// 다만 접근성 텍스트 크기에서는 여백을 걷는다. 글자가 커진 상태에서 폭까지 좁히면 한 줄에 몇
+/// 글자 못 들어가 말풍선이 세로로 길어지기만 한다. 그 크기에서는 화자 구분을 정렬이 아니라
+/// 이름 라벨이 맡는다.
+///
+/// 점수 대화와 일기 댓글이 이 규칙을 각자 네 곳에 적어두고 있어서 한 곳으로 모았다.
+struct BubbleOppositeGutter: View {
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+  /// 탭 영역 하한과 우연히 같은 44지만 뜻이 다르므로 따로 둔다.
+  private static let minimumWidth: CGFloat = 44
+
+  private let isVisible: Bool
+
+  init(_ isVisible: Bool) {
+    self.isVisible = isVisible
+  }
+
+  var body: some View {
+    if isVisible, !dynamicTypeSize.isAccessibilitySize {
+      Spacer(minLength: Self.minimumWidth)
+    }
   }
 }
 
@@ -474,10 +582,10 @@ struct BrandedStateCard<Content: View>: View {
   }
 
   var body: some View {
-    WarmSurface(cornerRadius: 24) {
+    WarmSurface(cornerRadius: WoorisaiRadius.large) {
       content
         .frame(maxWidth: .infinity, minHeight: 180)
-        .padding(22)
+        .padding(WoorisaiSpacing.large)
     }
   }
 }

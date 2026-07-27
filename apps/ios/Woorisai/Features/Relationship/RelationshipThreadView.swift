@@ -47,10 +47,10 @@ struct ScoreChangeThreadView: View {
         threadStateCard(identifier: "relationship.thread.loading") {
           ProgressView()
             .controlSize(.large)
-            .tint(WoorisaiPalette.coral)
+            .tint(WoorisaiColor.Fg.brandVivid)
             .accessibilityHidden(true)
           Text("대화를 불러오고 있어요.")
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         }
       case .loaded:
         threadList
@@ -171,10 +171,10 @@ struct ScoreChangeThreadView: View {
               VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
                 Text("이 마음에 대한 대화")
                   .font(.system(.title2, design: .rounded, weight: .bold))
-                  .foregroundStyle(WoorisaiPalette.ink)
+                  .foregroundStyle(WoorisaiColor.Fg.neutral)
                 Text("오래된 이야기부터 차례로 읽고, 가장 아래에서 답장을 건네 보세요.")
                   .font(.subheadline)
-                  .foregroundStyle(WoorisaiPalette.muted)
+                  .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
               }
               .accessibilityElement(children: .combine)
               .accessibilityAddTraits(.isHeader)
@@ -233,20 +233,20 @@ struct ScoreChangeThreadView: View {
         )
         .accessibilityIdentifier("relationship.thread.comments")
 
-        Divider().overlay(WoorisaiPalette.line)
+        Divider().overlay(WoorisaiColor.Stroke.neutralWeak)
 
         if thread.comments.isEmpty {
           VStack(spacing: WoorisaiSpacing.small) {
             Image(systemName: "bubble.left")
               .font(.title2)
-              .foregroundStyle(WoorisaiPalette.coral)
+              .foregroundStyle(WoorisaiColor.Fg.brandVivid)
               .accessibilityHidden(true)
             Text("아직 댓글이 없어요.")
               .font(.headline)
-              .foregroundStyle(WoorisaiPalette.ink)
+              .foregroundStyle(WoorisaiColor.Fg.neutral)
             Text("아래 입력창에서 먼저 다정한 이야기를 건네 보세요.")
               .font(.subheadline)
-              .foregroundStyle(WoorisaiPalette.muted)
+              .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
               .multilineTextAlignment(.center)
           }
           .frame(maxWidth: .infinity)
@@ -286,7 +286,7 @@ struct ScoreChangeThreadView: View {
         if let notice = model.commentNotice(for: scoreChangeID) {
           Label(notice, systemImage: "bubble.left.fill")
             .font(.caption.weight(.semibold))
-            .foregroundStyle(WoorisaiPalette.ink)
+            .foregroundStyle(WoorisaiColor.Fg.neutral)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityAddTraits(.updatesFrequently)
             .accessibilityIdentifier("relationship.thread.notice")
@@ -327,7 +327,7 @@ struct ScoreChangeThreadView: View {
     .padding(.vertical, WoorisaiSpacing.small)
     .background(.regularMaterial)
     .overlay(alignment: .top) {
-      Divider().overlay(WoorisaiPalette.line)
+      Divider().overlay(WoorisaiColor.Stroke.neutralWeak)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("relationship.thread.composer")
@@ -341,18 +341,18 @@ struct ScoreChangeThreadView: View {
     )
       .lineLimit(1...4)
       .focused($isCommentFocused)
-      .foregroundStyle(WoorisaiPalette.ink)
-      .tint(WoorisaiPalette.coralDark)
+      .foregroundStyle(WoorisaiColor.Fg.neutral)
+      .tint(WoorisaiColor.Fg.brand)
       .padding(.horizontal, WoorisaiSpacing.medium)
       .padding(.vertical, WoorisaiSpacing.small)
       .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
       .background(
-        WoorisaiPalette.field,
+        WoorisaiColor.Bg.layerFill,
         in: RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous)
       )
       .overlay {
         RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous)
-          .stroke(commentIsWithinLimit ? WoorisaiPalette.line : WoorisaiPalette.error, lineWidth: 1)
+          .stroke(commentIsWithinLimit ? WoorisaiColor.Stroke.neutralWeak : WoorisaiColor.Fg.critical, lineWidth: 1)
       }
       .accessibilityIdentifier("relationship.thread.commentInput")
       .disabled(isDraftEditingLocked)
@@ -368,7 +368,7 @@ struct ScoreChangeThreadView: View {
       ZStack(alignment: .topTrailing) {
         Image(systemName: showsMediaTray ? "paperclip.circle.fill" : "paperclip.circle")
           .font(.title2)
-          .foregroundStyle(WoorisaiPalette.coralDark)
+          .foregroundStyle(WoorisaiColor.Fg.brand)
           .frame(
             width: WoorisaiControlMetric.minimumTapTarget,
             height: WoorisaiControlMetric.minimumTapTarget
@@ -376,9 +376,9 @@ struct ScoreChangeThreadView: View {
         if !commentMediaModel.uploads.isEmpty {
           Text("\(commentMediaModel.uploads.count)")
             .font(.caption2.weight(.heavy))
-            .foregroundStyle(.white)
+            .foregroundStyle(WoorisaiColor.Fg.brandContrast)
             .frame(minWidth: 18, minHeight: 18)
-            .background(WoorisaiPalette.coral, in: Circle())
+            .background(WoorisaiColor.Bg.brandSolid, in: Circle())
         }
       }
     }
@@ -396,20 +396,20 @@ struct ScoreChangeThreadView: View {
       Group {
         if currentCommentSubmissionState == .submitting {
           ProgressView()
-            .tint(.white)
+            .tint(WoorisaiColor.Fg.staticWhite)
         } else {
           Image(systemName: "arrow.up")
             .font(.headline.weight(.bold))
         }
       }
-      .foregroundStyle(.white)
+      .foregroundStyle(WoorisaiColor.Fg.staticWhite)
       .frame(
         width: WoorisaiControlMetric.minimumTapTarget,
         height: WoorisaiControlMetric.minimumTapTarget
       )
       .background(
         canSubmitComment
-          ? WoorisaiPalette.primaryButtonStart : WoorisaiPalette.primaryButtonDisabled,
+          ? WoorisaiColor.Bg.brandSolid : WoorisaiColor.Bg.disabled,
         in: Circle()
       )
     }
@@ -423,7 +423,7 @@ struct ScoreChangeThreadView: View {
   private var commentCountLabel: some View {
     Text("\(commentCodePointCount)/\(RelationshipScoreCommentDraft.maximumContentCharacterCount)")
       .font(.caption2)
-      .foregroundStyle(commentIsWithinLimit ? WoorisaiPalette.muted : WoorisaiPalette.error)
+      .foregroundStyle(commentIsWithinLimit ? WoorisaiColor.Fg.neutralMuted : WoorisaiColor.Fg.critical)
       .accessibilityLabel("댓글 글자 수")
       .accessibilityValue(
         "\(commentCodePointCount)/\(RelationshipScoreCommentDraft.maximumContentCharacterCount)"
@@ -587,11 +587,11 @@ struct ScoreChangeThreadView: View {
   ) -> some View {
     WarmBackground {
       BrandedStateCard {
-        VStack(spacing: 16) {
+        VStack(spacing: WoorisaiSpacing.regular) {
           content()
         }
       }
-      .padding(20)
+      .padding(WoorisaiSpacing.regular)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(identifier)
@@ -601,21 +601,21 @@ struct ScoreChangeThreadView: View {
     threadStateCard(identifier: identifier) {
       Image(systemName: "bubble.left.and.exclamationmark.bubble.right")
         .font(.system(size: 34))
-        .foregroundStyle(WoorisaiPalette.coral)
+        .foregroundStyle(WoorisaiColor.Fg.brandVivid)
         .accessibilityHidden(true)
       Text("대화를 열 수 없어요")
         .font(.title3.weight(.bold))
-        .foregroundStyle(WoorisaiPalette.ink)
+        .foregroundStyle(WoorisaiColor.Fg.neutral)
       Text(message)
         .font(.subheadline)
-        .foregroundStyle(WoorisaiPalette.muted)
+        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         .multilineTextAlignment(.center)
       Button("다시 시도") {
         model.loadThread(scoreChangeID: scoreChangeID)
       }
       .buttonStyle(.borderedProminent)
-      .tint(WoorisaiPalette.primaryButtonStart)
-      .foregroundStyle(WoorisaiPalette.primaryButtonLabel)
+      .tint(WoorisaiColor.Bg.brandSolid)
+      .foregroundStyle(WoorisaiColor.Fg.brandContrast)
       .accessibilityIdentifier("relationship.thread.retry")
     }
   }
@@ -636,7 +636,7 @@ private struct RelationshipCommentUnknownOutcomeRecovery: View {
     VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
       Text(message)
         .font(.caption)
-        .foregroundStyle(WoorisaiPalette.error)
+        .foregroundStyle(WoorisaiColor.Fg.critical)
 
       Button {
         showsRecoveryActions = true
@@ -648,7 +648,7 @@ private struct RelationshipCommentUnknownOutcomeRecovery: View {
         .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
       }
       .buttonStyle(.borderedProminent)
-      .tint(WoorisaiPalette.coralDark)
+      .tint(WoorisaiColor.Fg.brand)
       .disabled(inspectionState == .loading)
       .accessibilityIdentifier("relationship.commentMutation.openRecovery")
     }
@@ -714,32 +714,30 @@ private struct ScoreCommentBubble: View {
   var body: some View {
     let metadataLayout =
       dynamicTypeSize.isAccessibilitySize
-      ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3))
-      : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
+      ? AnyLayout(VStackLayout(alignment: .leading, spacing: WoorisaiSpacing.xSmall))
+      : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small))
 
     return HStack(alignment: .top, spacing: 0) {
-      if isMine && !dynamicTypeSize.isAccessibilitySize {
-        Spacer(minLength: 44)
-      }
+      BubbleOppositeGutter(isMine)
 
-      VStack(alignment: .leading, spacing: 7) {
+      VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
         metadataLayout {
           Text(isMine ? "나" : comment.author.displayName)
             .font(.caption.weight(.heavy))
-            .foregroundStyle(WoorisaiPalette.ink)
+            .foregroundStyle(WoorisaiColor.Fg.neutral)
           if !dynamicTypeSize.isAccessibilitySize {
-            Spacer(minLength: 8)
+            Spacer(minLength: WoorisaiSpacing.small)
           }
           Text(comment.createdAt.formatted(date: .omitted, time: .shortened))
             .font(.caption2)
-            .foregroundStyle(WoorisaiPalette.muted)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
             .fixedSize(horizontal: true, vertical: true)
         }
 
         if let content = comment.content {
           Text(content)
             .font(.body)
-            .foregroundStyle(WoorisaiPalette.ink)
+            .foregroundStyle(WoorisaiColor.Fg.neutral)
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -752,23 +750,21 @@ private struct ScoreCommentBubble: View {
           )
         }
       }
-      .padding(13)
+      .padding(WoorisaiSpacing.medium)
       .background(
-        isMine ? WoorisaiPalette.coralSoft : WoorisaiPalette.field,
-        in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+        isMine ? WoorisaiColor.Bg.brandWeak : WoorisaiColor.Bg.layerFill,
+        in: RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous)
       )
       .overlay {
-        RoundedRectangle(cornerRadius: 17, style: .continuous)
+        RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous)
           .stroke(
-            isMine ? WoorisaiPalette.coral.opacity(0.22) : WoorisaiPalette.line,
+            WoorisaiColor.stroke(.init(isMine: isMine)),
             lineWidth: 1
           )
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      if !isMine && !dynamicTypeSize.isAccessibilitySize {
-        Spacer(minLength: 44)
-      }
+      BubbleOppositeGutter(!isMine)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("relationship.thread.comment.\(comment.id)")
