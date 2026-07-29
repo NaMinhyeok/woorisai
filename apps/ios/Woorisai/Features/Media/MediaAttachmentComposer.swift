@@ -72,15 +72,31 @@ struct BoundedPickerImageTransfer: Transferable, Sendable {
   let typeIdentifier: String?
 
   static var transferRepresentation: some TransferRepresentation {
-    FileRepresentation(
-      importedContentType: .image,
-      shouldAttemptToOpenInPlace: true
-    ) { receivedFile in
+    // Not `shouldAttemptToOpenInPlace: true`. Opening the original in place worked for JPEG assets
+    // but not for HEIC ones — the transfer never produced a readable file and every picked HEIC
+    // photo ended at "선택한 파일을 읽지 못했어요". That is the format iPhone cameras write by
+    // default, so in practice it meant most of a user's library could not be attached at all.
+    // Letting the system hand over a copy inside the app container costs one copy bounded by the
+    // 10MB image limit, and the HEIF conversion below needs the bytes anyway.
+    FileRepresentation(importedContentType: .image) { receivedFile in
       try importingFile(at: receivedFile.file)
     }
   }
 
   static func importingFile(at url: URL) throws -> Self {
+    // `shouldAttemptToOpenInPlace: true` hands back the original file rather than a copy inside the
+    // app container, and that URL is security-scoped. Without opening access first, both the
+    // metadata read and the file handle fail, and every failure here funnels into
+    // `.unreadableSelection` — so the picker opened, the user picked, and the only thing on screen
+    // was "선택한 파일을 읽지 못했어요". Opening a non-scoped URL just returns false, so this is safe
+    // for the file-importer path too.
+    let didStartAccess = url.startAccessingSecurityScopedResource()
+    defer {
+      if didStartAccess {
+        url.stopAccessingSecurityScopedResource()
+      }
+    }
+
     let fileSize = try BoundedPickerFileMetadata.byteSize(
       at: url,
       maximumByteSize: MediaUploadDraft.maximumImageByteSize,
@@ -167,6 +183,16 @@ struct BoundedPickerVideoTransfer: Transferable, Sendable {
     guard temporaryDirectory.isFileURL else {
       throw PickerFileTransferError.unreadableSelection
     }
+
+    // Same security-scoped URL as the image path — see `BoundedPickerImageTransfer`. Here it also
+    // covers `copyItem`, which reads the source.
+    let didStartAccess = url.startAccessingSecurityScopedResource()
+    defer {
+      if didStartAccess {
+        url.stopAccessingSecurityScopedResource()
+      }
+    }
+
     let fileSize = try BoundedPickerFileMetadata.byteSize(
       at: url,
       maximumByteSize: MediaUploadDraft.maximumVideoByteSize,
@@ -1194,69 +1220,60 @@ struct CameraCaptureView: UIViewControllerRepresentable {
   }
 }
 
-struct MediaAttachmentComposer: View {
-  @State private var model: MediaAttachmentComposerModel
+/// The three attach sources behind one paperclip.
+///
+/// This lives outside the composer because the app needs the same entry point in two very different
+/// layouts. A scrolling editor puts it inside a card above the previews; the keyboard bar puts it on
+/// the same row as the text field, where a full composer would not fit. Keeping the menu and its
+/// three presentations together in one view means moving the affordance never moves presentation
+/// ownership.
+///
+/// Every entry here is a plain `Button` that only flips state, and each presentation sits on this
+/// view's body. `Menu` does not keep its content in the SwiftUI hierarchy — it flattens the items
+/// into a UIKit menu, where an action closure survives but an owned presentation anchor does not. A
+/// `PhotosPicker` placed directly in the menu therefore renders its label and does nothing when
+/// tapped, which is how the library entry silently stopped working when the three sources first
+/// moved behind this menu.
+struct MediaAttachmentSourceMenu: View {
+  private let model: MediaAttachmentComposerModel
   @State private var pickerItems: [PhotosPickerItem] = []
   @State private var isPhotoLibraryPresented = false
   @State private var isCameraPresented = false
   @State private var isFileImporterPresented = false
 
-  @MainActor
   init(model: MediaAttachmentComposerModel) {
-    _model = State(initialValue: model)
+    self.model = model
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: WoorisaiSpacing.medium) {
-      HStack {
-        attachmentSourceMenu
+    Menu {
+      Button {
+        isPhotoLibraryPresented = true
+      } label: {
+        Label("사진 보관함", systemImage: "photo.on.rectangle")
+      }
 
-        Spacer()
-
-        if !model.uploads.isEmpty {
-          Text(attachmentCountLabel)
-            .font(.caption)
-            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
-            .accessibilityLabel(attachmentCountLabel)
+      if Self.isCameraAvailable {
+        Button {
+          isCameraPresented = true
+        } label: {
+          Label("사진 촬영", systemImage: "camera")
         }
       }
 
-      if model.isImporting {
-        ProgressView("선택한 파일을 준비하고 있어요.")
-          .accessibilityIdentifier("media.importing")
+      Button {
+        isFileImporterPresented = true
+      } label: {
+        Label("파일 선택", systemImage: "folder")
       }
-
-      if let failure = model.importFailure {
-        HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
-          Label(importFailureMessage(failure), systemImage: "exclamationmark.triangle")
-            .font(.footnote)
-            .foregroundStyle(WoorisaiColor.Fg.critical)
-          Spacer()
-          Button("닫기") {
-            model.dismissImportFailure()
-          }
-          .font(.footnote)
-          .frame(
-            minWidth: WoorisaiControlMetric.minimumTapTarget,
-            minHeight: WoorisaiControlMetric.minimumTapTarget
-          )
-          .accessibilityLabel("첨부 오류 닫기")
-        }
-        .accessibilityIdentifier("media.importError")
-      }
-
-      if !model.uploads.isEmpty {
-        MediaAttachmentGallery(items: model.uploads, kind: \.kind) { item, _ in
-          uploadTile(item)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("media.group")
-
-        ForEach(model.uploads) { item in
-          uploadDetails(item)
-        }
-      }
+    } label: {
+      Label(attachmentMenuLabel, systemImage: "paperclip")
+        .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
     }
+    .disabled(!model.canSelectMore)
+    .accessibilityLabel(attachmentMenuLabel)
+    .accessibilityHint(pickerAccessibilityHint)
+    .accessibilityIdentifier("media.attachMenu")
     .onChange(of: pickerItems) { _, selectedItems in
       guard !selectedItems.isEmpty else { return }
       model.importPickerItems(selectedItems)
@@ -1292,47 +1309,6 @@ struct MediaAttachmentComposer: View {
         model.reportUnreadableSelection()
       }
     }
-    .accessibilityElement(children: .contain)
-  }
-
-  /// Groups the three sources behind one paperclip so the attach affordance stays a single tap
-  /// target regardless of how many sources the current policy allows.
-  ///
-  /// Every entry here is a plain `Button` that only flips state, and each presentation lives on the
-  /// composer body instead. `Menu` does not keep its content in the SwiftUI hierarchy — it flattens
-  /// the items into a UIKit menu, where an action closure survives but an owned presentation anchor
-  /// does not. A `PhotosPicker` placed directly in here therefore renders its label and does
-  /// nothing when tapped, which is how the library entry silently stopped working when the three
-  /// sources moved behind this menu.
-  private var attachmentSourceMenu: some View {
-    Menu {
-      Button {
-        isPhotoLibraryPresented = true
-      } label: {
-        Label("사진 보관함", systemImage: "photo.on.rectangle")
-      }
-
-      if Self.isCameraAvailable {
-        Button {
-          isCameraPresented = true
-        } label: {
-          Label("사진 촬영", systemImage: "camera")
-        }
-      }
-
-      Button {
-        isFileImporterPresented = true
-      } label: {
-        Label("파일 선택", systemImage: "folder")
-      }
-    } label: {
-      Label(attachmentMenuLabel, systemImage: "paperclip")
-        .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
-    }
-    .disabled(!model.canSelectMore)
-    .accessibilityLabel(attachmentMenuLabel)
-    .accessibilityHint(pickerAccessibilityHint)
-    .accessibilityIdentifier("media.attachMenu")
   }
 
   private var attachmentMenuLabel: String {
@@ -1363,6 +1339,69 @@ struct MediaAttachmentComposer: View {
     case .comment, .diaryEntry:
       return "사진은 최대 네 장, 동영상은 한 개만 선택할 수 있습니다."
     }
+  }
+}
+
+struct MediaAttachmentComposer: View {
+  @State private var model: MediaAttachmentComposerModel
+
+  @MainActor
+  init(model: MediaAttachmentComposerModel) {
+    _model = State(initialValue: model)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: WoorisaiSpacing.medium) {
+      HStack {
+        MediaAttachmentSourceMenu(model: model)
+
+        Spacer()
+
+        if !model.uploads.isEmpty {
+          Text(attachmentCountLabel)
+            .font(.caption)
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
+            .accessibilityLabel(attachmentCountLabel)
+        }
+      }
+
+      if model.isImporting {
+        ProgressView("선택한 파일을 준비하고 있어요.")
+          .accessibilityIdentifier("media.importing")
+      }
+
+      if let failure = model.importFailure {
+        HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
+          Label(failure.message, systemImage: "exclamationmark.triangle")
+            .font(.footnote)
+            .foregroundStyle(WoorisaiColor.Fg.critical)
+          Spacer()
+          Button("닫기") {
+            model.dismissImportFailure()
+          }
+          .font(.footnote)
+          .frame(
+            minWidth: WoorisaiControlMetric.minimumTapTarget,
+            minHeight: WoorisaiControlMetric.minimumTapTarget
+          )
+          .accessibilityLabel("첨부 오류 닫기")
+        }
+        .accessibilityIdentifier("media.importError")
+      }
+
+      if !model.uploads.isEmpty {
+        MediaAttachmentGallery(items: model.uploads, kind: \.kind) { item, _ in
+          uploadTile(item)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("media.group")
+
+        ForEach(model.uploads) { item in
+          uploadDetails(item)
+        }
+      }
+    }
+    .accessibilityElement(children: .contain)
   }
 
   private var attachmentCountLabel: String {
@@ -1518,19 +1557,211 @@ struct MediaAttachmentComposer: View {
         .font(.caption)
         .foregroundStyle(WoorisaiColor.Fg.positive)
     case .failed(let failure):
-      Label(uploadFailureMessage(failure), systemImage: "exclamationmark.circle")
+      Label(failure.message, systemImage: "exclamationmark.circle")
         .font(.caption)
         .foregroundStyle(WoorisaiColor.Fg.critical)
-        .accessibilityLabel("\(item.fileName) 업로드 실패. \(uploadFailureMessage(failure))")
+        .accessibilityLabel("\(item.fileName) 업로드 실패. \(failure.message)")
     case .cancelled:
       Label("업로드를 취소했어요.", systemImage: "xmark.circle")
         .font(.caption)
         .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
     }
   }
+}
 
-  private func uploadFailureMessage(_ failure: MediaUploadModel.Failure) -> String {
-    switch failure {
+/// The attachment preview for the keyboard bar.
+///
+/// `MediaAttachmentComposer` lays previews out for a scrolling editor: a gallery whose height is a
+/// ratio of the available width, plus a file name, byte count and status sentence per item. Measured
+/// on an iPhone 15 Pro that spends about 425pt on a single photo. Above the keyboard that is the
+/// most expensive space on screen, so here the height is fixed and items flow horizontally — the
+/// strip stays one row no matter how many attachments there are.
+///
+/// Status is left to the tile overlay, which already says the same thing the sentence did. Only a
+/// failure gets a row of its own, because that is the one state where the user has a decision to
+/// make and needs the reason to make it.
+struct MediaAttachmentStrip: View {
+  private let model: MediaAttachmentComposerModel
+
+  init(model: MediaAttachmentComposerModel) {
+    self.model = model
+  }
+
+  /// Two tap targets wide. The tile has to hold a remove button that still meets the 44pt minimum
+  /// without covering the photo it belongs to.
+  private static let tileSide = WoorisaiControlMetric.minimumTapTarget * 2
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
+      if !model.uploads.isEmpty || model.isImporting {
+        ScrollView(.horizontal) {
+          HStack(spacing: WoorisaiControlMetric.mediaGap) {
+            ForEach(model.uploads) { item in
+              tile(item)
+            }
+
+            if model.isImporting {
+              importingTile
+            }
+          }
+        }
+        .scrollIndicators(.hidden)
+        .frame(height: Self.tileSide)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("media.strip")
+      }
+
+      if let failure = model.importFailure {
+        strippedFailureRow(
+          message: failure.message,
+          identifier: "media.strip.importError"
+        ) {
+          Button("닫기", action: model.dismissImportFailure)
+            .font(.footnote)
+            .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
+            .accessibilityLabel("첨부 오류 닫기")
+        }
+      }
+
+      ForEach(retryableUploads) { item in
+        strippedFailureRow(
+          message: item.upload.failureMessage ?? "파일을 전송하지 못했어요.",
+          identifier: "media.strip.uploadError.\(item.id.uuidString)"
+        ) {
+          Button("재시도") {
+            model.retry(item.id)
+          }
+          .font(.footnote)
+          .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
+          .accessibilityLabel("\(item.fileName) 업로드 재시도")
+        }
+      }
+    }
+  }
+
+  private var retryableUploads: [MediaAttachmentComposerModel.UploadItem] {
+    model.uploads.filter(\.upload.canRetry)
+  }
+
+  private func tile(_ item: MediaAttachmentComposerModel.UploadItem) -> some View {
+    MediaTileSurface {
+      ZStack {
+        if let previewImage = item.previewImage {
+          MediaFillImageSurface(image: previewImage)
+        } else {
+          WoorisaiColor.bg(.init(isImage: item.kind != .video))
+          Image(systemName: item.kind == .video ? "play.circle.fill" : "photo.fill")
+            .font(.title2)
+            .foregroundStyle(WoorisaiColor.fg(.init(isImage: item.kind != .video)))
+        }
+
+        tileStatus(item)
+      }
+      .overlay(alignment: .topTrailing) {
+        Button {
+          model.remove(item.id)
+        } label: {
+          Image(systemName: "xmark")
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(WoorisaiColor.Fg.staticWhite)
+            .frame(width: Self.removeBadgeSide, height: Self.removeBadgeSide)
+            .background(WoorisaiColor.Bg.scrim, in: Circle())
+            .frame(
+              width: WoorisaiControlMetric.minimumTapTarget,
+              height: WoorisaiControlMetric.minimumTapTarget,
+              alignment: .topTrailing
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(item.fileName) 첨부 제거")
+      }
+    }
+    .frame(width: Self.tileSide, height: Self.tileSide)
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel(
+      item.kind == .image ? "선택한 사진 \(item.fileName)" : "선택한 동영상 \(item.fileName)"
+    )
+    .accessibilityIdentifier("media.strip.tile.\(item.id.uuidString)")
+  }
+
+  /// The badge stays visually small while its tap target does not: a 44pt frame anchored to the
+  /// corner keeps the photo underneath readable at this tile size.
+  private static let removeBadgeSide: CGFloat = 24
+
+  private var importingTile: some View {
+    MediaTileSurface {
+      ProgressView()
+        .tint(WoorisaiColor.Fg.brand)
+    }
+    .frame(width: Self.tileSide, height: Self.tileSide)
+    .accessibilityLabel("선택한 파일을 준비하고 있어요.")
+    .accessibilityIdentifier("media.strip.importing")
+  }
+
+  @ViewBuilder
+  private func tileStatus(_ item: MediaAttachmentComposerModel.UploadItem) -> some View {
+    switch item.upload.state {
+    case .idle, .initiating, .uploading, .completing:
+      ProgressView()
+        .tint(WoorisaiColor.Fg.staticWhite)
+        .padding(WoorisaiSpacing.small)
+        .background(WoorisaiColor.Bg.scrimWeak, in: Circle())
+        .accessibilityHidden(true)
+    case .ready:
+      Image(systemName: "checkmark.circle.fill")
+        .font(.body)
+        .foregroundStyle(WoorisaiColor.Fg.staticWhite, WoorisaiColor.Fg.positive)
+        .padding(WoorisaiSpacing.xSmall)
+        .background(WoorisaiColor.Bg.scrimWeak, in: Circle())
+        .accessibilityHidden(true)
+    case .failed:
+      Image(systemName: "exclamationmark.circle.fill")
+        .font(.body)
+        .foregroundStyle(WoorisaiColor.Fg.staticWhite, WoorisaiColor.Fg.critical)
+        .padding(WoorisaiSpacing.xSmall)
+        .background(WoorisaiColor.Bg.scrimWeak, in: Circle())
+        .accessibilityHidden(true)
+    case .cancelled:
+      Image(systemName: "xmark.circle.fill")
+        .font(.body)
+        .foregroundStyle(WoorisaiColor.Fg.staticWhite)
+        .padding(WoorisaiSpacing.xSmall)
+        .background(WoorisaiColor.Bg.scrimWeak, in: Circle())
+        .accessibilityHidden(true)
+    }
+  }
+
+  private func strippedFailureRow<Action: View>(
+    message: String,
+    identifier: String,
+    @ViewBuilder action: () -> Action
+  ) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
+      Label(message, systemImage: "exclamationmark.triangle")
+        .font(.footnote)
+        .foregroundStyle(WoorisaiColor.Fg.critical)
+      Spacer(minLength: WoorisaiSpacing.small)
+      action()
+    }
+    .accessibilityIdentifier(identifier)
+  }
+}
+
+extension MediaUploadModel {
+  /// The strip needs the reason without re-deriving the state machine the composer already reads.
+  fileprivate var failureMessage: String? {
+    guard case .failed(let failure) = state else { return nil }
+    return failure.message
+  }
+}
+
+/// Failure wording lives on the failure itself because two very different surfaces read it — the
+/// scrolling composer spells it out per item, and the keyboard-bar strip surfaces only the failures
+/// that still need a decision from the user.
+extension MediaUploadModel.Failure {
+  fileprivate var message: String {
+    switch self {
     case .authenticationRequired: return "다시 로그인한 뒤 첨부해 주세요."
     case .forbidden: return "이 파일을 첨부할 권한이 없어요."
     case .unavailable: return "미디어 서버를 잠시 사용할 수 없어요."
@@ -1540,11 +1771,11 @@ struct MediaAttachmentComposer: View {
     case .completionFailed: return "업로드 확인을 마치지 못했어요."
     }
   }
+}
 
-  private func importFailureMessage(
-    _ failure: MediaAttachmentComposerModel.ImportFailure
-  ) -> String {
-    switch failure {
+extension MediaAttachmentComposerModel.ImportFailure {
+  fileprivate var message: String {
+    switch self {
     case .unreadableSelection:
       return "선택한 파일을 읽지 못했어요."
     case .unsupportedType:

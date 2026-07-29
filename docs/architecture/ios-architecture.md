@@ -149,10 +149,30 @@ menu 뒤에 둔다. 세 source는 같은 준비 경로와 같은 정책 검증�
 kind/size/cardinality 판단을 복제하지 않아야 "보관함은 막히는데 파일 앱은 통과하는" 차이가
 생기지 않는다. Camera는 simulator에서 사용할 수 없으므로 menu 항목 자체를 숨긴다.
 
-Menu 항목은 상태만 바꾸는 `Button`으로 두고 세 presentation은 모두 composer body가 소유한다.
-`Menu` content는 SwiftUI 계층에 남지 않고 UIKit menu로 평탄화되어 action closure만 살아남으므로,
-presentation을 스스로 소유하는 `PhotosPicker`를 항목으로 두면 label만 보이고 탭이 아무 일도 하지
-않는다. 새 source를 추가할 때도 같은 모양을 지킨다.
+Menu 항목은 상태만 바꾸는 `Button`으로 두고 세 presentation은 모두 `MediaAttachmentSourceMenu`가
+소유한다. `Menu` content는 SwiftUI 계층에 남지 않고 UIKit menu로 평탄화되어 action closure만
+살아남으므로, presentation을 스스로 소유하는 `PhotosPicker`를 항목으로 두면 label만 보이고 탭이 아무
+일도 하지 않는다. 새 source를 추가할 때도 같은 모양을 지킨다. Menu가 composer와 분리된 view인 것도
+이 때문이 아니라 배치 때문이다 — scrolling editor는 카드 안에, keyboard 위 입력 바는 text field와
+같은 행에 두므로, 묶어 두면 배치를 바꿀 때 presentation 소유권이 함께 움직여야 한다.
+
+선택한 첨부의 미리보기는 두 문법을 갖는다. Scrolling editor는 `MediaAttachmentComposer`의 갤러리와
+항목별 파일명·byte 크기·상태 문장을 펼치고, keyboard 위 입력 바는 고정 높이 가로
+strip(`MediaAttachmentStrip`)만 둔다. 갤러리 높이는 폭의 비율로 정해지므로 iPhone 15 Pro에서 사진
+한 장이 약 425pt를 먹는데, keyboard 위에서 그 높이는 감당할 수 없다. Strip은 상태를 tile overlay에
+맡기고 — 문장과 overlay가 같은 것을 두 번 말하고 있었다 — 결정이 필요한 실패만 한 줄로 내린다.
+첨부 진입은 paperclip 한 번으로 소스 menu를 열고 트레이를 여는 토글은 두지 않는다. 트레이는 상한을
+준 `ScrollView`였고, `ScrollView`는 상한을 받아도 주어진 공간을 채우므로 첨부가 없는 빈 트레이가
+240pt를 그대로 점유했다.
+
+Picker가 넘기는 파일은 앱 container 안 복사본으로 받는다 — `FileRepresentation`에
+`shouldAttemptToOpenInPlace`를 쓰지 않는다. 원본을 그 자리에서 열면 JPEG asset은 통과하지만 HEIC
+asset은 읽을 수 있는 파일을 얻지 못하고, 고른 HEIC 사진이 모두 "선택한 파일을 읽지 못했어요"에서
+끝난다. iPhone camera의 기본 출력이 HEIC이므로 실사용에서는 보관함 대부분을 첨부할 수 없다는 뜻이다.
+복사 비용은 image 10MB 상한 안에 있고 HEIF 변환은 어차피 byte가 필요하며, video는 그 다음 단계에서
+protected temporary file로 복사하므로 in-place로 아낄 것이 남지 않는다. Provider가 넘긴 URL은
+security-scoped일 수 있으므로 두 transfer 모두 읽기 구간 전체에서 접근을 열어 둔다. 파일 앱 경로만
+그렇게 하고 picker 경로는 빼 두면, 같은 준비 경로를 공유한다는 위의 약속이 깨진다.
 
 Photos picker와 파일 앱의 image, video는 provider file metadata에서 regular file, symbolic link
 여부와 byte size를 먼저 검증한다. Image는 10MB 상한보다 큰 파일을 읽기 전에 거절하고 제한된 byte
@@ -265,6 +285,23 @@ Keyboard 닫기는 messenger 관례를 따른다: 카드 주변 빈 영역을 �
 Keyboard 위에 `완료` toolbar를 두지 않는다 — 모든 입력 화면은 이미 자신의 action bar를
 `safeAreaInset(edge: .bottom)`으로 keyboard 바로 위에 고정하므로, system toolbar는 composer와
 keyboard 사이에 세 번째 chrome 줄만 쌓았다.
+
+그 action bar의 표면은 상단 좌우만 굽힌다(`woorisaiKeyboardActionBarSurface()`). iOS 26 keyboard는
+상단 모서리를 약 15pt 반경으로 그리므로 각진 전폭 바는 두 곳에서 어긋난다 — 위로는 scroll 카드를
+직선으로 잘라 내고, 아래로는 keyboard 곡선 바깥 좌우 코너에 배경이 비치는 틈을 남겨 바가 keyboard
+위에 떠 있는 판처럼 보인다. 하단을 굽히지 않는 것은 keyboard가 없을 때 화면 바닥까지 채우는 safe
+area 처리를 그대로 유지하기 위해서다. Divider는 상단 테두리로 대신해 선이 곡선을 따라 돌게 한다.
+다섯 개 입력 화면이 같은 modifier를 쓰므로 재질과 곡률이 화면마다 갈리지 않는다.
+
+글자수 카운터는 남은 글자 수만 보여주고 한도에 가까워질 때만 나타난다(`CharacterBudget`). 한도의
+15%와 40자 중 작은 쪽이 임계값이다 — 비율만 쓰면 500자 field가 75자 남은 시점에 뜨는데 그때는 아직
+문장 여러 개를 더 쓸 수 있고, 절대 수만 쓰면 200자 field는 한도의 20%에서 뜨는 반면 500자 field는
+8%에서 떠서 같은 숫자가 다른 촉박함을 뜻한다. 초과는 임계값과 무관하게 항상 보인다 — 제출을 막은
+이유는 화면에 남아야 한다. 표시는 사용량(`120/500`)이 아니라 잔여 수다. 사용자가 결정해야 하는 것은
+몇 자를 더 쓸 수 있는지이고, 사용량은 그 값을 머릿속에서 빼야 알 수 있다. 숫자는
+`monospacedDigit()`으로 폭을 고정한다. 그러지 않으면 타이핑 중 옆의 전송 버튼이 좌우로 흔들린다.
+카운터가 숨어 있는 동안 VoiceOver는 입력 field의 `accessibilityHint`로 여유를 듣는다 — `value`는
+입력한 text로 남겨 둔다.
 
 이 탭 제스처는 `ScrollView`의 **content**에, content의 가장 바깥
 `.frame(maxWidth: .infinity)` 뒤에 붙여 gutter까지 포함한 전체 폭을 탭 영역으로 만든다. 두 가지

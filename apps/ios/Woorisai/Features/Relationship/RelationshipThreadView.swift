@@ -7,7 +7,6 @@ struct ScoreChangeThreadView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var model: RelationshipModel
   @State private var commentMediaModel: MediaAttachmentComposerModel
-  @State private var showsMediaTray = false
   @State private var latestScrollRequest = 0
   @State private var confirmsDraftDiscard = false
   @FocusState private var isCommentFocused: Bool
@@ -144,7 +143,6 @@ struct ScoreChangeThreadView: View {
       guard successfulID == scoreChangeID else { return }
       commentMediaModel.consumeReadyUploads()
       model.discardCommentDraft(scoreChangeID: scoreChangeID)
-      showsMediaTray = false
       // Keep the conversation flowing: restore focus after a successful send (the field drops it
       // while disabled during the submit) instead of forcing a re-tap for the next reply.
       isCommentFocused = true
@@ -292,21 +290,14 @@ struct ScoreChangeThreadView: View {
             .accessibilityIdentifier("relationship.thread.notice")
         }
 
-        if showsMediaTray {
-          ScrollView {
-            MediaAttachmentComposer(model: commentMediaModel)
-              .padding(.horizontal, WoorisaiSpacing.xSmall)
-          }
+        MediaAttachmentStrip(model: commentMediaModel)
           .disabled(isDraftEditingLocked)
-          .frame(maxHeight: dynamicTypeSize.isAccessibilitySize ? 320 : 240)
-          .transition(.opacity.combined(with: .move(edge: .bottom)))
-        }
 
         if dynamicTypeSize.isAccessibilitySize {
           VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
             commentTextField
             HStack(spacing: WoorisaiSpacing.small) {
-              mediaTrayButton
+              attachmentSourceButton
               commentCountLabel
               Spacer(minLength: WoorisaiSpacing.small)
               commentSubmitButton
@@ -314,21 +305,17 @@ struct ScoreChangeThreadView: View {
           }
         } else {
           HStack(alignment: .bottom, spacing: WoorisaiSpacing.small) {
-            mediaTrayButton
+            attachmentSourceButton
             commentTextField
+            commentCountLabel
             commentSubmitButton
           }
-          commentCountLabel
-            .frame(maxWidth: .infinity, alignment: .trailing)
         }
       }
     }
     .padding(.horizontal, WoorisaiSpacing.screenGutter)
     .padding(.vertical, WoorisaiSpacing.small)
-    .background(.regularMaterial)
-    .overlay(alignment: .top) {
-      Divider().overlay(WoorisaiColor.Stroke.neutralWeak)
-    }
+    .woorisaiKeyboardActionBarSurface()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("relationship.thread.composer")
   }
@@ -355,40 +342,30 @@ struct ScoreChangeThreadView: View {
           .stroke(commentIsWithinLimit ? WoorisaiColor.Stroke.neutralWeak : WoorisaiColor.Stroke.critical, lineWidth: 1)
       }
       .accessibilityIdentifier("relationship.thread.commentInput")
+      // The counter only appears near the limit, so VoiceOver hears the remaining budget here — a
+      // hint rather than a value, because the value has to stay the typed text.
+      .accessibilityHint(commentBudget.accessibilityDescription)
       .disabled(isDraftEditingLocked)
   }
 
-  private var mediaTrayButton: some View {
-    Button {
-      withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-        showsMediaTray.toggle()
-      }
-      latestScrollRequest &+= 1
-    } label: {
-      ZStack(alignment: .topTrailing) {
-        Image(systemName: showsMediaTray ? "paperclip.circle.fill" : "paperclip.circle")
-          .font(.title2)
-          .foregroundStyle(WoorisaiColor.Fg.brand)
-          .frame(
-            width: WoorisaiControlMetric.minimumTapTarget,
-            height: WoorisaiControlMetric.minimumTapTarget
-          )
-        if !commentMediaModel.uploads.isEmpty {
-          Text("\(commentMediaModel.uploads.count)")
-            .font(.caption2.weight(.heavy))
-            .foregroundStyle(WoorisaiColor.Fg.brandContrast)
-            .frame(minWidth: 18, minHeight: 18)
-            .background(WoorisaiColor.Bg.brandSolid, in: Circle())
-        }
-      }
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel(showsMediaTray ? "미디어 첨부 닫기" : "미디어 첨부 열기")
-    .accessibilityValue(
-      commentMediaModel.uploads.isEmpty ? "첨부 없음" : "첨부 \(commentMediaModel.uploads.count)개"
-    )
-    .accessibilityIdentifier("relationship.thread.media.toggle")
-    .disabled(isDraftEditingLocked)
+  /// The attach affordance opens the source menu directly instead of toggling a tray.
+  ///
+  /// Before, this paperclip opened a tray and a second paperclip inside the tray picked the source —
+  /// two steps to the same place. Worse, the tray held a `ScrollView` capped at 240pt, and a
+  /// `ScrollView` fills the space it is offered rather than shrinking to its content, so an empty
+  /// tray spent all 240pt to show one row. Selected attachments now cost only what
+  /// `MediaAttachmentStrip` needs, and nothing at all while there are none.
+  private var attachmentSourceButton: some View {
+    MediaAttachmentSourceMenu(model: commentMediaModel)
+      .labelStyle(.iconOnly)
+      .font(.title2)
+      .foregroundStyle(WoorisaiColor.Fg.brand)
+      .frame(
+        width: WoorisaiControlMetric.minimumTapTarget,
+        height: WoorisaiControlMetric.minimumTapTarget
+      )
+      .accessibilityIdentifier("relationship.thread.media.attach")
+      .disabled(isDraftEditingLocked)
   }
 
   private var commentSubmitButton: some View {
@@ -421,13 +398,14 @@ struct ScoreChangeThreadView: View {
   }
 
   private var commentCountLabel: some View {
-    Text("\(commentCodePointCount)/\(RelationshipScoreCommentDraft.maximumContentCharacterCount)")
-      .font(.caption2)
-      .foregroundStyle(commentIsWithinLimit ? WoorisaiColor.Fg.neutralMuted : WoorisaiColor.Fg.critical)
-      .accessibilityLabel("댓글 글자 수")
-      .accessibilityValue(
-        "\(commentCodePointCount)/\(RelationshipScoreCommentDraft.maximumContentCharacterCount)"
-      )
+    WoorisaiCharacterCountLabel(commentBudget, name: "댓글")
+  }
+
+  private var commentBudget: CharacterBudget {
+    CharacterBudget(
+      used: commentCodePointCount,
+      limit: RelationshipScoreCommentDraft.maximumContentCharacterCount
+    )
   }
 
   private var commentContent: String {
@@ -454,7 +432,7 @@ struct ScoreChangeThreadView: View {
   }
 
   private var commentIsWithinLimit: Bool {
-    commentCodePointCount <= RelationshipScoreCommentDraft.maximumContentCharacterCount
+    !commentBudget.isExceeded
   }
 
   private var commentSubmissionAccessibility: RelationshipSubmissionAccessibility {
@@ -523,7 +501,6 @@ struct ScoreChangeThreadView: View {
     }
     commentMediaModel.consumeReadyUploads()
     model.discardCommentDraft(scoreChangeID: scoreChangeID)
-    showsMediaTray = false
     isCommentFocused = false
     syncCommentDraftProtection()
   }
@@ -540,7 +517,6 @@ struct ScoreChangeThreadView: View {
     }
     commentMediaModel.consumeReadyUploads()
     model.discardCommentDraft(scoreChangeID: scoreChangeID)
-    showsMediaTray = false
     isCommentFocused = false
     syncCommentDraftProtection()
   }
@@ -556,7 +532,6 @@ struct ScoreChangeThreadView: View {
     }
     commentMediaModel.clear()
     mediaSessionCoordinator.unregisterTransient(commentMediaModel)
-    showsMediaTray = false
     dismiss()
   }
 
