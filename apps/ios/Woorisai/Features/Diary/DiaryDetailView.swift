@@ -769,42 +769,42 @@ struct DiaryDetailView: View {
         )
       }
 
-      HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
-        Text("댓글 달기")
-          .font(.subheadline.weight(.bold))
-          .foregroundStyle(WoorisaiColor.Fg.neutral)
-        Spacer(minLength: WoorisaiSpacing.small)
-        Text("\(commentCodePointCount)/\(DiaryCommentDraft.maximumContentCharacterCount)")
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(
-            commentCodePointCount > DiaryCommentDraft.maximumContentCharacterCount
-              ? WoorisaiColor.Fg.critical : WoorisaiColor.Fg.neutralMuted
-          )
-      }
-
+      // The "댓글 달기" heading used to sit here purely to give the counter a row. The field's
+      // placeholder already says the same thing, so the row went and the counter moved beside 전송 —
+      // above the keyboard a row spent on a label the user can already read is the expensive kind.
       if dynamicTypeSize.isAccessibilitySize {
         VStack(spacing: WoorisaiSpacing.small) {
           commentInput
           HStack(spacing: WoorisaiSpacing.small) {
+            commentCountLabel
+            Spacer(minLength: WoorisaiSpacing.small)
             commentSubmitButton
           }
         }
       } else {
         HStack(alignment: .bottom, spacing: WoorisaiSpacing.small) {
           commentInput
+          commentCountLabel
           commentSubmitButton
         }
       }
     }
     .padding(.horizontal, WoorisaiSpacing.screenGutter)
     .padding(.vertical, WoorisaiSpacing.small)
-    .background(.regularMaterial)
-    .overlay(alignment: .top) {
-      Divider()
-        .overlay(WoorisaiColor.Stroke.neutralWeak)
-    }
+    .woorisaiKeyboardActionBarSurface()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("diary.comment.composer")
+  }
+
+  private var commentCountLabel: some View {
+    WoorisaiCharacterCountLabel(commentBudget, name: "댓글")
+  }
+
+  private var commentBudget: CharacterBudget {
+    CharacterBudget(
+      used: commentCodePointCount,
+      limit: DiaryCommentDraft.maximumContentCharacterCount
+    )
   }
 
   private var commentInput: some View {
@@ -819,9 +819,14 @@ struct DiaryDetailView: View {
       .clipShape(RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous))
       .overlay {
         RoundedRectangle(cornerRadius: WoorisaiRadius.small, style: .continuous)
-          .stroke(WoorisaiColor.Stroke.neutralWeak, lineWidth: 1)
+          .stroke(
+            commentBudget.isExceeded
+              ? WoorisaiColor.Stroke.critical : WoorisaiColor.Stroke.neutralWeak,
+            lineWidth: 1
+          )
       }
       .accessibilityIdentifier("diary.comment.input")
+      .accessibilityHint(commentBudget.accessibilityDescription)
       .disabled(isInlineDraftEditingLocked)
   }
 

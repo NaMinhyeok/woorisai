@@ -441,10 +441,7 @@ struct LoginOptionsView: View {
     .padding(.horizontal, WoorisaiSpacing.screenGutter)
     .padding(.vertical, WoorisaiSpacing.small)
     .frame(maxWidth: .infinity)
-    .background(.ultraThinMaterial)
-    .overlay(alignment: .top) {
-      Divider().opacity(0.5)
-    }
+    .woorisaiKeyboardActionBarSurface()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("authentication.actionBar")
   }

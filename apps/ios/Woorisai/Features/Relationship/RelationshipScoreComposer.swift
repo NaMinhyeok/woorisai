@@ -256,9 +256,7 @@ struct ScoreComposerSheet: View {
           .font(.headline)
           .foregroundStyle(WoorisaiColor.Fg.neutral)
         Spacer(minLength: WoorisaiSpacing.small)
-        Text("\(reasonCodePointCount)/\(RelationshipScoreChangeDraft.maximumReasonCharacterCount)")
-          .font(.caption)
-          .foregroundStyle(reasonIsWithinLimit ? WoorisaiColor.Fg.neutralMuted : WoorisaiColor.Fg.critical)
+        WoorisaiCharacterCountLabel(reasonBudget, name: "이유")
       }
 
       HStack(alignment: .bottom, spacing: WoorisaiSpacing.small) {
@@ -278,6 +276,7 @@ struct ScoreComposerSheet: View {
                 reasonIsWithinLimit ? WoorisaiColor.Stroke.neutralWeak : WoorisaiColor.Stroke.critical, lineWidth: 1)
           }
           .accessibilityIdentifier("relationship.reason")
+          .accessibilityHint(reasonBudget.accessibilityDescription)
 
       }
     }
@@ -315,10 +314,7 @@ struct ScoreComposerSheet: View {
     }
     .padding(.horizontal, WoorisaiSpacing.screenGutter)
     .padding(.vertical, WoorisaiSpacing.medium)
-    .background(.regularMaterial)
-    .overlay(alignment: .top) {
-      Divider().overlay(WoorisaiColor.Stroke.neutralWeak)
-    }
+    .woorisaiKeyboardActionBarSurface()
   }
 
   private var scoreSliderValue: Binding<Double> {
@@ -336,8 +332,15 @@ struct ScoreComposerSheet: View {
     WoorisaiTextInput.normalizedCodePointCount(reason)
   }
 
+  private var reasonBudget: CharacterBudget {
+    CharacterBudget(
+      used: reasonCodePointCount,
+      limit: RelationshipScoreChangeDraft.maximumReasonCharacterCount
+    )
+  }
+
   private var reasonIsWithinLimit: Bool {
-    reasonCodePointCount <= RelationshipScoreChangeDraft.maximumReasonCharacterCount
+    !reasonBudget.isExceeded
   }
 
   private var canSubmitScore: Bool {
