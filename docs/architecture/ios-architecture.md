@@ -149,6 +149,11 @@ menu 뒤에 둔다. 세 source는 같은 준비 경로와 같은 정책 검증�
 kind/size/cardinality 판단을 복제하지 않아야 "보관함은 막히는데 파일 앱은 통과하는" 차이가
 생기지 않는다. Camera는 simulator에서 사용할 수 없으므로 menu 항목 자체를 숨긴다.
 
+Menu 항목은 상태만 바꾸는 `Button`으로 두고 세 presentation은 모두 composer body가 소유한다.
+`Menu` content는 SwiftUI 계층에 남지 않고 UIKit menu로 평탄화되어 action closure만 살아남으므로,
+presentation을 스스로 소유하는 `PhotosPicker`를 항목으로 두면 label만 보이고 탭이 아무 일도 하지
+않는다. 새 source를 추가할 때도 같은 모양을 지킨다.
+
 Photos picker와 파일 앱의 image, video는 provider file metadata에서 regular file, symbolic link
 여부와 byte size를 먼저 검증한다. Image는 10MB 상한보다 큰 파일을 읽기 전에 거절하고 제한된 byte
 reader로만 `Data`를 만든다. HEIF 변환은 main actor 밖에서 ImageIO downsample을 사용해 decode

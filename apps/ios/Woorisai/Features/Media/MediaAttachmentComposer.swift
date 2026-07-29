@@ -1197,6 +1197,7 @@ struct CameraCaptureView: UIViewControllerRepresentable {
 struct MediaAttachmentComposer: View {
   @State private var model: MediaAttachmentComposerModel
   @State private var pickerItems: [PhotosPickerItem] = []
+  @State private var isPhotoLibraryPresented = false
   @State private var isCameraPresented = false
   @State private var isFileImporterPresented = false
 
@@ -1261,6 +1262,14 @@ struct MediaAttachmentComposer: View {
       model.importPickerItems(selectedItems)
       pickerItems = []
     }
+    .photosPicker(
+      isPresented: $isPhotoLibraryPresented,
+      selection: $pickerItems,
+      maxSelectionCount: model.pickerSelectionLimit,
+      selectionBehavior: .ordered,
+      matching: model.policy.allowsVideo ? .any(of: [.images, .videos]) : .images,
+      preferredItemEncoding: .current
+    )
     .fullScreenCover(isPresented: $isCameraPresented) {
       CameraCaptureView(
         onCapture: { photo in
@@ -1288,15 +1297,18 @@ struct MediaAttachmentComposer: View {
 
   /// Groups the three sources behind one paperclip so the attach affordance stays a single tap
   /// target regardless of how many sources the current policy allows.
+  ///
+  /// Every entry here is a plain `Button` that only flips state, and each presentation lives on the
+  /// composer body instead. `Menu` does not keep its content in the SwiftUI hierarchy — it flattens
+  /// the items into a UIKit menu, where an action closure survives but an owned presentation anchor
+  /// does not. A `PhotosPicker` placed directly in here therefore renders its label and does
+  /// nothing when tapped, which is how the library entry silently stopped working when the three
+  /// sources moved behind this menu.
   private var attachmentSourceMenu: some View {
     Menu {
-      PhotosPicker(
-        selection: $pickerItems,
-        maxSelectionCount: model.pickerSelectionLimit,
-        selectionBehavior: .ordered,
-        matching: model.policy.allowsVideo ? .any(of: [.images, .videos]) : .images,
-        preferredItemEncoding: .current
-      ) {
+      Button {
+        isPhotoLibraryPresented = true
+      } label: {
         Label("사진 보관함", systemImage: "photo.on.rectangle")
       }
 
