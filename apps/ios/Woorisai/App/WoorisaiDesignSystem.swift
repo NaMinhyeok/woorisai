@@ -47,6 +47,123 @@ enum SubmittedDraftEditingPolicy {
   }
 }
 
+/// 글자수 카운터의 표시 판단.
+///
+/// 카운터를 항상 띄우면 "0/500"처럼 정보가 없는 상태가 늘 자리를 차지한다. 키보드 위 입력
+/// 바에서는 그 대가가 특히 컸다 — 카운터 하나가 행 하나를 온전히 점유했다. 한도에 가까워질
+/// 때만 등장하도록 시점을 여기서 정한다.
+///
+/// 화면마다 한도가 다르다(이유 200자, 점수·일기 댓글 500자, 일기 본문은 또 다르다). 판단을
+/// 각 View에 두면 같은 앱 안에서 어떤 필드는 이르게, 어떤 필드는 늦게 나타난다. 표시 여부와
+/// 초과 판정을 한 타입에 모아 View는 결과만 그린다.
+struct CharacterBudget: Equatable {
+  let used: Int
+  let limit: Int
+
+  init(used: Int, limit: Int) {
+    self.used = used
+    self.limit = limit
+  }
+
+  /// 남은 글자 수. 한도를 넘으면 음수다 — 몇 자를 줄여야 하는지 보여주려고 0으로 자르지 않는다.
+  var remaining: Int { limit - used }
+
+  /// 제출을 막아야 하는 상태.
+  var isExceeded: Bool { remaining < 0 }
+
+  /// 카운터를 화면에 둘지. `false`면 View는 아무 공간도 차지하지 않는다.
+  ///
+  /// 비율과 절대 수 중 **작은 쪽**을 임계값으로 쓴다. 비율만 쓰면 500자 필드가 75자 남은
+  /// 시점에 등장하는데 그때는 아직 문장 여러 개를 더 쓸 수 있어 경고가 이르다. 절대 수만 쓰면
+  /// 200자 필드에서 한도의 20%를 남기고 뜨는 반면 500자 필드는 8%에서 떠서 같은 숫자가 다른
+  /// 촉박함을 뜻하게 된다. 둘의 최소값은 "비율로도 촉박하고 남은 글자로도 촉박할 때"만 고른다.
+  ///
+  /// `limit`이 0 이하면 초과로 보이더라도 숨는다. 그것은 사용자가 많이 쓴 상황이 아니라 한도를
+  /// 넘겨받지 못한 설정 문제이고, 그때 음수를 띄우면 사용자가 고칠 수 없는 수를 보게 된다.
+  var isVisible: Bool {
+    guard limit > 0 else { return false }
+    guard !isExceeded else { return true }
+    let proportionalThreshold = Int((Double(limit) * Self.proportionalShare).rounded(.down))
+    return remaining <= min(proportionalThreshold, Self.absoluteThreshold)
+  }
+
+  /// 한도의 15%. 짧은 필드에서 임계값을 지배한다.
+  private static let proportionalShare = 0.15
+  /// 40자. 긴 필드에서 임계값을 지배한다 — 한 문장을 더 쓸 여유가 남은 지점이다.
+  private static let absoluteThreshold = 40
+
+  /// 카운터에 그릴 문자열.
+  var displayText: String { "\(remaining)" }
+
+  /// 카운터가 숨어 있어도 VoiceOver는 여유를 알아야 하므로 입력 필드의 `accessibilityValue`가
+  /// 항상 이 문장을 읽는다. 시각적 표시와 접근성 표시의 등장 시점을 분리하는 것이 요점이다.
+  var accessibilityDescription: String {
+    isExceeded
+      ? "\(limit)자 한도를 \(-remaining)자 넘었습니다"
+      : "\(remaining)자 남았습니다"
+  }
+}
+
+/// 글자수 카운터.
+///
+/// 다섯 개 입력 화면이 각자 `Text("\(count)/\(limit)")`를 그리면서 폰트가 `caption`, `caption2`,
+/// `caption.monospacedDigit()` 세 갈래로 갈렸고 어떤 화면은 사용량을, 어떤 화면은 같은 값을 다른
+/// 크기로 보여줬다. 표시는 남은 글자 수 하나로 모은다 — 사용자가 결정해야 하는 것은 "몇 자를 더
+/// 쓸 수 있나"이고, 사용량은 그 값을 머릿속에서 빼야 알 수 있다.
+///
+/// `monospacedDigit()`은 필수다. 타이핑 중 숫자 폭이 바뀌면 옆에 놓인 전송 버튼이 좌우로 흔들린다.
+struct WoorisaiCharacterCountLabel: View {
+  private let budget: CharacterBudget
+  private let name: String
+
+  /// - Parameter name: VoiceOver가 어느 입력의 여유인지 말할 수 있게 하는 이름. "댓글", "이유".
+  init(_ budget: CharacterBudget, name: String) {
+    self.budget = budget
+    self.name = name
+  }
+
+  var body: some View {
+    if budget.isVisible {
+      Text(budget.displayText)
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(
+          budget.isExceeded ? WoorisaiColor.Fg.critical : WoorisaiColor.Fg.neutralMuted
+        )
+        .accessibilityLabel("\(name) 남은 글자 수")
+        .accessibilityValue(budget.accessibilityDescription)
+    }
+  }
+}
+
+extension View {
+  /// 키보드 위에 붙는 액션 바의 표면.
+  ///
+  /// iOS 26 키보드는 상단 좌우를 약 15pt 반경으로 굽는다. 바가 각진 전폭 사각형이면 두 가지가
+  /// 어긋난다 — 위로는 스크롤 카드를 직선으로 잘라 내고, 아래로는 키보드 곡선 바깥 좌우 코너에
+  /// 배경이 비치는 틈을 남긴다. 그 틈이 바를 키보드 위에 떠 있는 판처럼 보이게 한다.
+  ///
+  /// 그래서 상단만 굽히고 하단은 그대로 둔다. 상단 곡률이 키보드와 같은 계열이 되면 두 표면이
+  /// 한 스택으로 읽히고, 하단을 굽히지 않는 것은 키보드가 없을 때 화면 바닥까지 채우는 지금의
+  /// safe area 처리를 그대로 유지하기 위해서다. Divider를 상단 테두리로 대신해 선이 곡선을 따라
+  /// 돌게 한다.
+  func woorisaiKeyboardActionBarSurface() -> some View {
+    background {
+      let shape = UnevenRoundedRectangle(
+        topLeadingRadius: WoorisaiRadius.medium,
+        bottomLeadingRadius: 0,
+        bottomTrailingRadius: 0,
+        topTrailingRadius: WoorisaiRadius.medium,
+        style: .continuous
+      )
+      shape
+        .fill(.regularMaterial)
+        .overlay {
+          shape.strokeBorder(WoorisaiColor.Stroke.neutralWeak, lineWidth: 1)
+        }
+    }
+  }
+}
+
 /// The app-standard way to put the keyboard away.
 @MainActor
 enum WoorisaiKeyboard {
