@@ -320,10 +320,11 @@ struct AuthenticationModelSessionTests {
     // Supersede the login while the save is still in flight.
     await model.select(LoginOption(slot: 2, displayName: "여름"))
     await vault.releaseSave()
-    await Task.yield()
+    // The compensating delete runs in its own task, so a single `Task.yield()` did not reliably
+    // reach it — the assertion passed or failed on scheduler timing. Poll like the rest of the suite.
+    await sessionExpectEventually { await vault.deleteCount >= 1 }
 
     #expect(model.authenticatedParticipant == nil)
-    #expect(await vault.deleteCount >= 1)
   }
 
   // MARK: - Teardown semantics
