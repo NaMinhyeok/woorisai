@@ -196,6 +196,12 @@ final class RelationshipModel {
   @ObservationIgnored
   private var commentWriteGeneration: UInt = 0
 
+  /// Score submission completion is judged against this write generation, NOT `dataGeneration`:
+  /// a list reload while the request is in flight must not orphan the response handling, or
+  /// `scoreSubmissionState` sticks at `.submitting` and score entry locks until app restart.
+  @ObservationIgnored
+  private var scoreWriteGeneration: UInt = 0
+
   @ObservationIgnored
   private var committedCommentOverlays: [Int64: CommittedCommentOverlay] = [:]
 
@@ -297,12 +303,21 @@ final class RelationshipModel {
   }
 
   func refresh() async {
-    notice = nil
+    // A refresh supersedes load-status notices, but must not wipe an unresolved save-failure
+    // notice the user may not have read yet — those clear only via resolution or dismissal.
+    let mutationNeedsAttention =
+      scoreOutcomeRequiresConfirmation || scoreSubmissionState == .failed
+      || commentOutcomeRequiresConfirmation || commentSubmissionState == .failed
+    let preservedNotice = mutationNeedsAttention ? notice : nil
+    notice = preservedNotice
     archiveNotice = nil
     reload(preservingVisibleContent: true)
     let task = loadTask
     await task?.value
-    archiveNotice = notice
+    if notice != preservedNotice {
+      // Only a notice the reload itself produced belongs on the archive screen too.
+      archiveNotice = notice
+    }
   }
 
   func loadNextPage() {
@@ -318,11 +333,12 @@ final class RelationshipModel {
         let page = try await service.loadScoreChanges(pageNumber: expectedPage)
         try Task.checkCancellation()
         guard let self, self.dataGeneration == generation else { return }
-        let knownIDs = Set(self.changes.map(\.id))
-        guard page.changes.allSatisfy({ !knownIDs.contains($0.id) }) else {
-          throw WoorisaiAPIError.schemaDrift
-        }
-        self.changes.append(contentsOf: self.mergingCommittedCommentCounts(into: page.changes))
+        // Offset pagination shifts page boundaries whenever the list grows at the front
+        // (my own new score change, or the partner's). Overlap with already-loaded changes
+        // is therefore expected — absorb it instead of failing the page forever.
+        var knownIDs = Set(self.changes.map(\.id))
+        let freshChanges = page.changes.filter { knownIDs.insert($0.id).inserted }
+        self.changes.append(contentsOf: self.mergingCommittedCommentCounts(into: freshChanges))
         self.currentPage = page.pageNumber
         self.hasNextPage = page.hasNext
         self.totalCount = page.totalCount
@@ -392,7 +408,8 @@ final class RelationshipModel {
       currentParticipantSlot: scores.currentParticipant.slot
     )
 
-    let generation = dataGeneration
+    scoreWriteGeneration &+= 1
+    let generation = scoreWriteGeneration
     let service = service
     scoreSubmissionState = .submitting
     localScoreDraftProtected = false
@@ -415,7 +432,7 @@ final class RelationshipModel {
         // is never automatically retried after a transport failure or conflict.
         let created = try await service.createScoreChange(draft)
         try Task.checkCancellation()
-        guard let self, self.dataGeneration == generation else { return }
+        guard let self, self.scoreWriteGeneration == generation else { return }
         if let scores = self.scores {
           self.scores = RelationshipScores(
             currentParticipant: scores.currentParticipant,
@@ -442,7 +459,7 @@ final class RelationshipModel {
         self.notice = nil
         self.toast = "새 점수 기록을 남겼어요."
       } catch is CancellationError {
-        guard let self, self.dataGeneration == generation else { return }
+        guard let self, self.scoreWriteGeneration == generation else { return }
         self.scoreTask = nil
         self.scoreSubmissionState = .failed
         self.localScoreDraftProtected = true
@@ -452,7 +469,7 @@ final class RelationshipModel {
         self.unknownOutcomeTargetScore = targetScore
         self.notice = "저장 결과를 확인할 수 없어 재전송을 잠갔어요."
       } catch {
-        guard let self, self.dataGeneration == generation else { return }
+        guard let self, self.scoreWriteGeneration == generation else { return }
         self.scoreTask = nil
         let isDefinitiveNonCommit = Self.isDefinitiveNonCommit(error)
         if isDefinitiveNonCommit {
@@ -931,6 +948,7 @@ final class RelationshipModel {
     threadGeneration &+= 1
     threadReadGeneration &+= 1
     commentWriteGeneration &+= 1
+    scoreWriteGeneration &+= 1
     loadTask?.cancel()
     pageTask?.cancel()
     scoreTask?.cancel()
@@ -989,6 +1007,7 @@ final class RelationshipModel {
     threadGeneration &+= 1
     threadReadGeneration &+= 1
     commentWriteGeneration &+= 1
+    scoreWriteGeneration &+= 1
     loadTask?.cancel()
     pageTask?.cancel()
     scoreTask?.cancel()

@@ -79,8 +79,9 @@ final class WoorisaiAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
     willPresent notification: UNNotification
   ) async -> UNNotificationPresentationOptions {
     // Foreground delivery may show a banner, but navigation is user-driven. Only the response
-    // callback below turns a tapped notification into a refetch intent.
-    return [.banner, .badge, .sound]
+    // callback below turns a tapped notification into a refetch intent. No .badge — nothing
+    // in the payload or the app ever sets a badge count.
+    return [.banner, .sound]
   }
 
   nonisolated func userNotificationCenter(

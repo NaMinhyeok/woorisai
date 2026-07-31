@@ -77,6 +77,13 @@ struct DiaryView: View {
         }
     }
     .accessibilityIdentifier("diary.screen")
+    // One toast host for the whole stack: `mutationToast` is model-level state, so per-screen
+    // hosts replayed the same toast on the list after popping the detail mid-dismissal.
+    .woorisaiToast(
+      model.mutationToast,
+      reduceMotion: reduceMotion,
+      onDismiss: model.dismissToast
+    )
     .task {
       model.loadIfNeeded()
     }
@@ -125,7 +132,7 @@ struct DiaryView: View {
           onReloadLatest: inspectUnknownNewEntryOutcome,
           onResolveAsSaved: resolveUnknownNewEntryAsSaved,
           onConfirmManualRetry: allowUnknownNewEntryRetry,
-          onAbandonInconclusive: {},
+          onAbandonInconclusive: abandonInconclusiveNewEntry,
           onDiscard: discardNewEntryDraft,
           onSubmit: submitNewEntry
         )
@@ -279,11 +286,6 @@ struct DiaryView: View {
         await model.refresh()
       }
     }
-    .woorisaiToast(
-      model.mutationToast,
-      reduceMotion: reduceMotion,
-      onDismiss: model.dismissToast
-    )
     // Only entry creation is this screen's own act; comment and edit outcomes belong to the detail
     // screen, which stays pushed on top and confirms them itself.
     .sensoryFeedback(trigger: model.lastMutationCompletion) { _, completion in
@@ -439,6 +441,15 @@ struct DiaryView: View {
   private func allowUnknownNewEntryRetry() {
     guard model.confirmManualRetryAfterUnknownOutcome(context: .createEntry) else { return }
     newEntryMediaModel.releaseSubmittedUploadOwnership()
+  }
+
+  /// Abandon never resends: the entry may or may not have been saved, so ready uploads are
+  /// consumed (a committed entry may own them server-side) instead of discarded.
+  private func abandonInconclusiveNewEntry() {
+    guard model.abandonInconclusiveUnknownOutcome(context: .createEntry) else { return }
+    newEntryMediaModel.consumeReadyUploads()
+    newEntryContent = ""
+    isCreatingEntry = false
   }
 
   private func diaryStateShell<Content: View>(

@@ -71,6 +71,14 @@ private enum RelationshipSheetDestination: String, Identifiable {
   var id: String { rawValue }
 }
 
+/// Every pushed screen on the relationship tab must be a path element. Mixing
+/// `navigationDestination(isPresented:)` with a bound path gives SwiftUI two competing owners
+/// of the same stack depth, so a thread push from inside the archive lands unpredictably.
+enum RelationshipDestination: Hashable, Sendable {
+  case historyArchive
+  case scoreThread(Int64)
+}
+
 struct RelationshipView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -79,8 +87,7 @@ struct RelationshipView: View {
   @State private var targetScore = 50
   @State private var reason = ""
   @State private var presentedSheet: RelationshipSheetDestination?
-  @State private var showsHistoryArchive = false
-  @Binding private var navigationPath: [Int64]
+  @Binding private var navigationPath: [RelationshipDestination]
 
   private let mediaService: any MediaServing
   private let mediaUploader: any PresignedMediaUploading
@@ -92,7 +99,7 @@ struct RelationshipView: View {
   @MainActor
   init(
     model: RelationshipModel,
-    navigationPath: Binding<[Int64]>,
+    navigationPath: Binding<[RelationshipDestination]>,
     mediaService: any MediaServing,
     mediaUploader: any PresignedMediaUploading,
     mediaSessionCoordinator: TopLevelMediaSessionCoordinator,
@@ -114,25 +121,34 @@ struct RelationshipView: View {
     NavigationStack(path: $navigationPath) {
       stateContent
         .navigationTitle("우리 사이")
-        .navigationDestination(for: Int64.self) { scoreChangeID in
-          ScoreChangeThreadView(
-            model: model,
-            scoreChangeID: scoreChangeID,
-            mediaService: mediaService,
-            mediaUploader: mediaUploader,
-            mediaSessionCoordinator: mediaSessionCoordinator,
-            onAuthenticationRequired: onAuthenticationRequired
-          )
-        }
-        .navigationDestination(isPresented: $showsHistoryArchive) {
-          RelationshipHistoryArchiveView(
-            model: model,
-            mediaService: mediaService,
-            onAuthenticationRequired: onAuthenticationRequired
-          )
+        .navigationDestination(for: RelationshipDestination.self) { destination in
+          switch destination {
+          case .scoreThread(let scoreChangeID):
+            ScoreChangeThreadView(
+              model: model,
+              scoreChangeID: scoreChangeID,
+              mediaService: mediaService,
+              mediaUploader: mediaUploader,
+              mediaSessionCoordinator: mediaSessionCoordinator,
+              onAuthenticationRequired: onAuthenticationRequired
+            )
+          case .historyArchive:
+            RelationshipHistoryArchiveView(
+              model: model,
+              mediaService: mediaService,
+              onAuthenticationRequired: onAuthenticationRequired
+            )
+          }
         }
     }
     .accessibilityIdentifier("relationship.screen")
+    // One toast host for the whole stack: `model.toast` is model-level state, so per-screen
+    // hosts replayed the same toast on the dashboard after popping the thread mid-dismissal.
+    .woorisaiToast(
+      model.toast,
+      reduceMotion: reduceMotion,
+      onDismiss: model.dismissToast
+    )
     // Recording a score is the app's central act; confirm it in the hand, not only on screen.
     .sensoryFeedback(trigger: model.lastSuccessfulScoreChangeID) { _, scoreChangeID in
       scoreChangeID == nil ? nil : .success
@@ -265,11 +281,6 @@ struct RelationshipView: View {
         await model.refresh()
       }
     }
-    .woorisaiToast(
-      model.toast,
-      reduceMotion: reduceMotion,
-      onDismiss: model.dismissToast
-    )
     .accessibilityIdentifier("relationship.loaded")
   }
 
@@ -475,7 +486,7 @@ struct RelationshipView: View {
 
       if model.changes.count > 3 || model.hasNextPage {
         Button {
-          showsHistoryArchive = true
+          navigationPath.append(.historyArchive)
         } label: {
           HStack(spacing: WoorisaiSpacing.small) {
             Text("마음 기록 전체 보기")

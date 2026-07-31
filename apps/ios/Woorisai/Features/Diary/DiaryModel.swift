@@ -132,6 +132,9 @@ final class DiaryModel {
   private(set) var lastConflictEditorInvalidation: Conflict?
   private(set) var authenticationRequired = false
   private(set) var listNotice: String?
+  /// Detail-screen read failures. Kept separate from `mutationNotice` so the list screen never
+  /// renders a message about "작성 중인 내용" that belongs to the detail conversation.
+  private(set) var detailNotice: String?
   /// Problems and instructions that must stay on screen until the user resolves or dismisses them.
   private(set) var mutationNotice: String?
   /// Transient success confirmation. The toast view owns the dismissal timing and calls
@@ -282,11 +285,12 @@ final class DiaryModel {
         let page = try await service.loadDiaryEntries(pageNumber: expectedPage)
         try Task.checkCancellation()
         guard let self, self.listGeneration == generation else { return }
-        let knownIDs = Set(self.entries.map(\.id))
-        guard page.entries.allSatisfy({ !knownIDs.contains($0.id) }) else {
-          throw WoorisaiAPIError.schemaDrift
-        }
-        self.entries.append(contentsOf: page.entries)
+        // Offset pagination shifts page boundaries whenever the list grows at the front
+        // (my own new entry, or the partner's). Overlap with already-loaded entries is
+        // therefore expected — absorb it instead of failing the page forever.
+        var knownIDs = Set(self.entries.map(\.id))
+        let freshEntries = page.entries.filter { knownIDs.insert($0.id).inserted }
+        self.entries.append(contentsOf: freshEntries)
         self.currentPage = page.pageNumber
         self.hasNextPage = page.hasNext
         self.totalCount = page.totalCount
@@ -361,7 +365,11 @@ final class DiaryModel {
         }
         if keepsVisibleContent {
           self.detailState = .loaded
-          self.mutationNotice = "최신 내용 확인이 중단됐어요. 작성 중인 내용은 그대로 두었어요."
+          if updatesEditorReconciliation {
+            self.mutationNotice = "최신 내용 확인이 중단됐어요. 작성 중인 내용은 그대로 두었어요."
+          } else {
+            self.detailNotice = "최신 내용 확인이 중단됐어요. 작성 중인 내용은 그대로 두었어요."
+          }
         } else {
           self.detailState = .failed
         }
@@ -393,7 +401,9 @@ final class DiaryModel {
         if let reconciliationConflict,
           reconciliationConflict == self.lastConflictEditorInvalidation
         {
-          self.conflict = reconciliationConflict
+          // Do NOT re-arm the conflict alert here: while offline, every re-fetch fails, and a
+          // restored alert whose only button re-fetches becomes an inescapable modal loop.
+          // The dismissible notice carries the failure; retrying the edit re-raises the 409.
           self.mutationNotice = "최신 내용을 불러오지 못했어요. 초안은 그대로 두고 다시 시도해 주세요."
           if keepsVisibleContent {
             self.detailState = .loaded
@@ -402,7 +412,11 @@ final class DiaryModel {
         }
         if keepsVisibleContent {
           self.detailState = .loaded
-          self.mutationNotice = "최신 내용을 불러오지 못했어요. 작성 중인 내용은 그대로 두었어요."
+          if updatesEditorReconciliation {
+            self.mutationNotice = "최신 내용을 불러오지 못했어요. 작성 중인 내용은 그대로 두었어요."
+          } else {
+            self.detailNotice = "최신 내용을 불러오지 못했어요. 작성 중인 내용은 그대로 두었어요."
+          }
           return
         }
         switch error as? WoorisaiAPIError {
@@ -421,11 +435,17 @@ final class DiaryModel {
     detailReadGeneration &+= 1
     detailTask?.cancel()
     detailTask = nil
-    selectedEntryID = nil
-    selectedDetail = nil
-    detailState = .idle
+    detailNotice = nil
     editorReconciliationState = .idle
     lastConflictEditorInvalidation = nil
+    // `onDisappear` also fires on tab switches, not only on pops. Keep an already-loaded
+    // detail cached so a returning screen shows the conversation immediately instead of a
+    // spinner (or, offline, a failure screen); only an in-flight read is torn down.
+    if detailState != .loaded || selectedDetail?.entry.id != entryID {
+      selectedEntryID = nil
+      selectedDetail = nil
+      detailState = .idle
+    }
   }
 
   func refreshDetail(entryID: Int64) async {
@@ -534,22 +554,33 @@ final class DiaryModel {
     let generation = mutationGeneration
     let service = service
     mutationTask = Task { @MainActor [weak self] in
+      @MainActor func applyDeletion(_ model: DiaryModel) {
+        model.invalidateReads(afterMutationFor: entryID)
+        let wasKnown = model.entries.contains(where: { $0.id == entryID })
+        model.entries.removeAll { $0.id == entryID }
+        if wasKnown { model.totalCount = max(0, model.totalCount - 1) }
+        if model.selectedEntryID == entryID {
+          model.selectedEntryID = nil
+          model.selectedDetail = nil
+          model.detailState = .idle
+        }
+        model.commentDrafts.removeValue(forKey: entryID)
+        model.finishMutation(.entryDeleted(entryID: entryID), message: "일기를 삭제했어요.")
+      }
       do {
         try await service.deleteDiaryEntry(id: entryID)
         try Task.checkCancellation()
         guard let self, self.mutationGeneration == generation else { return }
-        self.invalidateReads(afterMutationFor: entryID)
-        let wasKnown = self.entries.contains(where: { $0.id == entryID })
-        self.entries.removeAll { $0.id == entryID }
-        if wasKnown { self.totalCount = max(0, self.totalCount - 1) }
-        if self.selectedEntryID == entryID {
-          self.selectedEntryID = nil
-          self.selectedDetail = nil
-          self.detailState = .idle
-        }
-        self.commentDrafts.removeValue(forKey: entryID)
-        self.finishMutation(.entryDeleted(entryID: entryID), message: "일기를 삭제했어요.")
+        applyDeletion(self)
       } catch {
+        // 404 means the goal state is already reached (the partner deleted it first).
+        // Converge to success instead of a dead-end "저장하지 못했어요" retry loop.
+        if error as? WoorisaiAPIError == .notFound,
+          let self, self.mutationGeneration == generation
+        {
+          applyDeletion(self)
+          return
+        }
         self?.finishMutationFailure(
           error,
           generation: generation,
@@ -651,17 +682,28 @@ final class DiaryModel {
     let generation = mutationGeneration
     let service = service
     mutationTask = Task { @MainActor [weak self] in
+      @MainActor func applyDeletion(_ model: DiaryModel) {
+        model.invalidateReads(afterMutationFor: entryID)
+        model.applyDeletedComment(commentID: commentID, entryID: entryID)
+        model.finishMutation(
+          .commentDeleted(entryID: entryID, commentID: commentID),
+          message: "댓글을 삭제했어요."
+        )
+      }
       do {
         try await service.deleteDiaryComment(id: commentID)
         try Task.checkCancellation()
         guard let self, self.mutationGeneration == generation else { return }
-        self.invalidateReads(afterMutationFor: entryID)
-        self.applyDeletedComment(commentID: commentID, entryID: entryID)
-        self.finishMutation(
-          .commentDeleted(entryID: entryID, commentID: commentID),
-          message: "댓글을 삭제했어요."
-        )
+        applyDeletion(self)
       } catch {
+        // 404 means the goal state is already reached (the partner deleted it first).
+        // Converge to success instead of a dead-end "저장하지 못했어요" retry loop.
+        if error as? WoorisaiAPIError == .notFound,
+          let self, self.mutationGeneration == generation
+        {
+          applyDeletion(self)
+          return
+        }
         self?.finishMutationFailure(
           error,
           generation: generation,
@@ -711,6 +753,7 @@ final class DiaryModel {
 
   func dismissNotices() {
     listNotice = nil
+    detailNotice = nil
     mutationNotice = nil
     mutationToast = nil
   }
@@ -884,6 +927,7 @@ final class DiaryModel {
     lastConflictEditorInvalidation = nil
     authenticationRequired = false
     listNotice = nil
+    detailNotice = nil
     mutationNotice = nil
     mutationToast = nil
     lastMutationCompletion = nil
@@ -1093,6 +1137,7 @@ final class DiaryModel {
     selectedDetail = nil
     conflict = nil
     listNotice = nil
+    detailNotice = nil
     mutationNotice = nil
     mutationToast = nil
     lastMutationCompletion = nil
