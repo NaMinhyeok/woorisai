@@ -4,9 +4,6 @@ import com.woorisai.support.error.ErrorDescriptor;
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.http.HttpStatus;
 
-/**
- * Published failure contract of the media upload and download APIs.
- */
 enum MediaError implements ErrorDescriptor {
     INVALID_UPLOAD_REQUEST(
             HttpStatus.BAD_REQUEST,
@@ -56,7 +53,6 @@ enum MediaError implements ErrorDescriptor {
             "Media download unavailable",
             "Media download is temporarily unavailable.",
             LogLevel.WARN);
-
 
     private final HttpStatus status;
     private final String code;

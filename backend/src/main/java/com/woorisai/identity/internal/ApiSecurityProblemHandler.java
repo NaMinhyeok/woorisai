@@ -17,12 +17,8 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Writes authentication and authorization problems from inside the security filter chain.
- *
- * <p>These run before any handler is resolved, so the response is written to the servlet directly
- * instead of returning a {@code ResponseEntity}. Only the body is shared with the controller advice.
- */
+// Runs before any handler is resolved, so the response goes to the servlet directly rather than
+// through a ResponseEntity. Only the body is shared with the controller advice.
 @Component
 @RequiredArgsConstructor
 class ApiSecurityProblemHandler implements AuthenticationEntryPoint, AccessDeniedHandler {

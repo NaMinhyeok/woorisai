@@ -22,14 +22,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-/**
- * Turns every API failure into the published RFC 7807 response.
- *
- * <p>Module-raised failures arrive as {@link ApplicationException} and already carry their own
- * contract. Framework-raised failures carry none, so the controller's {@link HandlerFailures}
- * supplies it; without a mapping the exception keeps Spring's default handling rather than being
- * reported under some other module's code.
- */
+// Module failures arrive as ApplicationException and carry their own contract; framework failures
+// get theirs from the controller's HandlerFailures.
 @RestControllerAdvice
 class ApiControllerAdvice {
 
@@ -108,6 +102,8 @@ class ApiControllerAdvice {
             Optional<ErrorDescriptor> error, Exception exception, HttpServletRequest request)
             throws Exception {
         if (error.isEmpty()) {
+            // Rethrow instead of guessing: reporting this under another module's code would break
+            // the published contract silently.
             throw exception;
         }
         return respond(error.get(), exception, request);
@@ -119,12 +115,8 @@ class ApiControllerAdvice {
         return ApiProblems.response(error, request.getRequestURI());
     }
 
-    /**
-     * Logs the cause without the response body.
-     *
-     * <p>Only the exception type and its own message are logged. Request bodies, participant data
-     * and media URLs must not reach the log.
-     */
+    // Logs the type and code only. Request bodies, participant data and media URLs must not reach
+    // the log.
     private void record(ErrorDescriptor error, Exception exception) {
         String type = exception.getClass().getSimpleName();
         if (error.logLevel() == LogLevel.ERROR) {

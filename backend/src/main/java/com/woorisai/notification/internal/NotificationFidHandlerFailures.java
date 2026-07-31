@@ -5,9 +5,6 @@ import com.woorisai.support.error.HandlerFailures;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
-/**
- * Framework failures reported under the notification FID contract.
- */
 @Component
 class NotificationFidHandlerFailures implements HandlerFailures {
 
@@ -20,6 +17,7 @@ class NotificationFidHandlerFailures implements HandlerFailures {
     public Optional<ErrorDescriptor> invalidRequest() {
         return Optional.of(NotificationError.INVALID_FID);
     }
+
     @Override
     public Optional<ErrorDescriptor> unavailable() {
         return Optional.of(NotificationError.FID_UNAVAILABLE);

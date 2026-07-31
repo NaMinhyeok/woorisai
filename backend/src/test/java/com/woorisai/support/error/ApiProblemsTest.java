@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import java.util.Optional;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -14,19 +13,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Pins the serialized key set of an error body.
- *
- * <p>{@code contracts/openapi-v2.yaml} declares {@code additionalProperties: false} on both problem
- * schemas, and {@code NotificationApiProblem} leaves {@code instance} out of its properties. So the
- * rendered JSON must carry exactly the published keys — an extra key, or an empty {@code instance}
- * string standing in for an absent one, breaks the contract just as a missing key would.
- *
- * <p>The assertions run against a rendered HTTP response rather than a bare object mapper, because
- * {@code ProblemDetail} only unwraps its extension properties under the web serialization setup.
- * {@code type} is absent from the rendered keys: it keeps its {@code about:blank} default, which the
- * serializer omits, and the published schemas do not require it.
- */
 class ApiProblemsTest {
 
     private enum Fixture implements ErrorDescriptor {
@@ -111,24 +97,25 @@ class ApiProblemsTest {
 
     private final JsonMapper mapper = JsonMapper.builder().build();
 
+    // Both published schemas set additionalProperties: false, so an extra key breaks the contract as
+    // surely as a missing one. "type" is absent because it keeps its about:blank default, which the
+    // serializer omits and neither schema requires.
     @Test
-    @DisplayName("instance를 노출하는 계약은 ApiProblem의 key만 직렬화한다")
-    void serializesExactlyTheApiProblemKeys() throws Exception {
+    void serializesExactlyTheKeysOfTheApiProblemSchema() throws Exception {
         assertThat(keysOf("/fixture/with-instance"))
                 .containsExactlyInAnyOrder("title", "status", "detail", "instance", "errorCode");
     }
 
+    // An empty instance string would satisfy doesNotExist() on some paths yet still violate
+    // NotificationApiProblem, so assert on the key set rather than the value.
     @Test
-    @DisplayName("instance를 노출하지 않는 계약은 instance key 자체를 직렬화하지 않는다")
-    void omitsTheInstanceKeyEntirely() throws Exception {
+    void omitsTheInstanceKeyEntirelyForTheNotificationSchema() throws Exception {
         assertThat(keysOf("/fixture/without-instance"))
-                .as("an empty instance string would still violate NotificationApiProblem")
                 .containsExactlyInAnyOrder("title", "status", "detail", "errorCode");
     }
 
     @Test
-    @DisplayName("응답은 problem+json과 no-store를 유지한다")
-    void keepsProblemJsonAndNoStore() {
+    void answersWithProblemJsonAndNoStore() {
         var response = ApiProblems.response(Fixture.WITH_INSTANCE, "/api/v2/fixtures");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
@@ -136,6 +123,8 @@ class ApiProblemsTest {
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
     }
 
+    // Rendered through MockMvc because ProblemDetail only unwraps its extension properties under the
+    // web serialization setup; a bare mapper nests them under "properties".
     private Iterable<String> keysOf(String path) throws Exception {
         String json = MockMvcBuilders.standaloneSetup(
                         new WithInstanceController(), new WithoutInstanceController())

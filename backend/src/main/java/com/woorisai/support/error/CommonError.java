@@ -3,9 +3,6 @@ package com.woorisai.support.error;
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.http.HttpStatus;
 
-/**
- * Failures raised before any module owns the request.
- */
 public enum CommonError implements ErrorDescriptor {
     UNSUPPORTED_MEDIA_TYPE(
             HttpStatus.UNSUPPORTED_MEDIA_TYPE,
@@ -13,7 +10,6 @@ public enum CommonError implements ErrorDescriptor {
             "Unsupported media type",
             "Content-Type must be application/json.",
             LogLevel.INFO);
-
 
     private final HttpStatus status;
     private final String code;

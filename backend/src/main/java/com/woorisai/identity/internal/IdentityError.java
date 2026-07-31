@@ -4,9 +4,6 @@ import com.woorisai.support.error.ErrorDescriptor;
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.http.HttpStatus;
 
-/**
- * Published failure contract of authentication and login options.
- */
 enum IdentityError implements ErrorDescriptor {
     AUTHENTICATION_REQUIRED(
             HttpStatus.UNAUTHORIZED,
@@ -32,7 +29,6 @@ enum IdentityError implements ErrorDescriptor {
             "Login options unavailable",
             "The participant login options are temporarily unavailable.",
             LogLevel.WARN);
-
 
     private final HttpStatus status;
     private final String code;

@@ -4,11 +4,7 @@ import com.woorisai.support.error.ErrorDescriptor;
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.http.HttpStatus;
 
-/**
- * Published failure contract of the notification FID API.
- *
- * <p>{@code NotificationApiProblem} omits {@code instance}, so these failures must not expose it.
- */
+// NotificationApiProblem omits instance, so these failures must not expose it.
 enum NotificationError implements ErrorDescriptor {
     INVALID_FID(
             HttpStatus.BAD_REQUEST,

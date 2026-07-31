@@ -5,9 +5,6 @@ import com.woorisai.support.error.HandlerFailures;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
-/**
- * Framework failures reported under the media upload contract.
- */
 @Component
 class MediaUploadHandlerFailures implements HandlerFailures {
 
@@ -20,6 +17,7 @@ class MediaUploadHandlerFailures implements HandlerFailures {
     public Optional<ErrorDescriptor> invalidRequest() {
         return Optional.of(MediaError.INVALID_UPLOAD_REQUEST);
     }
+
     @Override
     public Optional<ErrorDescriptor> unavailable() {
         return Optional.of(MediaError.UPLOADS_UNAVAILABLE);

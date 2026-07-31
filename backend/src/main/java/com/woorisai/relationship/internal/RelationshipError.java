@@ -4,9 +4,6 @@ import com.woorisai.support.error.ErrorDescriptor;
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.http.HttpStatus;
 
-/**
- * Published failure contract of the relationship API.
- */
 enum RelationshipError implements ErrorDescriptor {
     INVALID_REQUEST(
             HttpStatus.BAD_REQUEST,
@@ -38,7 +35,6 @@ enum RelationshipError implements ErrorDescriptor {
             "Relationship unavailable",
             "Relationship data is temporarily unavailable.",
             LogLevel.WARN);
-
 
     private final HttpStatus status;
     private final String code;

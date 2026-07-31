@@ -7,17 +7,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 
-/**
- * Pins the published failure contract.
- *
- * <p>Every value here is copied from {@code contracts/openapi-v2.yaml} and the HTTP tests. This
- * test is the reason the error-handling refactor cannot silently change a response: a renamed code,
- * a reworded title or a dropped constant fails here before it reaches the wire.
- */
 class ErrorCatalogTest {
 
     private record Contract(HttpStatus status, String title, String detail, boolean exposesInstance) {
@@ -31,7 +23,8 @@ class ErrorCatalogTest {
         }
     }
 
-    /** errorCode to its exact published response. Do not reword these strings. */
+    // Copied from contracts/openapi-v2.yaml and the HTTP tests. A renamed code, a reworded title or
+    // a dropped constant fails here before it can reach the wire.
     private static final Map<String, Contract> PUBLISHED = Map.ofEntries(
             Map.entry("UNSUPPORTED_MEDIA_TYPE", Contract.of(
                     HttpStatus.UNSUPPORTED_MEDIA_TYPE,
@@ -143,21 +136,18 @@ class ErrorCatalogTest {
             "identity.internal.IdentityError");
 
     @Test
-    @DisplayName("errorCode는 중복되지 않는다")
-    void errorCodesAreUnique() {
+    void assignsEveryErrorCodeToExactlyOneCatalogConstant() {
         assertThat(descriptors().map(ErrorDescriptor::code).toList()).doesNotHaveDuplicates();
     }
 
     @Test
-    @DisplayName("errorCode 집합은 공개 계약과 정확히 일치한다")
-    void errorCodesMatchPublishedContract() {
+    void publishesExactlyTheDocumentedSetOfErrorCodes() {
         assertThat(descriptors().map(ErrorDescriptor::code))
                 .containsExactlyInAnyOrderElementsOf(PUBLISHED.keySet());
     }
 
     @Test
-    @DisplayName("각 errorCode의 status, title, detail은 공개 계약과 문자 단위로 일치한다")
-    void responseFieldsMatchPublishedContract() {
+    void keepsTheStatusTitleAndDetailOfEveryPublishedErrorCode() {
         descriptors().forEach(error -> {
             Contract expected = PUBLISHED.get(error.code());
             assertThat(expected)
@@ -170,16 +160,14 @@ class ErrorCatalogTest {
     }
 
     @Test
-    @DisplayName("notification 오류만 instance를 노출하지 않는다")
-    void onlyNotificationFailuresOmitInstance() {
+    void exposesInstanceOnEveryFailureExceptTheNotificationContract() {
         descriptors().forEach(error -> assertThat(error.exposesInstance())
                 .as("exposesInstance of %s", error.code())
                 .isEqualTo(PUBLISHED.get(error.code()).exposesInstance()));
     }
 
     @Test
-    @DisplayName("모든 오류는 로그 수준을 선언한다")
-    void everyFailureDeclaresLogLevel() {
+    void declaresALogLevelForEveryFailure() {
         descriptors().forEach(error -> assertThat(error.logLevel())
                 .as("logLevel of %s", error.code())
                 .isNotNull());

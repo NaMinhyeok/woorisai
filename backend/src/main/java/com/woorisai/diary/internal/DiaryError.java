@@ -4,9 +4,6 @@ import com.woorisai.support.error.ErrorDescriptor;
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.http.HttpStatus;
 
-/**
- * Published failure contract of the diary API.
- */
 enum DiaryError implements ErrorDescriptor {
     INVALID_REQUEST(
             HttpStatus.BAD_REQUEST,
@@ -38,7 +35,6 @@ enum DiaryError implements ErrorDescriptor {
             "Diary unavailable",
             "Diary data is temporarily unavailable.",
             LogLevel.WARN);
-
 
     private final HttpStatus status;
     private final String code;
