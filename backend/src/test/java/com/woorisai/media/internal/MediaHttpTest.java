@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.woorisai.media.MediaKind;
+import com.woorisai.support.error.ApiErrorAdvice;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
@@ -51,9 +52,9 @@ class MediaHttpTest {
         mvc = MockMvcBuilders.standaloneSetup(
                         new MediaUploadController(Optional.of(media)),
                         new MediaAttachmentDownloadController(Optional.of(media)))
-                .setControllerAdvice(
-                        new MediaUploadApiExceptionHandler(),
-                        new MediaAttachmentDownloadApiExceptionHandler())
+                .setControllerAdvice(ApiErrorAdvice.of(
+                        new MediaUploadHandlerFailures(),
+                        new MediaAttachmentDownloadHandlerFailures()))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setMessageConverters(new JacksonJsonHttpMessageConverter(
                         JsonMapper.builder()

@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.woorisai.support.error.ApiErrorAdvice;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -46,7 +47,7 @@ class DiaryControllerTest {
                 UsernamePasswordAuthenticationToken.authenticated(ACTOR, null, List.of()));
         diary = mock(DiaryService.class);
         mvc = MockMvcBuilders.standaloneSetup(new DiaryController(diary))
-                .setControllerAdvice(new DiaryApiExceptionHandler())
+                .setControllerAdvice(ApiErrorAdvice.of(new DiaryHandlerFailures()))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }
@@ -175,7 +176,8 @@ class DiaryControllerTest {
         mvc.perform(get("/api/v2/diary-entries?pageNumber=not-a-number"))
                 .andExpect(status().isBadRequest())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.errorCode").value("INVALID_DIARY_REQUEST"));
+                .andExpect(jsonPath("$.errorCode").value("INVALID_DIARY_REQUEST"))
+                .andExpect(jsonPath("$.instance").value("/api/v2/diary-entries"));
 
         given(diary.listEntries(ACTOR, 1)).willThrow(
                 new CannotCreateTransactionException("fixture transaction unavailable"));
@@ -183,7 +185,8 @@ class DiaryControllerTest {
         mvc.perform(get("/api/v2/diary-entries"))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.errorCode").value("DIARY_UNAVAILABLE"));
+                .andExpect(jsonPath("$.errorCode").value("DIARY_UNAVAILABLE"))
+                .andExpect(jsonPath("$.instance").value("/api/v2/diary-entries"));
     }
 
     @Test
