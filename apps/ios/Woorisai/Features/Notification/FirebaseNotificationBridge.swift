@@ -31,7 +31,9 @@ final class SystemNotificationPermissionAuthorizer: NotificationPermissionAuthor
   }
 
   func requestAuthorization() async throws -> NotificationPermissionStatus {
-    _ = try await center.requestAuthorization(options: [.alert, .badge, .sound])
+    // No .badge: neither the backend payload nor the app ever sets a badge count, so
+    // requesting the permission only inflates the consent prompt.
+    _ = try await center.requestAuthorization(options: [.alert, .sound])
     return await currentStatus()
   }
 

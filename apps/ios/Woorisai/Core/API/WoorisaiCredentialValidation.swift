@@ -54,10 +54,18 @@ extension WoorisaiAPIClient: CredentialValidating {
       try Task.checkCancellation()
       switch output {
       case .ok(let response):
-        return try Self.makeAuthenticatedParticipant(
-          expectedSlot: credential.slot,
-          from: response.body
-        )
+        do {
+          return try Self.makeAuthenticatedParticipant(
+            expectedSlot: credential.slot,
+            from: response.body
+          )
+        } catch {
+          // The server disputes who this credential belongs to (slot mismatch / malformed
+          // identity). Unlike a plain 403 — where the credential itself is valid and is
+          // deliberately kept — an identity-confusion risk must not stay installed.
+          await credentialStore.clear(ifCurrent: credentialLease)
+          throw error
+        }
       case .unauthorized(let response):
         let problem: Components.Schemas.AuthenticationRequiredProblem
         switch response.body {

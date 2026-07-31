@@ -9,6 +9,9 @@ struct LoginOptionsView: View {
   @FocusState private var isPINFocused: Bool
   @AccessibilityFocusState private var isLoginFailureFocused: Bool
   @AccessibilityFocusState private var isAuthenticationFailureFocused: Bool
+  /// True when this screen mounted with a participant already selected — the 401
+  /// re-authentication flow, where PIN entry must not depend on the options reload.
+  @State private var isReauthenticatingSession = false
 
   @MainActor
   init(model: LoginOptionsModel, authenticationModel: AuthenticationModel) {
@@ -59,6 +62,9 @@ struct LoginOptionsView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("loginOptions.screen")
+    .onAppear {
+      isReauthenticatingSession = authenticationModel.selectedOption != nil
+    }
     .task {
       model.loadIfNeeded()
       await authenticationModel.refreshRememberOption()
@@ -200,6 +206,32 @@ struct LoginOptionsView: View {
 
   @ViewBuilder
   private var stateContent: some View {
+    if isReauthenticatingSession, let selectedOption = authenticationModel.selectedOption {
+      // A preserved participant selection (server rejected the stored credential mid-session)
+      // must render the PIN field immediately — never behind the options reload, which may be
+      // the very request that is failing offline. It also lives ONLY here during the whole
+      // re-authentication: hosting it inside loadedState as usual would recreate the field the
+      // moment the reload finishes, dropping focus and the keyboard mid-retype.
+      VStack(spacing: WoorisaiSpacing.medium) {
+        WarmSurface(cornerRadius: WoorisaiRadius.large) {
+          VStack(alignment: .leading, spacing: WoorisaiSpacing.regular) {
+            pinEntry(selectedOption)
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(WoorisaiSpacing.large)
+        }
+        optionsStateBody(includesPINEntry: false)
+      }
+      .frame(maxWidth: .infinity)
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier("loginOptions.reauthenticating")
+    } else {
+      optionsStateBody(includesPINEntry: true)
+    }
+  }
+
+  @ViewBuilder
+  private func optionsStateBody(includesPINEntry: Bool) -> some View {
     switch model.state {
     case .idle:
       progressState(
@@ -212,7 +244,7 @@ struct LoginOptionsView: View {
         identifier: "loginOptions.loading"
       )
     case .loaded(let options):
-      loadedState(options: options)
+      loadedState(options: options, includesPINEntry: includesPINEntry)
     case .unavailable:
       retryState(
         message: "지금은 로그인할 사람을 확인할 수 없어요. 잠시 후 다시 시도해 주세요.",
@@ -243,7 +275,7 @@ struct LoginOptionsView: View {
     .accessibilityIdentifier(identifier)
   }
 
-  private func loadedState(options: [LoginOption]) -> some View {
+  private func loadedState(options: [LoginOption], includesPINEntry: Bool) -> some View {
     VStack(spacing: WoorisaiSpacing.medium) {
       WarmSurface(cornerRadius: WoorisaiRadius.large) {
         VStack(alignment: .leading, spacing: WoorisaiSpacing.regular) {
@@ -258,7 +290,7 @@ struct LoginOptionsView: View {
             }
           }
 
-          if let selectedOption = authenticationModel.selectedOption {
+          if includesPINEntry, let selectedOption = authenticationModel.selectedOption {
             pinEntry(selectedOption)
           }
 

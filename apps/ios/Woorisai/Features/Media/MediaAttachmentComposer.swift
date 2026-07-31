@@ -530,6 +530,25 @@ final class MediaAttachmentComposerModel {
   }
 
   func importPickerItems(_ pickerItems: [PhotosPickerItem]) {
+    // Judge the mix on the WHOLE selection up front. Per-item validation processed photos
+    // first and then silently dropped the video mid-batch — the user saw their photos attach
+    // and their video vanish with only a transient banner.
+    let advertisesVideo = pickerItems.contains { item in
+      item.supportedContentTypes.contains(where: Self.isPotentialPickerVideoType)
+    }
+    let advertisesImage = pickerItems.contains { item in
+      item.supportedContentTypes.contains(where: Self.isSupportedPickerImageType)
+    }
+    if advertisesVideo {
+      if advertisesImage {
+        importFailure = .rule(.mixedMediaNotAllowed)
+        return
+      }
+      if pickerItems.count > 1 {
+        importFailure = .rule(.onlyOneVideoAllowed)
+        return
+      }
+    }
     startImport(pickerItems, prepare: Self.preparePickerItem)
   }
 
@@ -580,7 +599,8 @@ final class MediaAttachmentComposerModel {
               kind: prepared.kind,
               fileName: prepared.fileName,
               contentType: prepared.contentType,
-              file: file
+              file: file,
+              previewImage: prepared.previewCGImage.map(UIImage.init(cgImage:))
             )
           }
         } catch is CancellationError {
@@ -660,7 +680,8 @@ final class MediaAttachmentComposerModel {
     kind: MediaKind,
     fileName: String,
     contentType: String,
-    file: OwnedTemporaryMediaUploadFile
+    file: OwnedTemporaryMediaUploadFile,
+    previewImage: UIImage? = nil
   ) throws {
     do {
       try policy.validate(existingKinds: allKinds, adding: kind)
@@ -686,7 +707,7 @@ final class MediaAttachmentComposerModel {
           kind: kind,
           fileName: draft.fileName,
           byteSize: draft.byteSize,
-          previewImage: nil,
+          previewImage: previewImage,
           upload: upload
         )
       )
@@ -833,9 +854,14 @@ final class MediaAttachmentComposerModel {
       return try await preparedImage(transfer: transfer, advertisedType: advertisedType)
     }
 
-    if let advertisedType = supportedTypes.first(where: isSupportedPickerVideoType) {
+    // Photos can advertise only an abstract type (`public.movie`), whose preferredMIMEType is
+    // nil. Load the file anyway and let `preparedVideo` judge the ACTUAL transferred type —
+    // rejecting on the abstract advertisement alone refused perfectly supported videos.
+    if let advertisedType = supportedTypes.first(where: isSupportedPickerVideoType)
+      ?? supportedTypes.first(where: isPotentialPickerVideoType)
+    {
       let transfer = try await loadBoundedVideo(from: item)
-      return try preparedVideo(transfer: transfer, advertisedType: advertisedType)
+      return try await preparedVideo(transfer: transfer, advertisedType: advertisedType)
     }
 
     throw PickerPreparationError.unsupportedType
@@ -857,13 +883,21 @@ final class MediaAttachmentComposerModel {
     }
 
     if isSupportedPickerImageType(advertisedType) {
-      let transfer = try BoundedPickerImageTransfer.importingFile(at: url)
+      // The copy/read below is synchronous file I/O; off the MainActor so a slow provider
+      // cannot freeze the UI. The security scope stays open across the await.
+      let transfer = try await Task.detached(priority: .userInitiated) {
+        try BoundedPickerImageTransfer.importingFile(at: url)
+      }.value
       return try await preparedImage(transfer: transfer, advertisedType: advertisedType)
     }
 
-    if isSupportedPickerVideoType(advertisedType) {
-      let transfer = try BoundedPickerVideoTransfer.importingFile(at: url)
-      return try preparedVideo(transfer: transfer, advertisedType: advertisedType)
+    if isPotentialPickerVideoType(advertisedType) {
+      // Videos copy up to 100 MB — a synchronous MainActor copy froze the UI long enough to
+      // risk the watchdog. The security scope stays open across the await.
+      let transfer = try await Task.detached(priority: .userInitiated) {
+        try BoundedPickerVideoTransfer.importingFile(at: url)
+      }.value
+      return try await preparedVideo(transfer: transfer, advertisedType: advertisedType)
     }
 
     throw PickerPreparationError.unsupportedType
@@ -930,7 +964,7 @@ final class MediaAttachmentComposerModel {
   private static func preparedVideo(
     transfer: BoundedPickerVideoTransfer,
     advertisedType: UTType
-  ) throws -> PreparedPickerItem {
+  ) async throws -> PreparedPickerItem {
     let type = try resolvedPickerType(
       actualIdentifier: transfer.typeIdentifier,
       advertisedType: advertisedType,
@@ -944,8 +978,21 @@ final class MediaAttachmentComposerModel {
       fileName: generatedFileName(kind: .video, type: type, contentType: contentType),
       contentType: contentType,
       payload: .file(transfer.file),
-      previewCGImage: nil
+      // Without a poster the tray shows only a filename, which reads as "첨부가 안 됐다".
+      previewCGImage: await videoPosterCGImage(forFileAt: transfer.file.url)
     )
+  }
+
+  /// First-frame poster for a locally staged video. Best effort — a nil poster falls back to
+  /// the placeholder tile rather than failing the attachment.
+  private static func videoPosterCGImage(forFileAt url: URL) async -> CGImage? {
+    let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+    generator.appliesPreferredTrackTransform = true
+    generator.maximumSize = CGSize(
+      width: MediaImagePreview.maximumPixelSize,
+      height: MediaImagePreview.maximumPixelSize
+    )
+    return try? await generator.image(at: .zero).image
   }
 
   private static func thumbnailCGImage(from data: Data) async -> CGImage? {
@@ -1029,6 +1076,13 @@ final class MediaAttachmentComposerModel {
   private static func isSupportedPickerVideoType(_ type: UTType) -> Bool {
     guard let contentType = type.preferredMIMEType?.lowercased() else { return false }
     return allowedVideoMIMETypes.contains(contentType)
+  }
+
+  /// Abstract movie types (`public.movie`, `public.video`) have a nil preferredMIMEType, so a
+  /// MIME allowlist alone cannot judge them. They gate only whether loading is attempted; the
+  /// transferred file's actual type is still validated by `preparedVideo`.
+  private static func isPotentialPickerVideoType(_ type: UTType) -> Bool {
+    isSupportedPickerVideoType(type) || type.conforms(to: .movie)
   }
 
   static func resolvedPickerType(
@@ -2369,6 +2423,12 @@ struct MediaAttachmentPreview: View {
   @State private var opensImageViewerAfterLoading = false
   @State private var shouldReloadVideoAfterDismiss = false
   @State private var isMounted = false
+  /// Viewer-resolution decode of the original file. The tile's `model.image` is decode-bounded
+  /// for scrolling; the full view supports 5x zoom, which upscaled that bounded bitmap into a
+  /// visibly blurry image while "사진 앱에 저장" wrote the sharp original.
+  @State private var viewerImage: UIImage?
+  /// Outlives the viewer presentations — see MediaLibrarySaveControl.model.
+  @State private var librarySaveModel = MediaLibrarySaveModel()
 
   let attachmentID: UUID
   let fileName: String
@@ -2444,14 +2504,13 @@ struct MediaAttachmentPreview: View {
       .accessibilityIdentifier("media.tile.\(attachmentID.uuidString).surface")
     }
     .buttonStyle(.plain)
-    .disabled(model.state == .loading && !isImage)
     .accessibilityLabel(previewAccessibilityLabel)
     .accessibilityValue(previewAccessibilityValue)
     .accessibilityHint("비공개 파일을 앱 안에서 안전하게 미리 봅니다.")
     .accessibilityIdentifier("media.inline.\(attachmentID.uuidString)")
     .task(id: attachmentID) {
       if isImage, model.localURL == nil, model.state == .idle {
-        model.load(using: previewLoader)
+        model.load(using: previewLoader, decodeMaxPixelSize: tileFormat.decodeMaxPixelSize)
       }
     }
     .onChange(of: model.state) { _, state in
@@ -2476,7 +2535,7 @@ struct MediaAttachmentPreview: View {
       ZStack {
         WoorisaiColor.Bg.immersive.ignoresSafeArea()
 
-        if let image = model.image {
+        if let image = viewerImage ?? model.image {
           MediaAspectFitImageSurface(
             image: image,
             accessibilityName: "첨부 사진 \(fileName) 전체 보기"
@@ -2485,11 +2544,22 @@ struct MediaAttachmentPreview: View {
           .accessibilityIdentifier("media.viewer")
         }
       }
+      .task {
+        guard viewerImage == nil, let localURL = model.localURL else { return }
+        // 4,096px covers a 3x screen at the viewer's maximum zoom while still bounding decoded
+        // memory for oversized originals.
+        viewerImage = await Task.detached(priority: .userInitiated) {
+          MediaImagePreview.thumbnail(fromFileAt: localURL, maximumPixelSize: 4_096)
+        }.value
+      }
+      .onDisappear {
+        viewerImage = nil
+      }
       .overlay(alignment: .topLeading) {
         if let localURL = model.localURL,
           MediaLibrarySaveModel.supportsPhotoLibrary(contentType: contentType)
         {
-          MediaLibrarySaveControl(fileURL: localURL, isImage: true)
+          MediaLibrarySaveControl(model: librarySaveModel, fileURL: localURL, isImage: true)
             .padding(WoorisaiSpacing.regular)
         }
       }
@@ -2520,7 +2590,7 @@ struct MediaAttachmentPreview: View {
           return
         }
         shouldReloadVideoAfterDismiss = false
-        model.reloadDiscardingCurrentLease(using: previewLoader)
+        model.reloadDiscardingCurrentLease(using: previewLoader, decodeMaxPixelSize: tileFormat.decodeMaxPixelSize)
       }
     ) {
       if let localURL = model.localURL {
@@ -2528,6 +2598,7 @@ struct MediaAttachmentPreview: View {
           url: localURL,
           fileName: fileName,
           contentType: contentType,
+          librarySaveModel: librarySaveModel,
           onRetry: {
             shouldReloadVideoAfterDismiss = true
             isVideoViewerPresented = false
@@ -2605,7 +2676,7 @@ struct MediaAttachmentPreview: View {
 
   private var previewAccessibilityValue: String {
     if model.state == .loading {
-      return isImage ? "사진을 불러오는 중" : "동영상을 준비하는 중"
+      return isImage ? "사진을 불러오는 중" : "동영상을 준비하는 중, 누르면 취소"
     }
     return failureMessage ?? ""
   }
@@ -2620,10 +2691,14 @@ struct MediaAttachmentPreview: View {
     } else if isImage {
       opensImageViewerAfterLoading = true
       if model.state != .loading {
-        model.load(using: previewLoader)
+        model.load(using: previewLoader, decodeMaxPixelSize: tileFormat.decodeMaxPixelSize)
       }
+    } else if model.state == .loading {
+      // A video download (up to 100 MB) previously offered no way out but scrolling the tile
+      // off screen. Tapping the loading tile again cancels it.
+      model.clear()
     } else {
-      model.load(using: previewLoader)
+      model.load(using: previewLoader, decodeMaxPixelSize: tileFormat.decodeMaxPixelSize)
     }
   }
 }
@@ -2635,7 +2710,10 @@ struct MediaAttachmentPreview: View {
 /// success-only by design (it hardcodes a checkmark), and a blocked permission is exactly the case
 /// the user must be told about.
 private struct MediaLibrarySaveControl: View {
-  @State private var model = MediaLibrarySaveModel()
+  /// Owned by the attachment tile, not this control: a Photos write cannot be cancelled, so a
+  /// save that outlives a dismissed viewer must keep its outcome visible on the next open —
+  /// otherwise the user saves again and duplicates the asset.
+  let model: MediaLibrarySaveModel
 
   let fileURL: URL
   let isImage: Bool
@@ -2700,7 +2778,8 @@ private struct MediaLibrarySaveControl: View {
         }
       }
     }
-    .onDisappear { model.cancel() }
+    // No cancel on disappear: PHPhotoLibrary.performChanges cannot be interrupted, so the write
+    // finishes regardless. Resetting here only erased the outcome and invited a duplicate save.
   }
 
   private var outcomeMessage: (message: String, offersSettingsLink: Bool)? {
@@ -2742,6 +2821,7 @@ private struct PrivateVideoViewer: View {
   let fileURL: URL
   let fileName: String
   let contentType: String
+  let librarySaveModel: MediaLibrarySaveModel
   let onRetry: () -> Void
   let onClose: () -> Void
 
@@ -2749,6 +2829,7 @@ private struct PrivateVideoViewer: View {
     url: URL,
     fileName: String,
     contentType: String,
+    librarySaveModel: MediaLibrarySaveModel,
     onRetry: @escaping () -> Void,
     onClose: @escaping () -> Void
   ) {
@@ -2756,6 +2837,7 @@ private struct PrivateVideoViewer: View {
     fileURL = url
     self.fileName = fileName
     self.contentType = contentType
+    self.librarySaveModel = librarySaveModel
     self.onRetry = onRetry
     self.onClose = onClose
   }
@@ -2835,7 +2917,7 @@ private struct PrivateVideoViewer: View {
       if playbackFailureMessage == nil,
         MediaLibrarySaveModel.supportsPhotoLibrary(contentType: contentType)
       {
-        MediaLibrarySaveControl(fileURL: fileURL, isImage: false)
+        MediaLibrarySaveControl(model: librarySaveModel, fileURL: fileURL, isImage: false)
           .padding(WoorisaiSpacing.regular)
       }
     }
@@ -2893,6 +2975,9 @@ private struct PrivateVideoViewer: View {
     .onDisappear {
       player.pause()
       player.replaceCurrentItem(with: nil)
+      try? AVAudioSession.sharedInstance().setActive(
+        false, options: .notifyOthersOnDeactivation
+      )
     }
   }
 
@@ -2907,6 +2992,10 @@ private struct PrivateVideoViewer: View {
       currentSeconds = 0
       hasReachedEnd = false
     }
+    // The default .soloAmbient session is silenced by the ring/silent switch — a video the
+    // partner recorded with sound would play mute with no indication why.
+    try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+    try? AVAudioSession.sharedInstance().setActive(true)
     player.play()
     isPlaying = true
   }

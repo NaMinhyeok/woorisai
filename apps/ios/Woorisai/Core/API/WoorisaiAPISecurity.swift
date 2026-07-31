@@ -256,10 +256,19 @@ struct APIOrigin: Equatable, Sendable {
   }
 
   func contains(_ url: URL) -> Bool {
-    guard let candidate = APIOrigin(url: url) else {
+    // Origin membership is scheme/host/port only (plus the same https/userinfo hygiene).
+    // Reusing init(url:) here rejected any same-origin destination carrying a query string,
+    // because the initializer's job is to validate a *configured base origin*, which
+    // legitimately never has one.
+    guard url.scheme?.lowercased() == "https",
+      let host = url.host?.lowercased(),
+      !host.isEmpty,
+      url.user == nil,
+      url.password == nil
+    else {
       return false
     }
-    return candidate == self
+    return host == self.host && (url.port ?? 443) == port
   }
 }
 

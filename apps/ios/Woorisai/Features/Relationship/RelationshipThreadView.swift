@@ -207,17 +207,18 @@ struct ScoreChangeThreadView: View {
         .task(id: model.selectedThread?.change.id) {
           await Task.yield()
           scrollToLatest(using: proxy, animated: false)
+          // Second pass after layout settles: the first attempt can fire before the lazy
+          // content has registered the bottom sentinel, leaving the thread opened at the top.
+          try? await Task.sleep(for: .milliseconds(120))
+          scrollToLatest(using: proxy, animated: false)
         }
         .onChange(of: latestScrollRequest) { _, _ in
           scrollToLatest(using: proxy, animated: true)
         }
       }
     }
-    .woorisaiToast(
-      model.toast,
-      reduceMotion: reduceMotion,
-      onDismiss: model.dismissToast
-    )
+    // No toast host here: RelationshipView owns one host for the whole navigation stack, so
+    // a toast raised in this thread cannot replay on the dashboard after popping.
     .accessibilityIdentifier("relationship.thread.loaded")
   }
 

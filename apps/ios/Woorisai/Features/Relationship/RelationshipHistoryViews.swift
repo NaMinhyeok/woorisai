@@ -35,7 +35,7 @@ struct RelationshipHistoryArchiveView: View {
               mediaService: mediaService,
               onAuthenticationRequired: onAuthenticationRequired,
               reasonDisplay: .historySummary,
-              navigationValue: change.id
+              linksToThread: true
             )
           }
 
@@ -150,7 +150,7 @@ struct HistoryTimelineRow: View {
         mediaService: mediaService,
         onAuthenticationRequired: onAuthenticationRequired,
         reasonDisplay: .historySummary,
-        navigationValue: change.id
+        linksToThread: true
       )
       .padding(.bottom, isLast ? 0 : WoorisaiSpacing.medium)
     }
@@ -183,9 +183,23 @@ struct ScoreChangeRow: View {
   let mediaService: any MediaServing
   let onAuthenticationRequired: @MainActor () -> Void
   let reasonDisplay: ScoreChangeReasonDisplay
-  var navigationValue: Int64? = nil
+  var linksToThread = false
 
   var body: some View {
+    if linksToThread {
+      // The whole card is the tap target: users tap the comment badge or the body expecting
+      // to land in the conversation, so a single bottom link row is not enough.
+      NavigationLink(value: RelationshipDestination.scoreThread(change.id)) {
+        card
+      }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("relationship.history.\(change.id)")
+    } else {
+      card
+    }
+  }
+
+  private var card: some View {
     let headerLayout =
       dynamicTypeSize.isAccessibilitySize
       ? AnyLayout(VStackLayout(alignment: .leading, spacing: WoorisaiSpacing.small))
@@ -250,23 +264,19 @@ struct ScoreChangeRow: View {
         .font(.caption)
         .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
 
-        if let navigationValue {
-          NavigationLink(value: navigationValue) {
-            HStack {
-              Text("전체 내용과 대화 보기")
-              Spacer()
-              Image(systemName: "chevron.right")
-                .accessibilityHidden(true)
-            }
-            .font(.subheadline.weight(.bold))
-            .foregroundStyle(WoorisaiColor.Fg.brand)
-            .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
-            .contentShape(Rectangle())
-            // 간격이 아니라 광학 정렬이다. 위 텍스트 블록의 baseline에 맞추려고 2pt 내린 것이라
-            // `WoorisaiSpacing` 스케일에 올리지 않는다.
-            .padding(.top, 2)
+        if linksToThread {
+          HStack {
+            Text("전체 내용과 대화 보기")
+            Spacer()
+            Image(systemName: "chevron.right")
+              .accessibilityHidden(true)
           }
-          .accessibilityIdentifier("relationship.history.\(change.id)")
+          .font(.subheadline.weight(.bold))
+          .foregroundStyle(WoorisaiColor.Fg.brand)
+          .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
+          // 간격이 아니라 광학 정렬이다. 위 텍스트 블록의 baseline에 맞추려고 2pt 내린 것이라
+          // `WoorisaiSpacing` 스케일에 올리지 않는다.
+          .padding(.top, 2)
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)

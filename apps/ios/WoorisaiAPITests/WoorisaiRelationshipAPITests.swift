@@ -193,8 +193,24 @@ struct WoorisaiRelationshipAPITests {
 
   @Test
   func rejectsInvalidFlexibleAttachmentBranchAndNonCurrentCreatedAuthor() async throws {
+    // A video must be the group's only element; video+image mixing violates cardinality.
     var invalidGroupComment = RelationshipWireFixtures.comment
-    invalidGroupComment.attachments = .case2([])
+    invalidGroupComment.attachments = [
+      .init(
+        id: "0b6d7f68-51c5-4c3e-9a4e-2f6f6f0a1a11",
+        kind: .video,
+        fileName: "clip.mp4",
+        contentType: .videoMp4,
+        byteSize: 5_000_000
+      ),
+      .init(
+        id: "1c7e8a79-62d6-4d4f-8b5f-3a7a7a1b2b22",
+        kind: .image,
+        fileName: "photo.jpg",
+        contentType: .imageJpeg,
+        byteSize: 1_000_000
+      ),
+    ]
     let invalidAttachmentComment = invalidGroupComment
     let threadClient = WoorisaiAPIClient(
       relationshipClient: RelationshipAPIStub(thread: { _ in
@@ -217,6 +233,36 @@ struct WoorisaiRelationshipAPITests {
     await #expect(throws: WoorisaiAPIError.schemaDrift) {
       _ = try await commentClient.createScoreChangeComment(scoreChangeID: 101, draft: draft)
     }
+  }
+
+  // Regression: a media-only video comment must survive the real wire decoder. The
+  // undiscriminated array oneOf previously made every video group decode into the image
+  // branch and fail the whole thread as schema drift.
+  @Test
+  func decodesVideoCommentAttachmentFromWireJSON() async throws {
+    let json = """
+      {
+        "id": 301,
+        "author": {"slot": 2, "displayName": "여름", "mine": false},
+        "content": null,
+        "createdAt": "2023-11-14T22:13:21Z",
+        "attachments": [{"id": "0b6d7f68-51c5-4c3e-9a4e-2f6f6f0a1a11", "kind": "VIDEO", \
+      "fileName": "clip.mov", "contentType": "video/quicktime", "byteSize": 73400320}]
+      }
+      """
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    let comment = try decoder.decode(
+      Components.Schemas.ScoreChangeComment.self, from: Data(json.utf8)
+    )
+    let client = WoorisaiAPIClient(
+      relationshipClient: RelationshipAPIStub(thread: { _ in
+        RelationshipWireFixtures.threadOutput(comment: comment)
+      })
+    )
+    let thread = try await client.loadScoreChange(id: 101)
+    #expect(thread.comments.map { $0.attachments.map(\.kind) } == [[.video]])
+    #expect(thread.comments.first?.content == nil)
   }
 
   @Test
@@ -374,7 +420,7 @@ private enum RelationshipWireFixtures {
     author: partner,
     content: "나도 고마워",
     createdAt: timestamp.addingTimeInterval(1),
-    attachments: .case1([])
+    attachments: []
   )
   static let createdChange = Components.Schemas.ScoreChange(
     id: 102,
@@ -399,7 +445,7 @@ private enum RelationshipWireFixtures {
     author: current,
     content: "새 댓글",
     createdAt: timestamp.addingTimeInterval(3),
-    attachments: .case1([])
+    attachments: []
   )
 
   static let scoresOutput = Operations.GetRelationshipScores.Output.ok(

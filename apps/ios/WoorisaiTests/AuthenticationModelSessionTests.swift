@@ -253,6 +253,29 @@ struct AuthenticationModelSessionTests {
     #expect(await vault.hasStoredCredential() == false)
   }
 
+  // Regression: after a one-off PIN fallback the vault still holds the session, but the login
+  // toggle defaulted to OFF and the next submit purged it — Face ID silently disappeared. The
+  // toggle must seed from the vault so a fallback login preserves (and refreshes) the vault.
+  @Test
+  func pinFallbackLoginKeepsRememberedVaultBecauseToggleSeedsFromIt() async throws {
+    let store = InMemoryCredentialStore()
+    let vault = FakeCredentialVault(stored: true, loadResult: .success(try archive()))
+    let validator = SessionScriptedValidator(store: store, steps: [.success(participant)])
+    let model = makeModel(store: store, validator: validator, vault: vault, probe: availableProbe())
+
+    await model.refreshRememberOption()
+    #expect(model.remembersSession == true)
+
+    await model.select(option)
+    model.updatePIN("0123")
+    model.submit()
+
+    await sessionExpectEventually { model.authenticatedParticipant == participant }
+    #expect(await vault.deleteCount == 0)
+    #expect(await vault.hasStoredCredential() == true)
+    #expect(model.isSessionRemembered == true)
+  }
+
   // MARK: - Settings-driven remembering
 
   @Test

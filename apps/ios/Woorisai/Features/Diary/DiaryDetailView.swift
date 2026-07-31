@@ -109,7 +109,9 @@ struct DiaryDetailView: View {
         model.mutationState == .submitting || hasUnknownOutcomeForEntry
       )
       .task(id: entryID) {
-        model.loadDetail(entryID: entryID)
+        // Preserve a still-cached detail (kept across tab switches) so returning shows the
+        // conversation immediately while the refresh runs behind it.
+        model.loadDetail(entryID: entryID, preservingVisibleContent: true)
       }
       .onAppear {
         mediaSessionCoordinator.registerTransient(entryEditMediaModel)
@@ -410,7 +412,11 @@ struct DiaryDetailView: View {
   private var detailConflictBinding: Binding<Bool> {
     Binding(
       get: {
-        !isEditingEntry && editingComment == nil && model.conflict != nil
+        // Only this entry's conflict may present here — a conflict left over from another
+        // entry's screen must never re-arm on an unrelated detail.
+        !isEditingEntry && editingComment == nil
+          && (model.conflict == .entry(entryID: entryID)
+            || model.conflict == .comment(entryID: entryID))
       },
       set: { isPresented in
         dismissConflictWhenNeeded(isPresented)
@@ -444,7 +450,7 @@ struct DiaryDetailView: View {
     WarmBackground {
       ScrollViewReader { proxy in
         ScrollView {
-          if let detail = model.selectedDetail {
+          if let detail = model.selectedDetail, detail.entry.id == entryID {
             // No hero card here: the navigation title already says 일기 대화, and a repeated
             // marketing card pushed the actual entry below the fold on every open.
             LazyVStack(alignment: .leading, spacing: WoorisaiSpacing.regular) {
@@ -542,11 +548,7 @@ struct DiaryDetailView: View {
     .safeAreaInset(edge: .bottom, spacing: 0) {
       commentComposerBar
     }
-    .woorisaiToast(
-      model.mutationToast,
-      reduceMotion: reduceMotion,
-      onDismiss: model.dismissToast
-    )
+    // No toast host here: DiaryView owns one host for the whole navigation stack.
     // Scoped to this entry: the diary list stays mounted behind this pushed detail, so an unscoped
     // trigger would fire the same haptic twice.
     .sensoryFeedback(trigger: model.lastMutationCompletion) { _, completion in
@@ -749,9 +751,9 @@ struct DiaryDetailView: View {
 
   private var commentComposerBar: some View {
     VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
-      if let mutationNotice = model.mutationNotice {
+      if let notice = model.mutationNotice ?? model.detailNotice {
         DiaryMutationStatusCard(
-          message: mutationNotice,
+          message: notice,
           onDismiss: model.dismissNotices
         )
         .accessibilityIdentifier("diary.detail.notice")
@@ -1171,8 +1173,11 @@ struct DiaryDetailView: View {
   }
 
   private func abandonUnknownEntryEdit() {
-    guard entryEditReconciliation?.allowsResolveAsSaved == false,
-      entryEditReconciliation?.allowsManualRetry == false,
+    // A nil reconciliation (reload not yet run, or failed offline) must NOT block abandoning:
+    // this button exists precisely for the state where reloading is impossible. Only a
+    // successful reconciliation that offers resolve/retry disables it.
+    guard entryEditReconciliation?.allowsResolveAsSaved != true,
+      entryEditReconciliation?.allowsManualRetry != true,
       model.abandonInconclusiveUnknownOutcome(context: .updateEntry(entryID: entryID))
     else { return }
     // The unknown request may have attached these uploads before another write won. Do not
@@ -1209,10 +1214,12 @@ struct DiaryDetailView: View {
   }
 
   private func abandonUnknownCommentEdit() {
-    guard let editingComment,
-      let reconciliation = commentReconciliation(for: editingComment),
-      !reconciliation.allowsResolveAsSaved,
-      !reconciliation.allowsManualRetry,
+    guard let editingComment else { return }
+    // Same as abandonUnknownEntryEdit: a nil reconciliation means reloading was impossible,
+    // which is exactly when abandoning must stay available.
+    let reconciliation = commentReconciliation(for: editingComment)
+    guard reconciliation?.allowsResolveAsSaved != true,
+      reconciliation?.allowsManualRetry != true,
       model.abandonInconclusiveUnknownOutcome(
         context: .updateComment(entryID: entryID, commentID: editingComment.id)
       )
