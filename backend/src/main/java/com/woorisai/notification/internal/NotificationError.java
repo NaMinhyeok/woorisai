@@ -1,10 +1,14 @@
 package com.woorisai.notification.internal;
 
 import com.woorisai.support.error.ErrorDescriptor;
+import lombok.Getter;
+import lombok.experimental.Accessors;
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.http.HttpStatus;
 
 // NotificationApiProblem omits instance, so these failures must not expose it.
+@Getter
+@Accessors(fluent = true)
 enum NotificationError implements ErrorDescriptor {
     INVALID_FID(
             HttpStatus.BAD_REQUEST,
@@ -18,11 +22,6 @@ enum NotificationError implements ErrorDescriptor {
             "Notification FID service unavailable",
             "Notification FID service is temporarily unavailable.",
             LogLevel.WARN);
-
-    @Override
-    public boolean exposesInstance() {
-        return false;
-    }
 
     private final HttpStatus status;
     private final String code;
@@ -39,27 +38,7 @@ enum NotificationError implements ErrorDescriptor {
     }
 
     @Override
-    public HttpStatus status() {
-        return status;
-    }
-
-    @Override
-    public String code() {
-        return code;
-    }
-
-    @Override
-    public String title() {
-        return title;
-    }
-
-    @Override
-    public String detail() {
-        return detail;
-    }
-
-    @Override
-    public LogLevel logLevel() {
-        return logLevel;
+    public boolean exposesInstance() {
+        return false;
     }
 }

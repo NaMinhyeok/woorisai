@@ -1,9 +1,13 @@
 package com.woorisai.identity.internal;
 
 import com.woorisai.support.error.ErrorDescriptor;
+import lombok.Getter;
+import lombok.experimental.Accessors;
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.http.HttpStatus;
 
+@Getter
+@Accessors(fluent = true)
 enum IdentityError implements ErrorDescriptor {
     AUTHENTICATION_REQUIRED(
             HttpStatus.UNAUTHORIZED,
@@ -42,30 +46,5 @@ enum IdentityError implements ErrorDescriptor {
         this.title = title;
         this.detail = detail;
         this.logLevel = logLevel;
-    }
-
-    @Override
-    public HttpStatus status() {
-        return status;
-    }
-
-    @Override
-    public String code() {
-        return code;
-    }
-
-    @Override
-    public String title() {
-        return title;
-    }
-
-    @Override
-    public String detail() {
-        return detail;
-    }
-
-    @Override
-    public LogLevel logLevel() {
-        return logLevel;
     }
 }

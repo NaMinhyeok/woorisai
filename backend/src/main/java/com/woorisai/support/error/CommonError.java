@@ -1,8 +1,12 @@
 package com.woorisai.support.error;
 
+import lombok.Getter;
+import lombok.experimental.Accessors;
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.http.HttpStatus;
 
+@Getter
+@Accessors(fluent = true)
 public enum CommonError implements ErrorDescriptor {
     UNSUPPORTED_MEDIA_TYPE(
             HttpStatus.UNSUPPORTED_MEDIA_TYPE,
@@ -23,30 +27,5 @@ public enum CommonError implements ErrorDescriptor {
         this.title = title;
         this.detail = detail;
         this.logLevel = logLevel;
-    }
-
-    @Override
-    public HttpStatus status() {
-        return status;
-    }
-
-    @Override
-    public String code() {
-        return code;
-    }
-
-    @Override
-    public String title() {
-        return title;
-    }
-
-    @Override
-    public String detail() {
-        return detail;
-    }
-
-    @Override
-    public LogLevel logLevel() {
-        return logLevel;
     }
 }
