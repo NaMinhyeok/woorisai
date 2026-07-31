@@ -34,6 +34,12 @@ Business module은 `identity`, `participant`, `relationship`, `diary`, `media`,
 past-tense event만 사용한다. `shared`, `common`, `infrastructure`, 별도 `operations` business
 module을 우회 통로로 만들지 않는다.
 
+`support`는 business module이 아니라 기술 지원 module이다. `allowedDependencies = {}`로 어떤
+business module도 참조하지 않고, `@NamedInterface`로 노출면을 좁히며, 사용 module이
+`support::<interface>`를 명시 선언한다. Business 지식, domain 규칙, entity와 module 간 참조를
+`support`에 두지 않는다. 상세 근거와 재검토 조건은
+`docs/architecture/module-boundaries.md`가 정본이다.
+
 ## 반드시 보존할 계약
 
 - Participant는 slot 1과 2의 정확히 두 명이다.
