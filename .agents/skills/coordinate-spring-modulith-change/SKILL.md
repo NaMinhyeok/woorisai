@@ -47,6 +47,7 @@ Writable scope and protected files:
 | Aggregate state, invariants, entity/value semantics, repository authority | [`$model-spring-domain`](../model-spring-domain/SKILL.md) |
 | Event timing, delivery, publication, retries, idempotency, external side effects | [`$engineer-spring-modulith-events`](../engineer-spring-modulith-events/SKILL.md) |
 | Test layers, module verification, production-database and concurrency proof | [`$test-spring-modulith`](../test-spring-modulith/SKILL.md) |
+| Published API failures: error catalog, handler mapping, ProblemDetail schemas | [`$publish-woorisai-api-failures`](../publish-woorisai-api-failures/SKILL.md) |
 
 Use intentional combinations:
 
