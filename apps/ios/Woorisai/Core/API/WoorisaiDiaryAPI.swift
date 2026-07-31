@@ -755,34 +755,24 @@ extension WoorisaiDiaryAPI {
     let displayName = response.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
     guard let slot = ParticipantSlot(rawValue: response.slot.rawValue),
       !displayName.isEmpty,
-      response.displayName.count <= 30
+      displayName.count <= 30
     else {
       throw WoorisaiAPIError.schemaDrift
     }
-    return DiaryParticipant(slot: slot, displayName: response.displayName)
+    return DiaryParticipant(slot: slot, displayName: displayName)
   }
 
   private static func mapAttachments(
     _ response: Components.Schemas.FlexibleAttachmentGroup
   ) throws -> [DiaryAttachment] {
-    let attachments: [DiaryAttachment]
-    switch response {
-    case .case1(let values):
-      attachments = try values.map { try mapAttachment($0.value1) }
-      guard attachments.count <= 4,
-        attachments.allSatisfy({ $0.kind == .image && $0.byteSize <= 10_485_760 })
-      else {
-        throw WoorisaiAPIError.schemaDrift
-      }
-    case .case2(let values):
-      attachments = try values.map { try mapAttachment($0.value1) }
-      guard attachments.count == 1,
-        attachments.allSatisfy({ $0.kind == .video && $0.byteSize <= 104_857_600 })
-      else {
-        throw WoorisaiAPIError.schemaDrift
-      }
-    }
-    guard Set(attachments.map(\.id)).count == attachments.count else {
+    let attachments = try response.map(mapAttachment)
+    // Group shape is the domain invariant (cardinality, no image/video mixing); per-item
+    // content-type coherence lives in mapAttachment and byte ceilings are server-owned.
+    let containsVideo = attachments.contains { $0.kind == .video }
+    guard attachments.count <= 4,
+      !containsVideo || attachments.count == 1,
+      Set(attachments.map(\.id)).count == attachments.count
+    else {
       throw WoorisaiAPIError.schemaDrift
     }
     return attachments

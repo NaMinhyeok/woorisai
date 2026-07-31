@@ -617,7 +617,7 @@ extension WoorisaiAPIClient {
       normalizedReason?.unicodeScalars.count ?? 0
         <= RelationshipScoreChangeDraft.maximumReasonCharacterCount,
       attachments.count <= 1,
-      attachments.allSatisfy({ $0.kind == .image && $0.byteSize <= 10_485_760 })
+      attachments.allSatisfy({ $0.kind == .image })
     else {
       throw WoorisaiAPIError.schemaDrift
     }
@@ -640,28 +640,17 @@ extension WoorisaiAPIClient {
   ) throws -> RelationshipScoreComment {
     let author = try mapParticipant(response.author)
     let content = response.content?.trimmingCharacters(in: .whitespacesAndNewlines)
-    let rawAttachments: [Components.Schemas.AttachedMedia]
-    let attachmentGroupIsValid: ([RelationshipMedia]) -> Bool
-    switch response.attachments {
-    case .case1(let values):
-      rawAttachments = values.map(\.value1)
-      attachmentGroupIsValid = { attachments in
-        attachments.count <= 4
-          && attachments.allSatisfy { $0.kind == .image && $0.byteSize <= 10_485_760 }
-      }
-    case .case2(let values):
-      rawAttachments = values.map(\.value1)
-      attachmentGroupIsValid = { attachments in
-        attachments.count == 1 && attachments.allSatisfy { $0.kind == .video }
-      }
-    }
-    let attachments = try rawAttachments.map(mapMedia)
+    let attachments = try response.attachments.map(mapMedia)
+    // Group shape is the domain invariant (cardinality, no image/video mixing); per-item
+    // content-type coherence lives in mapMedia and byte ceilings are server-owned.
+    let containsVideo = attachments.contains { $0.kind == .video }
     guard response.id > 0,
       content?.isEmpty != true,
       content?.unicodeScalars.count ?? 0
         <= RelationshipScoreCommentDraft.maximumContentCharacterCount,
       !(content == nil && attachments.isEmpty),
-      attachmentGroupIsValid(attachments),
+      attachments.count <= 4,
+      !containsVideo || attachments.count == 1,
       Set(attachments.map(\.id)).count == attachments.count
     else {
       throw WoorisaiAPIError.schemaDrift
@@ -683,13 +672,13 @@ extension WoorisaiAPIClient {
     )
     guard let slot = ParticipantSlot(rawValue: response.slot.rawValue),
       !normalizedDisplayName.isEmpty,
-      response.displayName.count <= 30
+      normalizedDisplayName.count <= 30
     else {
       throw WoorisaiAPIError.schemaDrift
     }
     return RelationshipParticipant(
       slot: slot,
-      displayName: response.displayName,
+      displayName: normalizedDisplayName,
       isCurrentParticipant: response.mine
     )
   }

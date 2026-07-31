@@ -560,6 +560,25 @@ struct RelationshipModelTests {
     #expect(model.notice == nil)
   }
 
+  // Regression: with offset pagination, a list that grew at the front makes the next page
+  // overlap already-loaded changes. That overlap used to be treated as schema drift, which
+  // made "이전 기록 더 불러오기" fail forever after one new score change.
+  @Test
+  func nextPageAbsorbsOffsetOverlapInsteadOfFailingForever() async {
+    let service = OverlappingPaginationService()
+    let model = RelationshipModel(service: service)
+    model.loadIfNeeded()
+    await relationshipExpectEventually { model.loadState == .loaded }
+
+    model.loadNextPage()
+    await relationshipExpectEventually { model.currentPage == 2 }
+
+    #expect(model.changes.map(\.id) == [101, 102])
+    #expect(model.archiveNotice == nil)
+    #expect(model.pagingState == .idle)
+    #expect(model.hasNextPage == false)
+  }
+
   @Test
   func screenExitInvalidatesThreadReadAndIgnoresItsLateCompletion() async {
     let service = ControlledThreadReadService()
@@ -1171,6 +1190,42 @@ private actor RelationshipInspectionSupersedeService: RelationshipServing {
     draft: RelationshipScoreCommentDraft
   ) throws -> RelationshipScoreComment {
     throw WoorisaiAPIError.transport
+  }
+}
+
+private actor OverlappingPaginationService: RelationshipServing {
+  func loadRelationshipScores() async throws -> RelationshipScores {
+    RelationshipFixtures.scores
+  }
+
+  func loadScoreChanges(pageNumber: Int) async throws -> RelationshipScoreChangePage {
+    pageNumber == 1
+      ? RelationshipScoreChangePage(
+        changes: [RelationshipFixtures.change], pageNumber: 1, hasNext: true, totalCount: 2
+      )
+      : RelationshipScoreChangePage(
+        changes: [RelationshipFixtures.change, RelationshipFixtures.createdChange],
+        pageNumber: 2,
+        hasNext: false,
+        totalCount: 2
+      )
+  }
+
+  func createScoreChange(
+    _ draft: RelationshipScoreChangeDraft
+  ) async throws -> RelationshipScoreChangeCreated {
+    throw RelationshipModelTestFailure.unexpectedOperation
+  }
+
+  func loadScoreChange(id: Int64) async throws -> RelationshipScoreThread {
+    throw RelationshipModelTestFailure.unexpectedOperation
+  }
+
+  func createScoreChangeComment(
+    scoreChangeID: Int64,
+    draft: RelationshipScoreCommentDraft
+  ) async throws -> RelationshipScoreComment {
+    throw RelationshipModelTestFailure.unexpectedOperation
   }
 }
 

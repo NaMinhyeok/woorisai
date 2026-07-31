@@ -9,8 +9,14 @@ enum NotificationNavigationDisposition: Equatable, Sendable {
   case navigate
   case refetchVisible
 
-  static func resolve(currentPath: [Int64], targetID: Int64) -> Self {
-    currentPath == [targetID] ? .refetchVisible : .navigate
+  /// The visible screen is the path's last element, whatever sits beneath it (for example the
+  /// relationship history archive). Comparing the whole path instead used to misroute while a
+  /// non-target screen was stacked below the target.
+  static func resolve<Destination: Equatable>(
+    currentPath: [Destination],
+    target: Destination
+  ) -> Self {
+    currentPath.last == target ? .refetchVisible : .navigate
   }
 }
 

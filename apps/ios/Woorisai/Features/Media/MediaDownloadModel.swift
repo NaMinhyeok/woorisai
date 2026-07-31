@@ -619,20 +619,35 @@ final class PrivateMediaPreviewModel {
     self.descriptor = descriptor
   }
 
-  func load(using loader: any PrivateMediaPreviewLoading) {
-    startLoad(using: loader, discardingCurrentLease: false)
+  func load(
+    using loader: any PrivateMediaPreviewLoading,
+    decodeMaxPixelSize: Int = MediaImagePreview.maximumPixelSize
+  ) {
+    startLoad(
+      using: loader,
+      discardingCurrentLease: false,
+      decodeMaxPixelSize: decodeMaxPixelSize
+    )
   }
 
   /// Removes a locally cached file that could not be decoded before acquiring it again.
   /// Discard must finish before the replacement load starts, otherwise the shared store can hand
   /// the same corrupt cached file straight back to this model.
-  func reloadDiscardingCurrentLease(using loader: any PrivateMediaPreviewLoading) {
-    startLoad(using: loader, discardingCurrentLease: true)
+  func reloadDiscardingCurrentLease(
+    using loader: any PrivateMediaPreviewLoading,
+    decodeMaxPixelSize: Int = MediaImagePreview.maximumPixelSize
+  ) {
+    startLoad(
+      using: loader,
+      discardingCurrentLease: true,
+      decodeMaxPixelSize: decodeMaxPixelSize
+    )
   }
 
   private func startLoad(
     using loader: any PrivateMediaPreviewLoading,
-    discardingCurrentLease: Bool
+    discardingCurrentLease: Bool,
+    decodeMaxPixelSize: Int
   ) {
     generation &+= 1
     let generation = generation
@@ -665,7 +680,10 @@ final class PrivateMediaPreviewModel {
         let decodedImage: UIImage? =
           if descriptor.isImage {
             await Task.detached(priority: .userInitiated) {
-              MediaImagePreview.thumbnail(fromFileAt: newLease.localURL)
+              MediaImagePreview.thumbnail(
+                fromFileAt: newLease.localURL,
+                maximumPixelSize: decodeMaxPixelSize
+              )
             }.value
           } else {
             nil

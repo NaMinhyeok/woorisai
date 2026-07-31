@@ -118,6 +118,9 @@ final class AuthenticationModel {
   private var unlockTask: Task<Void, Never>?
 
   @ObservationIgnored
+  private var rememberSettingTask: Task<Void, Never>?
+
+  @ObservationIgnored
   private var requestGeneration: UInt = 0
 
   private static let unlockReason = "우리사이 잠금을 해제합니다."
@@ -139,6 +142,10 @@ final class AuthenticationModel {
   /// Probe biometric availability so the login screen can decide whether to offer the toggle.
   func refreshRememberOption() async {
     canOfferRemembering = await biometricProbe.availability().canPromptForUnlock
+    // Seed the login toggle from the vault. After a one-off PIN fallback (mask on, server
+    // hiccup) the stored session must survive by default: submit() purges the vault when this
+    // is false, and the user never asked the device to be forgotten.
+    remembersSession = await vault.hasStoredCredential()
   }
 
   /// Refresh both settings-toggle inputs: whether biometrics can gate a vault at all, and whether
@@ -146,6 +153,22 @@ final class AuthenticationModel {
   func refreshRememberedSessionStatus() async {
     canOfferRemembering = await biometricProbe.availability().canPromptForUnlock
     isSessionRemembered = await vault.hasStoredCredential()
+  }
+
+  /// Serializes settings-toggle writes: two overlapping Keychain operations (the
+  /// biometric-gated save can be slow) may complete out of order, leaving the vault
+  /// contradicting what the toggle shows.
+  func setSessionRemembered(_ remember: Bool) {
+    let previous = rememberSettingTask
+    rememberSettingTask = Task { [weak self] in
+      await previous?.value
+      guard let self else { return }
+      if remember {
+        await self.rememberCurrentSession()
+      } else {
+        await self.forgetRememberedSession()
+      }
+    }
   }
 
   /// Settings-driven opt-in AFTER login: persist the active session's credential so the user does
@@ -231,14 +254,15 @@ final class AuthenticationModel {
         guard let self, self.requestGeneration == generation else { return }
 
         if shouldRemember {
-          // Best effort: a failed Keychain write must never block login.
-          try? await vault.save(credential.archived())
+          // Best effort: a failed Keychain write must never block login — but it must not be
+          // reported as saved either, or the settings toggle lies until the next refresh.
+          let saved = (try? await vault.save(credential.archived())) != nil
           guard self.requestGeneration == generation else {
             // Superseded during the save (cancel/select/lock): undo persistence, do not authenticate.
             await vault.deleteCredential()
             return
           }
-          self.isSessionRemembered = true
+          self.isSessionRemembered = saved
         } else {
           // A non-remembered login must invalidate whatever the vault held before: a stale
           // archive would let the next launch biometric-unlock as whoever logged in previously —
@@ -438,7 +462,15 @@ final class AuthenticationModel {
       await vault.deleteCredential()
       isSessionRemembered = false
     }
-    guard requestGeneration == generation else { return }
+    guard requestGeneration == generation else {
+      // A user action superseded this failure while the purge awaits ran (e.g. "PIN으로
+      // 들어가기"). The purge above still happened, so its explanation must still reach the
+      // login screen — a silent drop from Face ID to the chooser reads as a broken app.
+      if outcome.forgetsVault, storedSessionNotice == nil {
+        storedSessionNotice = outcome.notice
+      }
+      return
+    }
     unlockTask = nil
     storedSessionNotice = outcome.notice
     state = outcome.state

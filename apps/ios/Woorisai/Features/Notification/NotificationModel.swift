@@ -480,7 +480,15 @@ final class NotificationModel {
     registrationRequestWasIssued: Bool,
     service: any NotificationFIDServing
   ) async {
-    guard sessionGeneration != generation else { return }
+    guard sessionGeneration != generation else {
+      // Same-session teardown: pauseRegistrationForLock cancels the task WITHOUT bumping the
+      // session generation (deliberately, so no compensation DELETE erases a committed FID).
+      // The attempt bookkeeping must still clear here — otherwise refreshRegistration()
+      // early-returns forever, the settings row sticks at "알림 설정 확인 중", and an FID
+      // rotation never re-registers.
+      finishRegistrationAttempt(generation: generation, attempt: attempt)
+      return
+    }
     if registrationRequestWasIssued, let possiblyCommittedFID {
       // An unstructured detached task does not inherit cancellation from the register transport.
       // Await it before reasserting a newer session so a late DELETE cannot erase that upsert.

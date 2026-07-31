@@ -254,6 +254,54 @@ struct WoorisaiDiaryAPITests {
       )
     }
   }
+
+  // Regression: attachment groups must survive the real wire decoder, not only
+  // hand-assembled generated values. A single-video group previously failed to map
+  // because the undiscriminated array oneOf always decoded into the image branch.
+  @Test
+  func decodesAttachmentGroupsFromWireJSONIncludingVideo() async throws {
+    let videoEntry = try DiaryWireFixtures.decodedEntry(
+      attachmentsJSON: """
+        [{"id": "0b6d7f68-51c5-4c3e-9a4e-2f6f6f0a1a11", "kind": "VIDEO", \
+        "fileName": "clip.mp4", "contentType": "video/mp4", "byteSize": 52428800}]
+        """
+    )
+    let videoAPI = WoorisaiDiaryAPI(
+      diaryClient: DiaryAPIStub(list: { _ in DiaryWireFixtures.listOutput(entry: videoEntry) })
+    )
+    let videoPage = try await videoAPI.loadDiaryEntries(pageNumber: 1)
+    #expect(videoPage.entries.first?.attachments.map(\.kind) == [.video])
+
+    let imagePairEntry = try DiaryWireFixtures.decodedEntry(
+      attachmentsJSON: """
+        [{"id": "2d8f9b8a-73e7-4e5a-9c6a-4b8b8b2c3c33", "kind": "IMAGE", \
+        "fileName": "one.jpg", "contentType": "image/jpeg", "byteSize": 1048576}, \
+        {"id": "3e9a0c9b-84f8-4f6b-8d7b-5c9c9c3d4d44", "kind": "IMAGE", \
+        "fileName": "two.png", "contentType": "image/png", "byteSize": 2097152}]
+        """
+    )
+    let imageAPI = WoorisaiDiaryAPI(
+      diaryClient: DiaryAPIStub(list: { _ in DiaryWireFixtures.listOutput(entry: imagePairEntry) })
+    )
+    let imagePage = try await imageAPI.loadDiaryEntries(pageNumber: 1)
+    #expect(imagePage.entries.first?.attachments.map(\.kind) == [.image, .image])
+
+    // Video+image mixing violates the group cardinality invariant.
+    let mixedEntry = try DiaryWireFixtures.decodedEntry(
+      attachmentsJSON: """
+        [{"id": "0b6d7f68-51c5-4c3e-9a4e-2f6f6f0a1a11", "kind": "VIDEO", \
+        "fileName": "clip.mp4", "contentType": "video/mp4", "byteSize": 52428800}, \
+        {"id": "2d8f9b8a-73e7-4e5a-9c6a-4b8b8b2c3c33", "kind": "IMAGE", \
+        "fileName": "one.jpg", "contentType": "image/jpeg", "byteSize": 1048576}]
+        """
+    )
+    let mixedAPI = WoorisaiDiaryAPI(
+      diaryClient: DiaryAPIStub(list: { _ in DiaryWireFixtures.listOutput(entry: mixedEntry) })
+    )
+    await #expect(throws: WoorisaiAPIError.schemaDrift) {
+      _ = try await mixedAPI.loadDiaryEntries(pageNumber: 1)
+    }
+  }
 }
 
 private struct DiaryAPIStub: DiaryAPIProtocol {
@@ -413,7 +461,7 @@ private enum DiaryWireFixtures {
     createdAt: timestamp,
     updatedAt: nil,
     isMine: true,
-    attachments: .case1([]),
+    attachments: [],
     commentCount: 1
   )
   static let updatedEntry = Components.Schemas.DiaryEntryUpdatedResponse(
@@ -423,7 +471,7 @@ private enum DiaryWireFixtures {
     createdAt: timestamp,
     updatedAt: timestamp.addingTimeInterval(30),
     isMine: true,
-    attachments: .case1([]),
+    attachments: [],
     commentCount: 1
   )
   static let comment = Components.Schemas.DiaryCommentResponse(
@@ -497,6 +545,45 @@ private enum DiaryWireFixtures {
       )
     )
   )
+  static func decodedEntry(
+    attachmentsJSON: String
+  ) throws -> Components.Schemas.DiaryEntryResponse {
+    let json = """
+      {
+        "id": 41,
+        "author": {"slot": 1, "displayName": "봄"},
+        "content": "와이어 일기",
+        "createdAt": "2023-11-14T22:13:20Z",
+        "updatedAt": null,
+        "isMine": true,
+        "attachments": \(attachmentsJSON),
+        "commentCount": 0
+      }
+      """
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    return try decoder.decode(
+      Components.Schemas.DiaryEntryResponse.self, from: Data(json.utf8)
+    )
+  }
+  static func listOutput(
+    entry: Components.Schemas.DiaryEntryResponse
+  ) -> Operations.ListDiaryEntries.Output {
+    .ok(
+      .init(
+        headers: .init(cacheControl: "no-store"),
+        body: .json(
+          .init(
+            results: [entry],
+            pageNumber: 1,
+            pageSize: ._20,
+            hasNext: false,
+            totalCount: 1
+          )
+        )
+      )
+    )
+  }
   static let detailOutput = Operations.GetDiaryEntry.Output.ok(
     .init(headers: .init(cacheControl: "no-store"), body: .json(detail))
   )

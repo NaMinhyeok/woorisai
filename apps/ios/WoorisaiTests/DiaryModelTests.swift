@@ -226,6 +226,58 @@ struct DiaryModelTests {
     )
   }
 
+  // Regression: deleting an entry/comment the partner already deleted returned 404 and
+  // surfaced a sticky "저장하지 못했어요" that could never succeed. 404 on delete means the goal
+  // state is reached — it must converge to the success path and update the list.
+  @Test
+  func deleteConverges404IntoSuccessBecauseTheGoalStateIsReached() async {
+    let service = AlreadyDeletedDiaryService()
+    let model = DiaryModel(service: service)
+    model.loadIfNeeded()
+    await diaryExpectEventually { model.listState == .loaded }
+    model.loadDetail(entryID: 41)
+    await diaryExpectEventually { model.detailState == .loaded }
+
+    model.deleteComment(entryID: 41, commentID: 51)
+    await diaryExpectEventually {
+      model.lastMutationCompletion?.outcome
+        == .commentDeleted(entryID: 41, commentID: 51)
+    }
+    #expect(model.mutationState == .idle)
+    #expect(model.mutationNotice == nil)
+    #expect(model.selectedDetail?.comments.isEmpty == true)
+
+    model.deleteEntry(entryID: 41)
+    await diaryExpectEventually {
+      model.lastMutationCompletion?.outcome == .entryDeleted(entryID: 41)
+    }
+    #expect(model.mutationState == .idle)
+    #expect(model.entries.isEmpty)
+  }
+
+  // Regression: when the post-conflict reload itself fails (offline), re-arming the conflict
+  // alert created an inescapable modal loop — its only button re-fetched and failed again.
+  // The failure must degrade to a dismissible notice instead.
+  @Test
+  func failedConflictReloadDegradesToNoticeInsteadOfRearmingTheAlertLoop() async {
+    let service = FlippableReadDiaryService()
+    let model = DiaryModel(service: service)
+    model.loadDetail(entryID: 41)
+    await diaryExpectEventually { model.detailState == .loaded }
+
+    model.updateEntry(entryID: 41, content: "경합한 내용")
+    await diaryExpectEventually { model.conflict == .entry(entryID: 41) }
+
+    await service.failReadsFromNowOn()
+    model.reloadAfterConflict(preservingVisibleContent: true)
+    await diaryExpectEventually { model.editorReconciliationState == .failed }
+
+    #expect(model.conflict == nil)
+    #expect(model.mutationNotice == "최신 내용을 불러오지 못했어요. 초안은 그대로 두고 다시 시도해 주세요.")
+    #expect(model.detailState == .loaded)
+    #expect(model.selectedDetail != nil)
+  }
+
   @Test
   func dismissingConflictReloadsTheKnownStaleDetailWithoutDiscardingEditorDraft() async {
     let entryService = DiaryServiceFake(updateEntryFailure: .conflict)
@@ -671,6 +723,24 @@ struct DiaryModelTests {
     #expect(model.entries.map(\.id) == [41, 40])
   }
 
+  // Regression: with offset pagination, a list that grew at the front makes the next page
+  // overlap already-loaded entries. That overlap used to be treated as schema drift, which
+  // made "더 보기" fail forever after writing a single entry.
+  @Test
+  func nextPageAbsorbsOffsetOverlapInsteadOfFailingForever() async {
+    let service = OverlappingDiaryPaginationService()
+    let model = DiaryModel(service: service)
+    model.loadIfNeeded()
+    await diaryExpectEventually { model.listState == .loaded }
+
+    model.loadNextPage()
+    await diaryExpectEventually { model.currentPage == 2 }
+
+    #expect(model.entries.map(\.id) == [41, 40])
+    #expect(model.listNotice == nil)
+    #expect(model.hasNextPage == false)
+  }
+
   @Test
   func authenticationFailureClearsPrivateCacheAndRequestsPIN() async {
     let service = DiaryServiceFake(readFailure: .credentialRejected)
@@ -772,6 +842,121 @@ private func diaryExpectEventually(
     await Task.yield()
   }
   Issue.record("Timed out waiting for diary state")
+}
+
+private actor AlreadyDeletedDiaryService: DiaryServing {
+  func loadDiaryEntries(pageNumber: Int) async throws -> DiaryEntryPage {
+    DiaryFeatureFixtures.page
+  }
+
+  func createDiaryEntry(_ draft: DiaryEntryCreateDraft) async throws -> DiaryEntry {
+    DiaryFeatureFixtures.createdEntry
+  }
+
+  func loadDiaryEntry(id: Int64) async throws -> DiaryEntryDetail {
+    DiaryFeatureFixtures.detail
+  }
+
+  func updateDiaryEntry(id: Int64, draft: DiaryEntryUpdateDraft) async throws -> DiaryEntry {
+    DiaryFeatureFixtures.updatedEntry
+  }
+
+  func deleteDiaryEntry(id: Int64) async throws {
+    throw WoorisaiAPIError.notFound
+  }
+
+  func createDiaryComment(
+    entryID: Int64, draft: DiaryCommentDraft
+  ) async throws -> DiaryComment {
+    DiaryFeatureFixtures.createdComment
+  }
+
+  func updateDiaryComment(id: Int64, draft: DiaryCommentDraft) async throws -> DiaryComment {
+    DiaryFeatureFixtures.updatedComment
+  }
+
+  func deleteDiaryComment(id: Int64) async throws {
+    throw WoorisaiAPIError.notFound
+  }
+}
+
+private actor FlippableReadDiaryService: DiaryServing {
+  private var failsReads = false
+
+  func failReadsFromNowOn() { failsReads = true }
+
+  func loadDiaryEntries(pageNumber: Int) async throws -> DiaryEntryPage {
+    if failsReads { throw WoorisaiAPIError.transport }
+    return DiaryFeatureFixtures.page
+  }
+
+  func createDiaryEntry(_ draft: DiaryEntryCreateDraft) async throws -> DiaryEntry {
+    DiaryFeatureFixtures.createdEntry
+  }
+
+  func loadDiaryEntry(id: Int64) async throws -> DiaryEntryDetail {
+    if failsReads { throw WoorisaiAPIError.transport }
+    return DiaryFeatureFixtures.detail
+  }
+
+  func updateDiaryEntry(id: Int64, draft: DiaryEntryUpdateDraft) async throws -> DiaryEntry {
+    throw WoorisaiAPIError.conflict
+  }
+
+  func deleteDiaryEntry(id: Int64) async throws {}
+
+  func createDiaryComment(
+    entryID: Int64, draft: DiaryCommentDraft
+  ) async throws -> DiaryComment {
+    DiaryFeatureFixtures.createdComment
+  }
+
+  func updateDiaryComment(id: Int64, draft: DiaryCommentDraft) async throws -> DiaryComment {
+    DiaryFeatureFixtures.updatedComment
+  }
+
+  func deleteDiaryComment(id: Int64) async throws {}
+}
+
+private actor OverlappingDiaryPaginationService: DiaryServing {
+  func loadDiaryEntries(pageNumber: Int) async throws -> DiaryEntryPage {
+    pageNumber == 1
+      ? DiaryEntryPage(
+        entries: [DiaryFeatureFixtures.entry], pageNumber: 1, hasNext: true, totalCount: 2
+      )
+      : DiaryEntryPage(
+        entries: [DiaryFeatureFixtures.entry, DiaryFeatureFixtures.olderEntry],
+        pageNumber: 2,
+        hasNext: false,
+        totalCount: 2
+      )
+  }
+
+  func createDiaryEntry(_ draft: DiaryEntryCreateDraft) async throws -> DiaryEntry {
+    DiaryFeatureFixtures.createdEntry
+  }
+
+  func loadDiaryEntry(id: Int64) async throws -> DiaryEntryDetail {
+    DiaryFeatureFixtures.detail
+  }
+
+  func updateDiaryEntry(id: Int64, draft: DiaryEntryUpdateDraft) async throws -> DiaryEntry {
+    DiaryFeatureFixtures.updatedEntry
+  }
+
+  func deleteDiaryEntry(id: Int64) async throws {}
+
+  func createDiaryComment(
+    entryID: Int64, draft: DiaryCommentDraft
+  ) async throws -> DiaryComment {
+    DiaryFeatureFixtures.createdComment
+  }
+
+  func updateDiaryComment(id: Int64, draft: DiaryCommentDraft) async throws -> DiaryComment {
+    DiaryFeatureFixtures.updatedComment
+  }
+
+  func deleteDiaryComment(id: Int64) async throws {}
 }
 
 private actor DiaryServiceFake: DiaryServing {

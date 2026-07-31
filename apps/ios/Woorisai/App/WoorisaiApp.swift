@@ -254,7 +254,7 @@ private struct AppRootView: View {
   @State private var diaryModel: DiaryModel
   @State private var notificationModel: NotificationModel
   @State private var selectedTab = AuthenticatedTab.relationship
-  @State private var relationshipNavigationPath: [Int64] = []
+  @State private var relationshipNavigationPath: [RelationshipDestination] = []
   @State private var diaryNavigationPath: [Int64] = []
   @State private var isEndingSession = false
   @State private var hasInjectedUnknownOutcomeNotification = false
@@ -348,13 +348,7 @@ private struct AppRootView: View {
         isSessionRemembered: Binding(
           get: { authenticationModel.isSessionRemembered },
           set: { remember in
-            Task {
-              if remember {
-                await authenticationModel.rememberCurrentSession()
-              } else {
-                await authenticationModel.forgetRememberedSession()
-              }
-            }
+            authenticationModel.setSessionRemembered(remember)
           }
         ),
         onLock: lockSession,
@@ -595,18 +589,18 @@ private struct AppRootView: View {
         relationshipModel.reload()
         if NotificationNavigationDisposition.resolve(
           currentPath: relationshipNavigationPath,
-          targetID: id
+          target: .scoreThread(id)
         ) == .refetchVisible {
           relationshipModel.loadThread(scoreChangeID: id)
         } else {
-          relationshipNavigationPath = [id]
+          relationshipNavigationPath = [.scoreThread(id)]
         }
       case .diaryEntry(let id):
         selectedTab = .diary
         diaryModel.reload()
         if NotificationNavigationDisposition.resolve(
           currentPath: diaryNavigationPath,
-          targetID: id
+          target: id
         ) == .refetchVisible {
           diaryModel.loadDetail(entryID: id)
         } else {

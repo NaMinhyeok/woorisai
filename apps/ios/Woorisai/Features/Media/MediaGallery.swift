@@ -17,6 +17,19 @@ enum MediaInlineTileFormat: Equatable, Sendable {
       16 / 9
     }
   }
+
+  /// Decode budget per tile role. A 2-column mosaic cell renders ~170pt (~510px @3x); decoding
+  /// every cell at the global 1,200px ceiling held ~4× the pixels a 4-image comment needs and
+  /// pushed long threads toward jetsam on older devices. The full-screen viewer re-decodes the
+  /// original separately, so tiles never need more than their own display size.
+  var decodeMaxPixelSize: Int {
+    switch self {
+    case .singleImage, .video:
+      MediaImagePreview.maximumPixelSize
+    case .mosaicImage:
+      640
+    }
+  }
 }
 
 enum MediaGroupLayout: Equatable, Sendable {

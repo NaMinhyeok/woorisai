@@ -418,6 +418,33 @@ struct NotificationModelTests {
     )
   }
 
+  // Regression: pausing for lock cancels the in-flight attempt WITHOUT bumping the session
+  // generation. The old cleanup path early-returned in that exact case and left the attempt
+  // bookkeeping populated forever — after unlock every refresh stuck at "알림 설정 확인 중"
+  // and an FID rotation never re-registered. A same-session pause must also never issue a
+  // compensation DELETE for the committed FID.
+  @Test
+  func pauseDuringInFlightRegisterDoesNotStrandRegistrationAfterUnlock() async {
+    let provider = NotificationInstallationIDStub(values: [.success(fid), .success(fid)])
+    let service = SuspendedNotificationFIDServiceStub()
+    let model = NotificationModel(
+      permissions: NotificationPermissionStub(status: .authorized),
+      installationIDs: provider,
+      service: service
+    )
+
+    model.authenticatedSessionDidStart()
+    await notificationExpectEventually { await service.hasSuspendedRegistration }
+
+    model.pauseRegistrationForLock()
+    await service.resumeFirstRegistration()
+
+    model.authenticatedSessionDidStart()
+    await notificationExpectEventually { model.state == .registered }
+    #expect(await service.unregisteredRawValues.isEmpty)
+    #expect(await service.registeredRawValues == [fid, fid])
+  }
+
   @Test
   func signOutDeadlineStillWinsWhenInFlightRegisterNeverSettles() async {
     let service = NeverReturningRegistrationNotificationFIDServiceStub()
@@ -582,14 +609,38 @@ struct NotificationModelTests {
   @Test
   func sameVisiblePushRefetchesInsteadOfDependingOnNavigationTaskRestart() {
     #expect(
-      NotificationNavigationDisposition.resolve(currentPath: [101], targetID: 101)
+      NotificationNavigationDisposition.resolve(currentPath: [101], target: 101)
         == .refetchVisible
     )
     #expect(
-      NotificationNavigationDisposition.resolve(currentPath: [], targetID: 101) == .navigate
+      NotificationNavigationDisposition.resolve(currentPath: [], target: 101) == .navigate
     )
     #expect(
-      NotificationNavigationDisposition.resolve(currentPath: [202], targetID: 101) == .navigate
+      NotificationNavigationDisposition.resolve(currentPath: [202], target: 101) == .navigate
+    )
+  }
+
+  // The visible screen is the path's LAST element: a thread stacked above the history
+  // archive must still refetch in place instead of replacing the whole stack.
+  @Test
+  func resolveJudgesVisibleScreenByLastPathElementIncludingArchiveStacks() {
+    #expect(
+      NotificationNavigationDisposition.resolve(
+        currentPath: [RelationshipDestination.historyArchive, .scoreThread(101)],
+        target: .scoreThread(101)
+      ) == .refetchVisible
+    )
+    #expect(
+      NotificationNavigationDisposition.resolve(
+        currentPath: [RelationshipDestination.historyArchive],
+        target: .scoreThread(101)
+      ) == .navigate
+    )
+    #expect(
+      NotificationNavigationDisposition.resolve(
+        currentPath: [RelationshipDestination.scoreThread(202), .scoreThread(101)],
+        target: .scoreThread(101)
+      ) == .refetchVisible
     )
   }
 

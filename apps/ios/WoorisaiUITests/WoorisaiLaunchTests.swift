@@ -365,6 +365,18 @@ final class WoorisaiLaunchTests: XCTestCase {
       XCTAssertTrue(archivedHistory.exists)
     }
     XCTAssertFalse(element("relationship.history.nextPage", in: app).exists)
+
+    // Regression: pushing a thread FROM the archive used to collide with the archive's own
+    // stack slot (navigationDestination(isPresented:) vs the bound path) — the push was
+    // swallowed or popped the archive. The whole card is now the tap target.
+    let archivedEntry = element("relationship.history.101", in: app)
+    scrollToHittable(archivedEntry, in: app, maximumSwipes: 20)
+    archivedEntry.tap()
+    XCTAssertTrue(element("relationship.thread.loaded", in: app).waitForExistence(timeout: 5))
+
+    // Popping the thread must land back on the archive, not on the dashboard.
+    app.navigationBars.buttons.element(boundBy: 0).tap()
+    XCTAssertTrue(element("relationship.history.archive", in: app).waitForExistence(timeout: 5))
   }
 
   func testHistoryArchiveShowsPagingProgressFailureAndRetry() {
@@ -722,7 +734,9 @@ final class WoorisaiLaunchTests: XCTestCase {
     submitScore.tap()
     XCTAssertTrue(element("relationship.composer", in: app).waitForNonExistence(timeout: 10))
 
-    let mediaHistory = element("relationship.history.801", in: app)
+    // The whole card is now the navigation link; its center can land on an inner media tile
+    // button, which wins the tap. Tap the (non-interactive) reason text to navigate.
+    let mediaHistory = element("relationship.history.reason.801", in: app)
     scrollToHittable(mediaHistory, in: app, maximumSwipes: 20)
     mediaHistory.tap()
     XCTAssertTrue(element("relationship.thread.loaded", in: app).waitForExistence(timeout: 5))
@@ -758,7 +772,9 @@ final class WoorisaiLaunchTests: XCTestCase {
     enterPIN("0123", participantSlot: 1, in: app)
     XCTAssertTrue(element("relationship.loaded", in: app).waitForExistence(timeout: 5))
 
-    let mediaHistory = element("relationship.history.801", in: app)
+    // The whole card is now the navigation link; its center can land on an inner media tile
+    // button, which wins the tap. Tap the (non-interactive) reason text to navigate.
+    let mediaHistory = element("relationship.history.reason.801", in: app)
     scrollToHittable(mediaHistory, in: app, maximumSwipes: 20)
     mediaHistory.tap()
     XCTAssertTrue(element("relationship.thread.loaded", in: app).waitForExistence(timeout: 5))
