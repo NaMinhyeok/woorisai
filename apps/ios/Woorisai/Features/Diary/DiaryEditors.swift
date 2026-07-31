@@ -162,13 +162,12 @@ struct DiaryCommentEditor: View {
         .font(.headline)
         .foregroundStyle(WoorisaiColor.Fg.neutral)
       Spacer(minLength: WoorisaiSpacing.small)
-      Text("\(codePointCount)/\(DiaryCommentDraft.maximumContentCharacterCount)")
-        .font(.caption.monospacedDigit())
-        .foregroundStyle(
-          codePointCount > DiaryCommentDraft.maximumContentCharacterCount
-            ? WoorisaiColor.Fg.critical : WoorisaiColor.Fg.neutralMuted
-        )
+      WoorisaiCharacterCountLabel(budget, name: "댓글")
     }
+  }
+
+  private var budget: CharacterBudget {
+    CharacterBudget(used: codePointCount, limit: DiaryCommentDraft.maximumContentCharacterCount)
   }
 
   private var stickySubmitBar: some View {
@@ -188,10 +187,7 @@ struct DiaryCommentEditor: View {
     }
     .padding(.horizontal, WoorisaiSpacing.screenGutter)
     .padding(.vertical, WoorisaiSpacing.small)
-    .background(.regularMaterial)
-    .overlay(alignment: .top) {
-      Divider().overlay(WoorisaiColor.Stroke.neutralWeak)
-    }
+    .woorisaiKeyboardActionBarSurface()
   }
 
   private var canSubmit: Bool {
@@ -449,13 +445,15 @@ struct DiaryEntryComposer: View {
         .font(.headline)
         .foregroundStyle(WoorisaiColor.Fg.neutral)
       Spacer(minLength: WoorisaiSpacing.small)
-      Text("\(contentCodePointCount)/\(DiaryEntryCreateDraft.maximumContentCharacterCount)")
-        .font(.caption.monospacedDigit())
-        .foregroundStyle(
-          contentCodePointCount > DiaryEntryCreateDraft.maximumContentCharacterCount
-            ? WoorisaiColor.Fg.critical : WoorisaiColor.Fg.neutralMuted
-        )
+      WoorisaiCharacterCountLabel(contentBudget, name: "일기 내용")
     }
+  }
+
+  private var contentBudget: CharacterBudget {
+    CharacterBudget(
+      used: contentCodePointCount,
+      limit: DiaryEntryCreateDraft.maximumContentCharacterCount
+    )
   }
 
   private var retainedMediaCard: some View {
@@ -604,10 +602,7 @@ struct DiaryEntryComposer: View {
     }
     .padding(.horizontal, WoorisaiSpacing.screenGutter)
     .padding(.vertical, WoorisaiSpacing.small)
-    .background(.regularMaterial)
-    .overlay(alignment: .top) {
-      Divider().overlay(WoorisaiColor.Stroke.neutralWeak)
-    }
+    .woorisaiKeyboardActionBarSurface()
   }
 
   private var canSubmit: Bool {

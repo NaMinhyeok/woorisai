@@ -163,6 +163,67 @@ struct WoorisaiDesignSystemTests {
     UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: style))
   }
 
+  // MARK: - CharacterBudget
+
+  /// 카운터가 평소에 숨어 있으므로 등장 시점이 곧 이 규칙의 전부다. 화면 안에서는 경계 한 글자를
+  /// 눈으로 확인할 방법이 없어 값으로 못 박는다.
+  @Test
+  func characterCounterStaysHiddenUntilTheProportionalShareIsReachedOnShortFields() {
+    // 200자의 15% = 30자. 절대 임계 40자보다 작으므로 비율이 지배한다.
+    #expect(CharacterBudget(used: 169, limit: 200).isVisible == false)
+    #expect(CharacterBudget(used: 170, limit: 200).isVisible)
+  }
+
+  @Test
+  func characterCounterStaysHiddenUntilTheAbsoluteThresholdIsReachedOnLongFields() {
+    // 500자의 15% = 75자지만 절대 임계 40자가 더 작으므로 40자 남을 때까지 숨는다.
+    #expect(CharacterBudget(used: 425, limit: 500).isVisible == false)
+    #expect(CharacterBudget(used: 459, limit: 500).isVisible == false)
+    #expect(CharacterBudget(used: 460, limit: 500).isVisible)
+  }
+
+  @Test
+  func characterCounterShowsTheOverflowAsANegativeRemainder() {
+    let exact = CharacterBudget(used: 500, limit: 500)
+    #expect(exact.remaining == 0)
+    #expect(exact.isExceeded == false)
+    #expect(exact.isVisible)
+    #expect(exact.displayText == "0")
+
+    let over = CharacterBudget(used: 508, limit: 500)
+    #expect(over.remaining == -8)
+    #expect(over.isExceeded)
+    #expect(over.isVisible)
+    #expect(over.displayText == "-8")
+  }
+
+  /// 제출을 막은 이유는 화면에 남아야 하므로 초과는 임계값과 무관하게 항상 보인다.
+  @Test
+  func characterCounterAlwaysShowsWhileExceeded() {
+    #expect(CharacterBudget(used: 100_000, limit: 500).isVisible)
+    #expect(CharacterBudget(used: 201, limit: 200).isVisible)
+  }
+
+  /// 한도가 없는 field는 카운터를 그릴 근거 자체가 없다. 초과처럼 보이는 입력이 와도 마찬가지다 —
+  /// `limit`이 0인 것은 사용자가 많이 쓴 상황이 아니라 한도를 넘겨받지 못한 설정 문제이고, 그때
+  /// "-1"을 띄우면 사용자가 고칠 수 없는 수를 보게 된다.
+  @Test
+  func characterCounterStaysHiddenWithoutALimit() {
+    #expect(CharacterBudget(used: 0, limit: 0).isVisible == false)
+    #expect(CharacterBudget(used: 1, limit: 0).isVisible == false)
+  }
+
+  @Test
+  func characterCounterDescribesRemainingBudgetForVoiceOver() {
+    #expect(
+      CharacterBudget(used: 460, limit: 500).accessibilityDescription == "40자 남았습니다"
+    )
+    #expect(
+      CharacterBudget(used: 508, limit: 500).accessibilityDescription
+        == "500자 한도를 8자 넘었습니다"
+    )
+  }
+
   private func contrastRatio(_ first: UIColor, _ second: UIColor) -> CGFloat {
     let firstLuminance = relativeLuminance(first)
     let secondLuminance = relativeLuminance(second)
