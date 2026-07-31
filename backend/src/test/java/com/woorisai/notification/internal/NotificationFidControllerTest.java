@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.woorisai.notification.internal.NotificationFidService.NotificationFidUnavailableException;
+import com.woorisai.support.error.ApiErrorAdvice;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +47,7 @@ class NotificationFidControllerTest {
         notificationFids = mock(NotificationFidService.class);
         mvc = MockMvcBuilders.standaloneSetup(
                         new NotificationFidController(notificationFids))
-                .setControllerAdvice(new NotificationFidApiExceptionHandler())
+                .setControllerAdvice(ApiErrorAdvice.of(new NotificationFidHandlerFailures()))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setMessageConverters(new JacksonJsonHttpMessageConverter(
                         JsonMapper.builder()
@@ -115,7 +116,8 @@ class NotificationFidControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(
                         MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.errorCode").value("NOTIFICATION_FID_UNAVAILABLE"));
+                .andExpect(jsonPath("$.errorCode").value("NOTIFICATION_FID_UNAVAILABLE"))
+                .andExpect(jsonPath("$.instance").doesNotExist());
 
         doThrow(new DataAccessResourceFailureException("redacted"))
                 .when(notificationFids).unregister(ACTOR_ID, INSTALLATION_ID);
@@ -125,7 +127,8 @@ class NotificationFidControllerTest {
                         .content("{\"fid\":\"" + FID + "\"}"))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.errorCode").value("NOTIFICATION_FID_UNAVAILABLE"));
+                .andExpect(jsonPath("$.errorCode").value("NOTIFICATION_FID_UNAVAILABLE"))
+                .andExpect(jsonPath("$.instance").doesNotExist());
     }
 
     private void assertInvalidProblem(String body) throws Exception {
@@ -137,6 +140,7 @@ class NotificationFidControllerTest {
                         MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(jsonPath("$.title").value("Invalid notification FID request"))
-                .andExpect(jsonPath("$.errorCode").value("INVALID_NOTIFICATION_FID"));
+                .andExpect(jsonPath("$.errorCode").value("INVALID_NOTIFICATION_FID"))
+                .andExpect(jsonPath("$.instance").doesNotExist());
     }
 }

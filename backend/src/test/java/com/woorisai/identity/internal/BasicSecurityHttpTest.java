@@ -53,7 +53,7 @@ import org.springframework.web.bind.annotation.RestController;
         ApiSecurityProblemHandler.class,
         BasicParticipantAuthenticationProvider.class,
         IdentityAuthenticationConfiguration.class,
-        LoginOptionsApiExceptionHandler.class,
+        LoginOptionsHandlerFailures.class,
         BasicSecurityHttpTest.SecurityProbeController.class
 })
 class BasicSecurityHttpTest {

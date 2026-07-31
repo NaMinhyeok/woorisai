@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.woorisai.support.error.ApiErrorAdvice;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -41,7 +42,7 @@ class RelationshipControllerTest {
                 UsernamePasswordAuthenticationToken.authenticated(ACTOR, null, List.of()));
         service = mock(RelationshipService.class);
         mvc = MockMvcBuilders.standaloneSetup(new RelationshipController(service))
-                .setControllerAdvice(new RelationshipApiExceptionHandler())
+                .setControllerAdvice(ApiErrorAdvice.of(new RelationshipHandlerFailures()))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }

@@ -1,6 +1,8 @@
 package com.woorisai.identity.internal;
 
+import com.woorisai.participant.CanonicalParticipantPair;
 import com.woorisai.participant.ParticipantDirectory;
+import com.woorisai.participant.ParticipantDirectory.ParticipantPairUnavailableException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -16,7 +18,7 @@ class LoginOptionsController {
 
     @GetMapping("/api/v2/auth/login-options")
     ResponseEntity<LoginOptionsResponse> listLoginOptions() {
-        List<LoginParticipantOption> options = participants.canonicalPair()
+        List<LoginParticipantOption> options = canonicalPair()
                 .inSlotOrder()
                 .stream()
                 .map(LoginParticipantOption::from)
@@ -25,5 +27,13 @@ class LoginOptionsController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(new LoginOptionsResponse(options));
+    }
+
+    private CanonicalParticipantPair canonicalPair() {
+        try {
+            return participants.canonicalPair();
+        } catch (ParticipantPairUnavailableException exception) {
+            throw new LoginOptionsUnavailableException(exception);
+        }
     }
 }

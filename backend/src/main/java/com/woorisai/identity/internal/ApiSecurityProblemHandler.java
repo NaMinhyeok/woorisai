@@ -1,13 +1,13 @@
 package com.woorisai.identity.internal;
 
+import com.woorisai.support.error.ApiProblems;
+import com.woorisai.support.error.ErrorDescriptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.net.URI;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
@@ -17,6 +17,8 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
+// Runs before any handler is resolved, so the response goes to the servlet directly rather than
+// through a ResponseEntity. Only the body is shared with the controller advice.
 @Component
 @RequiredArgsConstructor
 class ApiSecurityProblemHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
@@ -31,18 +33,12 @@ class ApiSecurityProblemHandler implements AuthenticationEntryPoint, AccessDenie
             HttpServletResponse response,
             AuthenticationException exception) throws IOException {
         if (exception instanceof InternalAuthenticationServiceException) {
-            authenticationUnavailable(request, response);
+            write(request, response, IdentityError.AUTHENTICATION_UNAVAILABLE);
             return;
         }
 
         response.setHeader(HttpHeaders.WWW_AUTHENTICATE, BASIC_CHALLENGE);
-        write(
-                request,
-                response,
-                HttpStatus.UNAUTHORIZED,
-                "Authentication required",
-                "Valid HTTP Basic participant credentials are required.",
-                "AUTHENTICATION_REQUIRED");
+        write(request, response, IdentityError.AUTHENTICATION_REQUIRED);
     }
 
     @Override
@@ -51,40 +47,16 @@ class ApiSecurityProblemHandler implements AuthenticationEntryPoint, AccessDenie
             HttpServletResponse response,
             org.springframework.security.access.AccessDeniedException exception)
             throws IOException {
-        write(
-                request,
-                response,
-                HttpStatus.FORBIDDEN,
-                "Access denied",
-                "Access to this resource is denied.",
-                "ACCESS_DENIED");
-    }
-
-    private void authenticationUnavailable(
-            HttpServletRequest request,
-            HttpServletResponse response) throws IOException {
-        write(
-                request,
-                response,
-                HttpStatus.SERVICE_UNAVAILABLE,
-                "Authentication unavailable",
-                "Authentication is temporarily unavailable.",
-                "AUTHENTICATION_UNAVAILABLE");
+        write(request, response, IdentityError.ACCESS_DENIED);
     }
 
     private void write(
             HttpServletRequest request,
             HttpServletResponse response,
-            HttpStatus status,
-            String title,
-            String detail,
-            String errorCode) throws IOException {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
-        problem.setTitle(title);
-        problem.setInstance(URI.create(request.getRequestURI()));
-        problem.setProperty("errorCode", errorCode);
+            ErrorDescriptor error) throws IOException {
+        ProblemDetail problem = ApiProblems.body(error, request.getRequestURI());
 
-        response.setStatus(status.value());
+        response.setStatus(error.status().value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.setHeader(
                 HttpHeaders.CACHE_CONTROL,

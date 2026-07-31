@@ -1,51 +1,53 @@
 package com.woorisai.diary.internal;
 
-class InvalidDiaryRequestException extends RuntimeException {
+import com.woorisai.support.error.ApplicationException;
+
+class InvalidDiaryRequestException extends ApplicationException {
 
     InvalidDiaryRequestException() {
-        super("Diary request is invalid");
+        super(DiaryError.INVALID_REQUEST, "Diary request is invalid");
     }
 }
 
-class DiaryEntryNotFoundException extends RuntimeException {
+class DiaryEntryNotFoundException extends ApplicationException {
 
     DiaryEntryNotFoundException() {
-        super("Diary entry was not found");
+        super(DiaryError.NOT_FOUND, "Diary entry was not found");
     }
 }
 
-class DiaryCommentNotFoundException extends RuntimeException {
+class DiaryCommentNotFoundException extends ApplicationException {
 
     DiaryCommentNotFoundException() {
-        super("Diary comment was not found");
+        super(DiaryError.NOT_FOUND, "Diary comment was not found");
     }
 }
 
-class DiaryMutationForbiddenException extends RuntimeException {
+class DiaryMutationForbiddenException extends ApplicationException {
 
     DiaryMutationForbiddenException() {
-        super("Diary resource cannot be changed by this participant");
+        super(DiaryError.FORBIDDEN, "Diary resource cannot be changed by this participant");
     }
 }
 
-class DiaryConflictException extends RuntimeException {
+class DiaryConflictException extends ApplicationException {
 
     DiaryConflictException() {
-        super("Diary request conflicts with current state");
+        super(DiaryError.CONFLICT, "Diary request conflicts with current state");
     }
 
     DiaryConflictException(Throwable cause) {
-        super("Diary request conflicts with current state", cause);
+        super(DiaryError.CONFLICT, "Diary request conflicts with current state", cause);
     }
 }
 
-class DiaryUnavailableException extends RuntimeException {
+class DiaryUnavailableException extends ApplicationException {
 
     DiaryUnavailableException() {
-        super("Diary is not available");
+        super(DiaryError.UNAVAILABLE, "Diary is not available");
     }
 
     DiaryUnavailableException(Throwable cause) {
-        super("Diary is not available", cause);
+        super(DiaryError.UNAVAILABLE, "Diary is not available", cause);
     }
 }

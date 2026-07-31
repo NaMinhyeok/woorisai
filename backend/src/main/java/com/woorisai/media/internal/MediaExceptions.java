@@ -1,107 +1,109 @@
 package com.woorisai.media.internal;
 
-final class InvalidMediaUploadRequestException extends RuntimeException {
+import com.woorisai.support.error.ApplicationException;
+
+final class InvalidMediaUploadRequestException extends ApplicationException {
     InvalidMediaUploadRequestException() {
-        super("Media upload request is invalid");
+        super(MediaError.INVALID_UPLOAD_REQUEST, "Media upload request is invalid");
     }
 }
 
-final class MediaUploadInitiationUnavailableException extends RuntimeException {
+final class MediaUploadInitiationUnavailableException extends ApplicationException {
     MediaUploadInitiationUnavailableException() {
-        super("Media upload initiation is not available");
+        super(MediaError.UPLOADS_UNAVAILABLE, "Media upload initiation is not available");
     }
 
     MediaUploadInitiationUnavailableException(Throwable cause) {
-        super("Media upload initiation is not available", cause);
+        super(MediaError.UPLOADS_UNAVAILABLE, "Media upload initiation is not available", cause);
     }
 }
 
-final class InvalidMediaUploadCompletionRequestException extends RuntimeException {
+final class InvalidMediaUploadCompletionRequestException extends ApplicationException {
     InvalidMediaUploadCompletionRequestException() {
-        super("Media upload completion request is invalid");
+        super(MediaError.INVALID_UPLOAD_REQUEST, "Media upload completion request is invalid");
     }
 }
 
-final class MediaUploadNotFoundException extends RuntimeException {
+final class MediaUploadNotFoundException extends ApplicationException {
     MediaUploadNotFoundException() {
-        super("Media upload was not found");
+        super(MediaError.UPLOAD_NOT_FOUND, "Media upload was not found");
     }
 }
 
-final class MediaUploadCompletionForbiddenException extends RuntimeException {
+final class MediaUploadCompletionForbiddenException extends ApplicationException {
     MediaUploadCompletionForbiddenException() {
-        super("Media upload completion is forbidden");
+        super(MediaError.UPLOAD_FORBIDDEN, "Media upload completion is forbidden");
     }
 }
 
-final class MediaUploadCompletionConflictException extends RuntimeException {
+final class MediaUploadCompletionConflictException extends ApplicationException {
     MediaUploadCompletionConflictException() {
-        super("Media upload cannot be completed in its current state");
+        super(MediaError.UPLOAD_CONFLICT, "Media upload cannot be completed in its current state");
     }
 }
 
-final class MediaUploadContentRejectedException extends RuntimeException {
+final class MediaUploadContentRejectedException extends ApplicationException {
     MediaUploadContentRejectedException() {
-        super("Uploaded media content was rejected");
+        super(MediaError.INVALID_UPLOAD_REQUEST, "Uploaded media content was rejected");
     }
 }
 
-final class MediaUploadCompletionUnavailableException extends RuntimeException {
+final class MediaUploadCompletionUnavailableException extends ApplicationException {
     MediaUploadCompletionUnavailableException() {
-        super("Media upload completion is not available");
+        super(MediaError.UPLOADS_UNAVAILABLE, "Media upload completion is not available");
     }
 
     MediaUploadCompletionUnavailableException(Throwable cause) {
-        super("Media upload completion is not available", cause);
+        super(MediaError.UPLOADS_UNAVAILABLE, "Media upload completion is not available", cause);
     }
 }
 
-final class InvalidMediaUploadDiscardRequestException extends RuntimeException {
+final class InvalidMediaUploadDiscardRequestException extends ApplicationException {
     InvalidMediaUploadDiscardRequestException() {
-        super("Media upload discard request is invalid");
+        super(MediaError.INVALID_UPLOAD_REQUEST, "Media upload discard request is invalid");
     }
 }
 
-final class MediaUploadDiscardForbiddenException extends RuntimeException {
+final class MediaUploadDiscardForbiddenException extends ApplicationException {
     MediaUploadDiscardForbiddenException() {
-        super("Media upload discard is forbidden");
+        super(MediaError.UPLOAD_FORBIDDEN, "Media upload discard is forbidden");
     }
 }
 
-final class MediaUploadDiscardConflictException extends RuntimeException {
+final class MediaUploadDiscardConflictException extends ApplicationException {
     MediaUploadDiscardConflictException() {
-        super("Media upload cannot be discarded in its current state");
+        super(MediaError.UPLOAD_CONFLICT, "Media upload cannot be discarded in its current state");
     }
 }
 
-final class MediaUploadDiscardUnavailableException extends RuntimeException {
+final class MediaUploadDiscardUnavailableException extends ApplicationException {
     MediaUploadDiscardUnavailableException() {
-        super("Media upload discard is not available");
+        super(MediaError.UPLOADS_UNAVAILABLE, "Media upload discard is not available");
     }
 
     MediaUploadDiscardUnavailableException(Throwable cause) {
-        super("Media upload discard is not available", cause);
+        super(MediaError.UPLOADS_UNAVAILABLE, "Media upload discard is not available", cause);
     }
 }
 
-final class InvalidMediaDownloadRequestException extends RuntimeException {
+final class InvalidMediaDownloadRequestException extends ApplicationException {
     InvalidMediaDownloadRequestException() {
-        super("Media download request is invalid");
+        super(MediaError.INVALID_DOWNLOAD_REQUEST, "Media download request is invalid");
     }
 }
 
-final class MediaAttachmentNotFoundException extends RuntimeException {
+final class MediaAttachmentNotFoundException extends ApplicationException {
     MediaAttachmentNotFoundException() {
-        super("Media attachment was not found");
+        super(MediaError.ATTACHMENT_NOT_FOUND, "Media attachment was not found");
     }
 }
 
-final class MediaDownloadUnavailableException extends RuntimeException {
+final class MediaDownloadUnavailableException extends ApplicationException {
     MediaDownloadUnavailableException() {
-        super("Media download is not available");
+        super(MediaError.DOWNLOAD_UNAVAILABLE, "Media download is not available");
     }
 
     MediaDownloadUnavailableException(Throwable cause) {
-        super("Media download is not available", cause);
+        super(MediaError.DOWNLOAD_UNAVAILABLE, "Media download is not available", cause);
     }
 }

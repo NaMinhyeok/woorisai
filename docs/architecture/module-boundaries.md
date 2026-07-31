@@ -38,6 +38,41 @@ notification이나 Firebase를 알지 않는다.
 Readiness와 metric은 Actuator 기술 설정이다. 여러 module이 쓰는 코드라는 이유만으로
 business vocabulary를 generic package로 옮기지 않는다.
 
+### 예외: `support` 기술 지원 module
+
+`support`는 business module이 아니라 기술 지원 module이다. Business module 목록
+(`identity`, `participant`, `relationship`, `diary`, `media`, `notification`)에 포함되지 않고
+domain 상태나 business 규칙을 소유하지 않는다.
+
+**문제.** HTTP 오류 응답은 RFC 7807 `ProblemDetail`에 `status`, `title`, `detail`, `instance`와
+`errorCode`를 실어 `application/problem+json` + `Cache-Control: no-store`로 반환한다는 단일
+계약이다. 이 계약은 어느 business module도 소유하지 않는데, module마다 handler를 두면 조립
+코드가 module 수만큼 복제되고 계약이 조용히 갈라진다.
+
+**선택.** 표현 계약만 `support`에 두고 module은 자신의 오류 의미만 소유한다.
+`support`는 다음 세 장치로 우회 통로가 되는 것을 구조적으로 막는다.
+
+- `allowedDependencies = {}` — `support`는 어떤 business module도 참조할 수 없다.
+  경유 참조가 성립하지 않는다.
+- `@NamedInterface` — 노출 package만 공개하고 나머지 하위 package는 비공개다.
+- 사용 module의 `allowedDependencies = {"support::<interface>"}` — 암묵적 전역 접근이 아니라
+  module별 명시 opt-in이다.
+
+세 장치는 `com.woorisai.ModularityTests`가 build 시점에 검증한다.
+
+**대안과 trade-off.** Module마다 handler를 유지하면 `support` 없이도 경계가 가장 좁지만
+동일한 조립 코드가 복제되고 계약 drift를 test로만 막는다. 반대로 root package에 utility를
+두면 module 선언 없이 전역 접근이 열려 `allowedDependencies` 검사를 우회한다. `support`는
+공유 범위를 명시 선언으로 좁히는 중간 선택이며, 대가는 module 목록에 business가 아닌
+항목이 하나 늘어나는 것이다.
+
+**금지.** Business 지식, domain 규칙, entity, module 간 참조를 `support`에 두지 않는다.
+Module 하나만 쓰는 코드를 `support`로 올리지 않는다. `support`가 business module을
+참조해야 하는 상황은 경계 설계가 틀렸다는 신호다.
+
+**재검토 조건.** `support`의 `allowedDependencies`를 비울 수 없게 되거나, `@NamedInterface`가
+아닌 경로로 접근이 필요해지거나, 노출 interface가 계속 늘어나면 이 선택을 다시 판단한다.
+
 ## Module 계약
 
 ### `participant`
@@ -104,7 +139,8 @@ Object deletion은 DB commit 뒤 best effort다. 삭제 실패 때문에 committ
 - Module 밖 entity, repository 또는 `internal` package import
 - Producer에서 notification service나 Firebase 직접 호출
 - Consumer 편의를 위한 broad service/repository 공개
-- Generic utility package를 통한 dependency 우회
+- Generic utility package를 통한 dependency 우회 (`support`는 `allowedDependencies = {}`와
+  `@NamedInterface`로 이 우회가 불가능하다)
 - Custom outbox, delivery ledger, cleanup scheduler, lease나 business CAS state machine 도입
 - 근거 없이 `allowedDependencies`를 넓혀 구조 검사를 통과시키는 변경
 
