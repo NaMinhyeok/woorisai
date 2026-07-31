@@ -2,7 +2,6 @@ package com.woorisai.media.internal;
 
 import com.woorisai.support.error.ApplicationException;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 final class InvalidMediaUploadHttpRequestException extends ApplicationException {
 
@@ -23,10 +22,7 @@ final class MediaHttpActors {
     private MediaHttpActors() {}
 
     static long require(Long actorId) {
-        if (actorId == null || actorId <= 0) {
-            throw new InvalidMediaUploadHttpRequestException();
-        }
-        return actorId;
+        return MediaHttpIds.requireActor(actorId, InvalidMediaUploadHttpRequestException::new);
     }
 }
 
@@ -43,19 +39,9 @@ final class MediaUploadHttpBodies {
 
 final class MediaUploadHttpIds {
 
-    private static final Pattern CANONICAL_UUID = Pattern.compile(
-            "(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
-
     private MediaUploadHttpIds() {}
 
     static UUID parse(String value) {
-        if (value == null || !CANONICAL_UUID.matcher(value).matches()) {
-            throw new InvalidMediaUploadHttpRequestException();
-        }
-        try {
-            return UUID.fromString(value);
-        } catch (IllegalArgumentException exception) {
-            throw new InvalidMediaUploadHttpRequestException();
-        }
+        return MediaHttpIds.parse(value, InvalidMediaUploadHttpRequestException::new);
     }
 }
