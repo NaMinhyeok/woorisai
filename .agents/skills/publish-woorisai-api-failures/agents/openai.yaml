@@ -1,0 +1,4 @@
+interface:
+  display_name: "Publish Woorisai API Failures"
+  short_description: "API 오류 계약과 ProblemDetail 발행 경로"
+  default_prompt: "Use $publish-woorisai-api-failures to review the error catalog, handler mapping, and problem schema impact of this failure change."

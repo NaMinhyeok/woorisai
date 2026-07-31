@@ -107,3 +107,5 @@ Stop implementation when the owning module cannot be named in one sentence.
 
 Use `$test-spring-modulith` for test mechanics and `$coordinate-spring-modulith-change` once when
 two or more focused concerns materially apply and no coordinator is already active.
+
+Use `$publish-woorisai-api-failures` when the contract being exposed is a published API failure.
