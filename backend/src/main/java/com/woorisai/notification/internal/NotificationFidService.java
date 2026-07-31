@@ -1,5 +1,6 @@
 package com.woorisai.notification.internal;
 
+import com.woorisai.support.error.ApplicationException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -36,10 +37,10 @@ class NotificationFidService {
         fids.deleteByFidAndParticipantId(fid.value(), participantId);
     }
 
-    static final class NotificationFidUnavailableException extends RuntimeException {
+    static final class NotificationFidUnavailableException extends ApplicationException {
 
         NotificationFidUnavailableException() {
-            super("Notification FID service is unavailable");
+            super(NotificationError.FID_UNAVAILABLE, "Notification FID service is unavailable");
         }
     }
 }

@@ -1,44 +1,46 @@
 package com.woorisai.relationship.internal;
 
-final class InvalidRelationshipRequestException extends RuntimeException {
+import com.woorisai.support.error.ApplicationException;
+
+final class InvalidRelationshipRequestException extends ApplicationException {
 
     InvalidRelationshipRequestException() {
-        super("Relationship request is invalid");
+        super(RelationshipError.INVALID_REQUEST, "Relationship request is invalid");
     }
 }
 
-final class RelationshipNotFoundException extends RuntimeException {
+final class RelationshipNotFoundException extends ApplicationException {
 
     RelationshipNotFoundException() {
-        super("Relationship resource was not found");
+        super(RelationshipError.NOT_FOUND, "Relationship resource was not found");
     }
 }
 
-final class RelationshipForbiddenException extends RuntimeException {
+final class RelationshipForbiddenException extends ApplicationException {
 
     RelationshipForbiddenException() {
-        super("Relationship resource is forbidden");
+        super(RelationshipError.FORBIDDEN, "Relationship resource is forbidden");
     }
 }
 
-final class RelationshipConflictException extends RuntimeException {
+final class RelationshipConflictException extends ApplicationException {
 
     RelationshipConflictException() {
-        super("Relationship request conflicts with current state");
+        super(RelationshipError.CONFLICT, "Relationship request conflicts with current state");
     }
 
     RelationshipConflictException(Throwable cause) {
-        super("Relationship request conflicts with current state", cause);
+        super(RelationshipError.CONFLICT, "Relationship request conflicts with current state", cause);
     }
 }
 
-final class RelationshipUnavailableException extends RuntimeException {
+final class RelationshipUnavailableException extends ApplicationException {
 
     RelationshipUnavailableException() {
-        super("Relationship data is unavailable");
+        super(RelationshipError.UNAVAILABLE, "Relationship data is unavailable");
     }
 
     RelationshipUnavailableException(Throwable cause) {
-        super("Relationship data is unavailable", cause);
+        super(RelationshipError.UNAVAILABLE, "Relationship data is unavailable", cause);
     }
 }

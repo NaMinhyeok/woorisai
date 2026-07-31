@@ -20,6 +20,22 @@ public abstract class ApplicationException extends RuntimeException {
         this.error = error;
     }
 
+    /**
+     * Keeps a narrower internal message than the published {@code detail}.
+     *
+     * <p>Several failures share one wire contract but not one cause. The message stays in logs and
+     * stack traces; only {@link #error()} reaches the client.
+     */
+    protected ApplicationException(ErrorDescriptor error, String message) {
+        super(message);
+        this.error = error;
+    }
+
+    protected ApplicationException(ErrorDescriptor error, String message, Throwable cause) {
+        super(message, cause);
+        this.error = error;
+    }
+
     public ErrorDescriptor error() {
         return error;
     }

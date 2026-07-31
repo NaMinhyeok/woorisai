@@ -1,5 +1,6 @@
 package com.woorisai.notification.internal;
 
+import com.woorisai.support.error.ApplicationException;
 import java.util.regex.Pattern;
 
 record FirebaseInstallationId(String value) {
@@ -17,9 +18,9 @@ record FirebaseInstallationId(String value) {
     }
 }
 
-final class InvalidNotificationFidException extends IllegalArgumentException {
+final class InvalidNotificationFidException extends ApplicationException {
 
     InvalidNotificationFidException() {
-        super("Notification FID is invalid");
+        super(NotificationError.INVALID_FID, "Notification FID is invalid");
     }
 }

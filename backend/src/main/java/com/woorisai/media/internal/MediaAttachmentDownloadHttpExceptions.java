@@ -1,11 +1,22 @@
 package com.woorisai.media.internal;
 
+import com.woorisai.support.error.ApplicationException;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-final class InvalidMediaAttachmentDownloadRequestException extends RuntimeException {}
+final class InvalidMediaAttachmentDownloadRequestException extends ApplicationException {
 
-final class MediaAttachmentDownloadUnavailableException extends RuntimeException {}
+    InvalidMediaAttachmentDownloadRequestException() {
+        super(MediaError.INVALID_DOWNLOAD_REQUEST, "Media attachment download request is invalid");
+    }
+}
+
+final class MediaAttachmentDownloadUnavailableException extends ApplicationException {
+
+    MediaAttachmentDownloadUnavailableException() {
+        super(MediaError.DOWNLOAD_UNAVAILABLE, "Media attachment download is not available");
+    }
+}
 
 final class MediaAttachmentDownloadHttpIds {
 
