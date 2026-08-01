@@ -20,6 +20,8 @@ import com.woorisai.participant.ParticipantReference;
 import com.woorisai.relationship.RelationshipScoreChanged;
 import com.woorisai.relationship.ScoreChangeCommentCreated;
 import java.time.Clock;
+import com.woorisai.support.paging.PageResponse;
+import com.woorisai.support.paging.Paging;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -169,11 +171,10 @@ class RelationshipServiceCleanSchemaTest {
         assertThat(thread.comments().getFirst().author().mine()).isFalse();
         assertThat(thread.comments().getFirst().attachments()).hasSize(1);
 
-        ScoreChangeHistoryResponse history = relationships.scoreChanges(FIRST, 1);
+        PageResponse<ScoreChangeView> history = relationships.scoreChanges(FIRST, 1);
         assertThat(history.results()).hasSize(1);
         assertThat(history.results().getFirst().commentCount()).isOne();
-        assertThat(history.paging()).isEqualTo(
-                new ScoreChangeHistoryResponse.Paging(1, 20, false, 1));
+        assertThat(history.paging()).isEqualTo(new Paging(1, 20, false, 1));
     }
 
     @Test
@@ -273,11 +274,10 @@ class RelationshipServiceCleanSchemaTest {
 
     @Test
     void returnsAnEmptyFirstHistoryPageButRejectsAnEmptyLaterPage() {
-        ScoreChangeHistoryResponse firstPage = relationships.scoreChanges(FIRST, 1);
+        PageResponse<ScoreChangeView> firstPage = relationships.scoreChanges(FIRST, 1);
 
         assertThat(firstPage.results()).isEmpty();
-        assertThat(firstPage.paging()).isEqualTo(
-                new ScoreChangeHistoryResponse.Paging(1, 20, false, 0));
+        assertThat(firstPage.paging()).isEqualTo(new Paging(1, 20, false, 0));
         assertThatThrownBy(() -> relationships.scoreChanges(FIRST, 2))
                 .isInstanceOf(RelationshipNotFoundException.class);
     }

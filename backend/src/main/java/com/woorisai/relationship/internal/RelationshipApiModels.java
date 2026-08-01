@@ -154,15 +154,6 @@ record ScoreChangeCreatedResponse(
 
 record ScoreChangeCommentCreatedResponse(ScoreChangeCommentView comment) {}
 
-record ScoreChangeHistoryResponse(List<ScoreChangeView> results, Paging paging) {
-
-    ScoreChangeHistoryResponse {
-        results = List.copyOf(results);
-    }
-
-    record Paging(int pageNumber, int pageSize, boolean hasNext, long totalCount) {}
-}
-
 record ScoreChangeThreadResponse(
         ScoreChangeView change,
         List<ScoreChangeCommentView> comments) {
