@@ -23,6 +23,20 @@ class DiaryCommentNotFoundException extends ApplicationException {
     }
 }
 
+class DiaryMediaUploadNotFoundException extends ApplicationException {
+
+    DiaryMediaUploadNotFoundException() {
+        super(DiaryError.NOT_FOUND, "Diary media upload was not found");
+    }
+}
+
+class DiaryMediaForbiddenException extends ApplicationException {
+
+    DiaryMediaForbiddenException() {
+        super(DiaryError.FORBIDDEN, "Diary media upload belongs to another participant");
+    }
+}
+
 class DiaryMutationForbiddenException extends ApplicationException {
 
     DiaryMutationForbiddenException() {
