@@ -65,9 +65,12 @@
 - Comment content는 trim 후 nonblank 최대 500 code point다.
 - Server가 게시·수정 시각을 결정한다.
 - Entry/comment update와 delete는 JPA `@Version`으로 겹친 transaction을 감지한다.
-- Optimistic loser와 comment create 중 parent가 먼저 삭제된 FK race는
-  `409 DIARY_CONFLICT`다. 실패한 transaction은 content, attachment와 event를 모두
-  rollback하며 자동 재시도하지 않는다.
+- Entry와 comment delete는 행을 지우지 않고 `deleted_at`을 기록한다. 삭제 표시된 행은 목록,
+  단건 조회, thread와 comment count에서 제외되며 재조회는 `404`다.
+- Entry를 삭제하면 같은 transaction에서 살아있는 comment도 함께 표시한다. Parent 행이 남아
+  `ON DELETE CASCADE`가 더 이상 동작하지 않기 때문이다.
+- Optimistic loser와 comment create 중 parent가 먼저 삭제된 race는 `409 DIARY_CONFLICT`다.
+  실패한 transaction은 content, attachment와 event를 모두 rollback하며 자동 재시도하지 않는다.
 - 같은 entry에 독립적인 comment create는 parent version을 갱신하지 않아 함께 commit될 수
   있다.
 - Diary comment 생성만 상대 participant 대상 event를 만든다.
@@ -92,6 +95,17 @@ target score 또는 content를 새 상태에 다시 적용하면 사용자가 �
 Persistence version을 wire에 노출하지 않아 client는 단순하지만 이미 commit된 변경보다 오래된
 화면의 overwrite는 식별하지 못한다. 반대로 media upload는 single-use 상태와 R2 side effect를
 version check만으로 되돌릴 수 없어 비관적 락을 유지한다.
+
+Diary가 soft delete로 바뀌면서 "comment를 쓰는 순간 상대가 entry를 삭제한" race를 감지하던
+`diary_entry_comment_entry_fk`는 더 이상 위반되지 않는다. Parent 행이 남기 때문이다. 그래서
+comment create는 살아있는 parent를 `PESSIMISTIC_READ`로 잠그고, 결과가 비면 `409
+DIARY_CONFLICT`로 처리한다. 잠금 자체가 insert를 막지는 않으므로 빈 결과를 caller가 판단하는
+것이 방어의 실체다.
+
+Parent의 `@Version`을 강제로 증가시키는 방법도 같은 race를 감지하지만 채택하지 않는다. 그러면
+comment create가 parent를 write하게 되어, 위에서 피하려는 "같은 entry의 독립 comment create
+직렬화"가 그대로 발생한다. `PESSIMISTIC_READ`는 shared lock이라 parent를 수정하지 않고, 독립
+comment는 계속 함께 commit된다.
 
 ## 미디어
 

@@ -52,15 +52,26 @@ Media-only comment는 빈 문자열 대신 `NULL`을 저장한다. Thread 순서
 
 ## Diary
 
-`diary_entry`는 author, trim 뒤 nonblank 최대 1000자 content, server timestamps와 내부 JPA
-`@Version`을 가진다. 목록 정렬은 `created_at DESC, id DESC`다.
+`diary_entry`는 author, trim 뒤 nonblank 최대 1000자 content, server timestamps, 내부 JPA
+`@Version`과 nullable `deleted_at`을 가진다. 목록 정렬은 `created_at DESC, id DESC`이고 살아있는
+행만 담는 부분 인덱스가 이를 지원한다.
 
 `diary_entry_comment`는 parent entry, author, trim 뒤 nonblank 최대 500자 content, server
-timestamps와 내부 JPA `@Version`을 가진다. Thread 정렬은 `created_at ASC, id ASC`다. Entry
-delete는 comment를 cascade로 삭제한다. Participant, score와 history에는 accidental cascade를
-허용하지 않는다.
+timestamps, 내부 JPA `@Version`과 nullable `deleted_at`을 가진다. Thread 정렬은
+`created_at ASC, id ASC`다. Participant, score와 history에는 accidental cascade를 허용하지
+않는다.
 
-Persistence version은 public JSON, ETag이나 `If-Match`로 노출하지 않는다.
+Entry delete는 물리 삭제가 아니라 `deleted_at` 기록이므로 `ON DELETE CASCADE`가 동작하지
+않는다. Application이 같은 transaction에서 살아있는 comment를 함께 표시한다. 연결된
+`media_attachment` 행은 남으며 R2 object도 함께 남는다 — 삭제 표시된 entry가 조회에서 제외되어
+첨부도 노출되지 않는다. 자세한 의미는 [media lifecycle](media-lifecycle.md)을 따른다.
+
+`deleted_at`은 `score_change`, `score_change_comment`, `participant`에도 있지만 이 세 테이블은
+삭제 경로가 없어 항상 `NULL`이다. `score_change` 계열은 불변 이력이고, `participant`는 정확히 두
+명이라는 불변식 때문에 삭제 표시를 적용할 수 없다.
+
+Persistence version은 public JSON, ETag이나 `If-Match`로 노출하지 않는다. `deleted_at`도
+노출하지 않는다.
 
 ## Media attachment
 

@@ -64,10 +64,11 @@ business module도 참조하지 않고, `@NamedInterface`로 노출면을 좁히
 - Production business data의 유일한 owner/writer는 Spring과 PostgreSQL `woorisai` schema다.
 - Legacy Django와 `public` data를 runtime, fallback writer 또는 최신 recovery source로 되살리지
   않는다.
-- Flyway V1/V2, `hibernate.default_schema=woorisai`, `ddl-auto=validate`를 유지한다.
+- `hibernate.default_schema=woorisai`와 `ddl-auto=validate`를 유지한다.
 - 적용된 Flyway migration을 수정·삭제하지 않는다. Schema 변경은 새 forward migration이다.
-- One-time cutover copy tool을 production에서 다시 실행하거나 legacy data로 target을 덮어쓰지
-  않는다. CDC, incremental sync, dual-write와 production shadow write도 만들지 않는다.
+- Django에서 Spring으로의 one-time cutover는 완료됐고 복사 도구는 제거했다. 도구를 되살리거나
+  legacy data로 target을 덮어쓰지 않는다. CDC, incremental sync, dual-write와 production shadow
+  write도 만들지 않는다.
 - PostgreSQL schema, constraint, sequence, lock, isolation이나 concurrency 의미는 PostgreSQL
   Testcontainers로 검증한다. Docker가 없을 때 H2로 대체하거나 skip하지 않는다.
 - 운영 DB write, migration, backfill, reconcile, restore, deploy와 object 삭제는 사용자의 명시적

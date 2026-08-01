@@ -166,9 +166,11 @@ class DiaryCleanSchemaH2Test {
 
         diary.deleteEntry(FIRST, created.id());
 
-        assertThat(count("diary_entry", "id", created.id())).isZero();
-        assertThat(count("diary_entry_comment", "id", comment.id())).isZero();
-        assertThat(countUuid("media_attachment", "id", FIRST_UPLOAD)).isZero();
+        assertThat(liveCount("diary_entry", "id", created.id())).isZero();
+        assertThat(liveCount("diary_entry_comment", "id", comment.id())).isZero();
+        assertThatThrownBy(() -> diary.getEntry(FIRST, created.id()))
+                .isInstanceOf(DiaryEntryNotFoundException.class);
+        assertThat(countUuid("media_attachment", "id", FIRST_UPLOAD)).isOne();
         assertThat(media.replacements()).hasSize(replacementCount);
     }
 
@@ -280,6 +282,39 @@ class DiaryCleanSchemaH2Test {
         diary.deleteComment(SECOND, first.id());
         assertThat(applicationEvents.stream(DiaryEntryCommentCreated.class).count()).isEqualTo(2);
         assertThat(diary.getEntry(FIRST, entryId).commentCount()).isEqualTo(1);
+    }
+
+    @Test
+    void softDeletedEntriesLeaveTheListAndTheirCommentsGoWithThem() {
+        DiaryEntryCreatedResponse kept = diary.createEntry(
+                FIRST, CreateDiaryEntryCommand.from("kept entry", List.of()));
+        DiaryEntryCreatedResponse removed = diary.createEntry(
+                FIRST, CreateDiaryEntryCommand.from("removed entry", List.of()));
+        DiaryEntryCommentCreatedResponse orphaned = diary.createComment(
+                SECOND, removed.id(), CreateDiaryCommentCommand.from("goes with the parent"));
+
+        assertThat(diary.listEntries(FIRST, 1).results())
+                .extracting(DiaryEntryListItemResponse::id)
+                .containsExactly(removed.id(), kept.id());
+
+        diary.deleteEntry(FIRST, removed.id());
+
+        DiaryEntryListResponse list = diary.listEntries(FIRST, 1);
+        assertThat(list.results())
+                .extracting(DiaryEntryListItemResponse::id)
+                .containsExactly(kept.id());
+        assertThat(list.totalCount()).isOne();
+
+        // The parent row survives, so the cascade that used to clear the thread is gone.
+        // The child must be marked in the same transaction or it outlives its parent.
+        assertThat(liveCount("diary_entry_comment", "id", orphaned.id())).isZero();
+        assertThat(count("diary_entry_comment", "id", orphaned.id())).isOne();
+
+        assertThatThrownBy(() -> diary.getEntry(FIRST, removed.id()))
+                .isInstanceOf(DiaryEntryNotFoundException.class);
+        assertThatThrownBy(() -> diary.createComment(
+                        SECOND, removed.id(), CreateDiaryCommentCommand.from("too late")))
+                .isInstanceOf(DiaryEntryNotFoundException.class);
     }
 
     @Test
@@ -401,6 +436,15 @@ class DiaryCleanSchemaH2Test {
     private long count(String table, String column, long id) {
         return jdbc.queryForObject(
                 "SELECT COUNT(*) FROM woorisai." + table + " WHERE " + column + " = ?",
+                Long.class,
+                id);
+    }
+
+    // Soft delete keeps the row, so physical counts no longer answer "is it gone".
+    private long liveCount(String table, String column, long id) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM woorisai." + table
+                        + " WHERE " + column + " = ? AND deleted_at IS NULL",
                 Long.class,
                 id);
     }

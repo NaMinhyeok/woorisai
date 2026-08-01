@@ -20,10 +20,6 @@ repositories {
 
 extra["springModulithVersion"] = "2.1.0"
 
-val cutover = sourceSets.create("cutover") {
-    java.srcDir("src/cutover/java")
-}
-
 dependencies {
     implementation("com.google.firebase:firebase-admin:9.10.0")
     implementation("software.amazon.awssdk:s3:2.48.3") {
@@ -55,11 +51,7 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("com.h2database:h2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    add(cutover.runtimeOnlyConfigurationName, "org.postgresql:postgresql")
 }
-
-sourceSets["test"].compileClasspath += cutover.output
-sourceSets["test"].runtimeClasspath += cutover.output
 
 dependencyManagement {
     imports {
@@ -93,13 +85,6 @@ val postgresTest = tasks.register<Test>("postgresTest") {
         includeTags("postgres")
     }
     shouldRunAfter(tasks.named("test"))
-}
-
-tasks.register<JavaExec>("cutoverDataCopy") {
-    description = "Runs the operator-only Django-to-Spring data copy (dry-run by default)."
-    group = "migration"
-    classpath = cutover.runtimeClasspath
-    mainClass = "com.woorisai.cutover.CutoverDataCopyMain"
 }
 
 tasks.named("check") {
