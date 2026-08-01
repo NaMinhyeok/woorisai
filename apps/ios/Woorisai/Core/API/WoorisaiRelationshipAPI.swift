@@ -528,7 +528,7 @@ extension WoorisaiAPIClient {
     }
     let changes = try response.results.map(mapScoreChange)
     guard Int(response.paging.pageNumber) == expectedPageNumber,
-      response.paging.pageSize.rawValue == 20,
+      changes.count <= Int(response.paging.pageSize),
       response.paging.totalCount >= Int64(changes.count),
       isNewestFirst(changes)
     else {

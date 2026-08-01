@@ -1,5 +1,6 @@
 package com.woorisai.diary.internal;
 
+import com.woorisai.support.paging.PageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
@@ -23,7 +24,7 @@ class DiaryController {
     @GetMapping(
             path = "/api/v2/diary-entries",
             produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<DiaryEntryListResponse> listEntries(
+    ResponseEntity<PageResponse<DiaryEntryListItemResponse>> listEntries(
             @AuthenticationPrincipal(errorOnInvalidType = true) Long actorId,
             @RequestParam(name = "pageNumber", defaultValue = "1") int pageNumber) {
         requirePositive(pageNumber);

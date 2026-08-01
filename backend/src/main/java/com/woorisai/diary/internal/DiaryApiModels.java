@@ -238,18 +238,6 @@ record DiaryEntryDetailResponse(
     }
 }
 
-record DiaryEntryListResponse(
-        List<DiaryEntryListItemResponse> results,
-        int pageNumber,
-        int pageSize,
-        boolean hasNext,
-        long totalCount) {
-
-    DiaryEntryListResponse {
-        results = List.copyOf(results);
-    }
-}
-
 record DiaryEntryUpdatedResponse(
         long id,
         DiaryParticipantResponse author,

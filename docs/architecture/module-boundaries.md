@@ -44,12 +44,16 @@ business vocabulary를 generic package로 옮기지 않는다.
 (`identity`, `participant`, `relationship`, `diary`, `media`, `notification`)에 포함되지 않고
 domain 상태나 business 규칙을 소유하지 않는다.
 
-**문제.** HTTP 오류 응답은 RFC 7807 `ProblemDetail`에 `status`, `title`, `detail`, `instance`와
-`errorCode`를 실어 `application/problem+json` + `Cache-Control: no-store`로 반환한다는 단일
-계약이다. 이 계약은 어느 business module도 소유하지 않는데, module마다 handler를 두면 조립
-코드가 module 수만큼 복제되고 계약이 조용히 갈라진다.
+**문제.** 어느 business module도 소유하지 않으면서 모든 module이 같은 모양으로 지켜야 하는
+HTTP 표현 계약이 있다. Module마다 조립을 두면 코드가 module 수만큼 복제되고 계약이 조용히
+갈라진다.
 
-**선택.** 표현 계약만 `support`에 두고 module은 자신의 오류 의미만 소유한다.
+- 오류 응답은 RFC 7807 `ProblemDetail`에 `status`, `title`, `detail`, `instance`와 `errorCode`를
+  실어 `application/problem+json` + `Cache-Control: no-store`로 반환한다.
+- 페이지 응답은 `{ results, paging }`이며 `paging`은 `pageNumber`, `pageSize`, `hasNext`,
+  `totalCount`다. 한쪽만 평평하게 두면 client가 페이징을 두 벌로 해석해야 한다.
+
+**선택.** 표현 계약만 `support`에 두고 module은 자신의 오류 의미와 결과 type만 소유한다.
 `support`는 다음 세 장치로 우회 통로가 되는 것을 구조적으로 막는다.
 
 - `allowedDependencies = {}` — `support`는 어떤 business module도 참조할 수 없다.
@@ -59,6 +63,11 @@ domain 상태나 business 규칙을 소유하지 않는다.
   module별 명시 opt-in이다.
 
 세 장치는 `com.woorisai.ModularityTests`가 build 시점에 검증한다.
+
+현재 노출 interface는 `support::error`와 `support::paging` 둘이다. `support::paging`의
+`PageResponse<T>`와 `Paging`은 결과 type을 모르는 봉투이며 business 규칙을 담지 않는다.
+Page 크기는 각 service가 자신의 상수로 정하고 `Paging`은 그 결과를 전달만 한다. Diary와 score
+이력이 지금 같은 값을 쓰는 것은 우연이므로 공용 상수로 묶지 않는다.
 
 **대안과 trade-off.** Module마다 handler를 유지하면 `support` 없이도 경계가 가장 좁지만
 동일한 조립 코드가 복제되고 계약 drift를 test로만 막는다. 반대로 root package에 utility를

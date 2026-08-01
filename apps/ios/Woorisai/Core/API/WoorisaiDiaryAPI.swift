@@ -545,9 +545,9 @@ extension WoorisaiDiaryAPI {
     case .json(let value): response = value
     }
     let entries = try response.results.map { try mapEntry($0, requireMine: false) }
-    guard Int(response.pageNumber) == expectedPageNumber,
-      response.pageSize.rawValue == 20,
-      response.totalCount >= Int64(entries.count),
+    guard Int(response.paging.pageNumber) == expectedPageNumber,
+      entries.count <= Int(response.paging.pageSize),
+      response.paging.totalCount >= Int64(entries.count),
       isNewestFirst(entries)
     else {
       throw WoorisaiAPIError.schemaDrift
@@ -555,8 +555,8 @@ extension WoorisaiDiaryAPI {
     return DiaryEntryPage(
       entries: entries,
       pageNumber: expectedPageNumber,
-      hasNext: response.hasNext,
-      totalCount: response.totalCount
+      hasNext: response.paging.hasNext,
+      totalCount: response.paging.totalCount
     )
   }
 

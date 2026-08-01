@@ -463,7 +463,7 @@ private enum RelationshipWireFixtures {
       body: .json(
         .init(
           results: [change],
-          paging: .init(pageNumber: 1, pageSize: ._20, hasNext: false, totalCount: 1)
+          paging: .init(pageNumber: 1, pageSize: 20, hasNext: false, totalCount: 1)
         )
       )
     )
@@ -478,7 +478,7 @@ private enum RelationshipWireFixtures {
         body: .json(
           .init(
             results: [change],
-            paging: .init(pageNumber: 1, pageSize: ._20, hasNext: false, totalCount: 1)
+            paging: .init(pageNumber: 1, pageSize: 20, hasNext: false, totalCount: 1)
           )
         )
       )

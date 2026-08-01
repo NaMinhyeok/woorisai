@@ -23,6 +23,8 @@ import com.woorisai.participant.CanonicalParticipantPair;
 import com.woorisai.participant.ParticipantDirectory;
 import com.woorisai.participant.ParticipantReference;
 import java.time.Clock;
+import com.woorisai.support.paging.PageResponse;
+import com.woorisai.support.paging.Paging;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -299,11 +301,11 @@ class DiaryCleanSchemaH2Test {
 
         diary.deleteEntry(FIRST, removed.id());
 
-        DiaryEntryListResponse list = diary.listEntries(FIRST, 1);
+        PageResponse<DiaryEntryListItemResponse> list = diary.listEntries(FIRST, 1);
         assertThat(list.results())
                 .extracting(DiaryEntryListItemResponse::id)
                 .containsExactly(kept.id());
-        assertThat(list.totalCount()).isOne();
+        assertThat(list.paging().totalCount()).isOne();
 
         // The parent row survives, so the cascade that used to clear the thread is gone.
         // The child must be marked in the same transaction or it outlives its parent.
@@ -341,8 +343,8 @@ class DiaryCleanSchemaH2Test {
                 "image/png",
                 512)));
 
-        DiaryEntryListResponse firstPage = diary.listEntries(FIRST, 1);
-        DiaryEntryListResponse secondPage = diary.listEntries(FIRST, 2);
+        PageResponse<DiaryEntryListItemResponse> firstPage = diary.listEntries(FIRST, 1);
+        PageResponse<DiaryEntryListItemResponse> secondPage = diary.listEntries(FIRST, 2);
 
         assertThat(firstPage.results()).hasSize(20);
         assertThat(firstPage.results().getFirst().id()).isEqualTo(10_021);
@@ -351,14 +353,11 @@ class DiaryCleanSchemaH2Test {
         assertThat(firstPage.results().getFirst().attachments())
                 .extracting(DiaryMediaResponse::id)
                 .containsExactly(FIRST_UPLOAD);
-        assertThat(firstPage.pageNumber()).isEqualTo(1);
-        assertThat(firstPage.pageSize()).isEqualTo(20);
-        assertThat(firstPage.totalCount()).isEqualTo(21);
-        assertThat(firstPage.hasNext()).isTrue();
+        assertThat(firstPage.paging()).isEqualTo(new Paging(1, 20, true, 21));
         assertThat(secondPage.results())
                 .extracting(DiaryEntryListItemResponse::id)
                 .containsExactly(10_001L);
-        assertThat(secondPage.hasNext()).isFalse();
+        assertThat(secondPage.paging().hasNext()).isFalse();
     }
 
     @Test

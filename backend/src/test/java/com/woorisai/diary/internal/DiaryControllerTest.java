@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.woorisai.support.error.ApiErrorAdvice;
+import com.woorisai.support.paging.PageResponse;
+import com.woorisai.support.paging.Paging;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -64,8 +66,8 @@ class DiaryControllerTest {
                 UPLOAD_ID, "IMAGE", "memory.png", "image/png", 512);
         DiaryEntryListItemResponse item = new DiaryEntryListItemResponse(
                 41, author, "entry", CREATED_AT, null, true, List.of(media), 1);
-        given(diary.listEntries(ACTOR, 2)).willReturn(new DiaryEntryListResponse(
-                List.of(item), 2, 20, false, 21));
+        given(diary.listEntries(ACTOR, 2)).willReturn(new PageResponse<>(
+                List.of(item), new Paging(2, 20, false, 21)));
         given(diary.createEntry(
                         ACTOR,
                         CreateDiaryEntryCommand.from("entry", List.of(UPLOAD_ID))))
@@ -92,7 +94,7 @@ class DiaryControllerTest {
         mvc.perform(get("/api/v2/diary-entries?pageNumber=2"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.pageNumber").value(2))
+                .andExpect(jsonPath("$.paging.pageNumber").value(2))
                 .andExpect(jsonPath("$.results[0].id").value(41))
                 .andExpect(jsonPath("$.results[0].attachments[0].id")
                         .value(UPLOAD_ID.toString()));

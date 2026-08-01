@@ -12,6 +12,7 @@ import com.woorisai.participant.CanonicalParticipantPair;
 import com.woorisai.participant.ParticipantDirectory;
 import com.woorisai.participant.ParticipantDirectory.ParticipantPairUnavailableException;
 import com.woorisai.participant.ParticipantReference;
+import com.woorisai.support.paging.PageResponse;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -43,26 +44,18 @@ class DiaryService {
     private final Clock clock;
 
     @Transactional(readOnly = true)
-    DiaryEntryListResponse listEntries(long actorId, int pageNumber) {
+    PageResponse<DiaryEntryListItemResponse> listEntries(long actorId, int pageNumber) {
         DiaryContext context = context(actorId);
         Page<DiaryEntry> page = entries.findAllByDeletedAtIsNullOrderByCreatedAtDescIdDesc(
                 PageRequest.of(pageNumber - 1, PAGE_SIZE));
         List<DiaryEntry> content = page.getContent();
         Map<Long, Long> commentCounts = commentCounts(content);
         Map<Long, List<DiaryMediaResponse>> media = attachments(content);
-        List<DiaryEntryListItemResponse> results = content.stream()
-                .map(entry -> DiaryEntryListItemResponse.of(
-                        entry,
-                        context.authorshipOf(entry.getAuthorId()),
-                        media.get(entry.getId()),
-                        commentCounts.getOrDefault(entry.getId(), 0L)))
-                .toList();
-        return new DiaryEntryListResponse(
-                results,
-                pageNumber,
-                PAGE_SIZE,
-                page.hasNext(),
-                page.getTotalElements());
+        return PageResponse.of(page, entry -> DiaryEntryListItemResponse.of(
+                entry,
+                context.authorshipOf(entry.getAuthorId()),
+                media.get(entry.getId()),
+                commentCounts.getOrDefault(entry.getId(), 0L)));
     }
 
     @Transactional(readOnly = true)
