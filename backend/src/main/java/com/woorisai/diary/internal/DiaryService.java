@@ -68,11 +68,11 @@ class DiaryService {
     @Transactional(readOnly = true)
     DiaryEntryDetailResponse getEntry(long actorId, long entryId) {
         DiaryContext context = context(actorId);
-        DiaryEntry entry = entries.findByIdAndDeletedAtIsNull(entryId)
-                .orElseThrow(DiaryEntryNotFoundException::new);
+        DiaryEntry entry = liveEntry(entryId);
         ParticipantReference author = canonicalAuthor(entry.getAuthorId(), context);
-        List<DiaryEntryComment> thread = comments
-                .findAllByDiaryEntryIdAndDeletedAtIsNullOrderByCreatedAtAscIdAsc(entryId);
+        List<DiaryEntryComment> thread = liveComments(entryId).stream()
+                .sorted(DiaryEntryComment.IN_THREAD_ORDER)
+                .toList();
         List<DiaryCommentResponse> commentResponses = thread.stream()
                 .map(comment -> commentResponse(comment, context))
                 .toList();
@@ -145,8 +145,7 @@ class DiaryService {
         entry.deleteBy(context.actor().id(), deletedAt);
         // The parent no longer disappears physically, so ON DELETE CASCADE cannot
         // clear the thread. Mark the live children in the same transaction.
-        comments.findAllByDiaryEntryIdAndDeletedAtIsNull(entryId)
-                .forEach(comment -> comment.deleteWithParent(deletedAt));
+        liveComments(entryId).forEach(comment -> comment.deleteWithParent(deletedAt));
         flushComments();
         flushEntries();
     }
@@ -194,7 +193,8 @@ class DiaryService {
     }
 
     private DiaryEntryComment commentWithParent(long commentId, DiaryContext context) {
-        DiaryEntryComment comment = comments.findByIdAndDeletedAtIsNull(commentId)
+        DiaryEntryComment comment = comments.findById(commentId)
+                .filter(DiaryEntryComment::isActive)
                 .orElseThrow(DiaryCommentNotFoundException::new);
         entry(comment.getDiaryEntryId(), context);
         canonicalAuthor(comment.getAuthorId(), context);
@@ -202,10 +202,21 @@ class DiaryService {
     }
 
     private DiaryEntry entry(long entryId, DiaryContext context) {
-        DiaryEntry entry = entries.findByIdAndDeletedAtIsNull(entryId)
-                .orElseThrow(DiaryEntryNotFoundException::new);
+        DiaryEntry entry = liveEntry(entryId);
         canonicalAuthor(entry.getAuthorId(), context);
         return entry;
+    }
+
+    private DiaryEntry liveEntry(long entryId) {
+        return entries.findById(entryId)
+                .filter(DiaryEntry::isActive)
+                .orElseThrow(DiaryEntryNotFoundException::new);
+    }
+
+    private List<DiaryEntryComment> liveComments(long entryId) {
+        return comments.findAllByDiaryEntryId(entryId).stream()
+                .filter(DiaryEntryComment::isActive)
+                .toList();
     }
 
     private void lockLiveEntry(long entryId) {
