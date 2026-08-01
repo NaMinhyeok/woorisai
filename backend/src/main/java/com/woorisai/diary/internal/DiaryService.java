@@ -27,7 +27,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -51,7 +50,7 @@ class DiaryService {
     @Transactional(readOnly = true)
     DiaryEntryListResponse listEntries(long actorId, int pageNumber) {
         DiaryContext context = context(actorId);
-        Page<DiaryEntry> page = entries.findAllByOrderByCreatedAtDescIdDesc(
+        Page<DiaryEntry> page = entries.findAllByDeletedAtIsNullOrderByCreatedAtDescIdDesc(
                 PageRequest.of(pageNumber - 1, PAGE_SIZE));
         List<DiaryEntry> content = page.getContent();
         Map<Long, Long> commentCounts = commentCounts(content);
@@ -74,11 +73,11 @@ class DiaryService {
     @Transactional(readOnly = true)
     DiaryEntryDetailResponse getEntry(long actorId, long entryId) {
         DiaryContext context = context(actorId);
-        DiaryEntry entry = entries.findById(entryId)
+        DiaryEntry entry = entries.findByIdAndDeletedAtIsNull(entryId)
                 .orElseThrow(DiaryEntryNotFoundException::new);
         ParticipantReference author = canonicalAuthor(entry.getAuthorId(), context);
         List<DiaryEntryComment> thread = comments
-                .findAllByDiaryEntryIdOrderByCreatedAtAscIdAsc(entryId);
+                .findAllByDiaryEntryIdAndDeletedAtIsNullOrderByCreatedAtAscIdAsc(entryId);
         List<DiaryCommentResponse> commentResponses = thread.stream()
                 .map(comment -> commentResponse(comment, context))
                 .toList();
@@ -147,8 +146,13 @@ class DiaryService {
     void deleteEntry(long actorId, long entryId) {
         DiaryContext context = context(actorId);
         DiaryEntry entry = entry(entryId, context);
-        entry.requireDeletionBy(context.actor().id());
-        entries.delete(entry);
+        Instant deletedAt = now();
+        entry.deleteBy(context.actor().id(), deletedAt);
+        // The parent no longer disappears physically, so ON DELETE CASCADE cannot
+        // clear the thread. Mark the live children in the same transaction.
+        comments.findAllByDiaryEntryIdAndDeletedAtIsNull(entryId)
+                .forEach(comment -> comment.deleteWithParent(deletedAt));
+        flushComments();
         flushEntries();
     }
 
@@ -158,20 +162,17 @@ class DiaryService {
             long entryId,
             CreateDiaryCommentCommand command) {
         DiaryContext context = context(actorId);
+        // 404 for an entry that never existed, plus the participant check.
         entry(entryId, context);
-        DiaryEntryComment comment;
-        try {
-            comment = comments.saveAndFlush(DiaryEntryComment.create(
-                    entryId,
-                    context.actor().id(),
-                    command.content(),
-                    now()));
-        } catch (DataIntegrityViolationException exception) {
-            if (DiaryConstraintViolationClassifier.isDeletedEntryConflict(exception)) {
-                throw new DiaryConflictException(exception);
-            }
-            throw exception;
-        }
+        // Then close the race: if the partner's delete commits between the two,
+        // the locked read comes back empty and this stays a 409 like the dropped
+        // foreign key produced.
+        lockLiveEntry(entryId);
+        DiaryEntryComment comment = comments.saveAndFlush(DiaryEntryComment.create(
+                entryId,
+                context.actor().id(),
+                command.content(),
+                now()));
         events.publishEvent(new DiaryEntryCommentCreated(
                 context.recipient().id(), entryId));
         return createdCommentResponse(comment, context.actor());
@@ -193,13 +194,12 @@ class DiaryService {
     void deleteComment(long actorId, long commentId) {
         DiaryContext context = context(actorId);
         DiaryEntryComment comment = commentWithParent(commentId, context);
-        comment.requireDeletionBy(context.actor().id());
-        comments.delete(comment);
+        comment.deleteBy(context.actor().id(), now());
         flushComments();
     }
 
     private DiaryEntryComment commentWithParent(long commentId, DiaryContext context) {
-        DiaryEntryComment comment = comments.findById(commentId)
+        DiaryEntryComment comment = comments.findByIdAndDeletedAtIsNull(commentId)
                 .orElseThrow(DiaryCommentNotFoundException::new);
         entry(comment.getDiaryEntryId(), context);
         canonicalAuthor(comment.getAuthorId(), context);
@@ -207,10 +207,16 @@ class DiaryService {
     }
 
     private DiaryEntry entry(long entryId, DiaryContext context) {
-        DiaryEntry entry = entries.findById(entryId)
+        DiaryEntry entry = entries.findByIdAndDeletedAtIsNull(entryId)
                 .orElseThrow(DiaryEntryNotFoundException::new);
         canonicalAuthor(entry.getAuthorId(), context);
         return entry;
+    }
+
+    private void lockLiveEntry(long entryId) {
+        if (entries.lockLiveEntryForCommentCreation(entryId).isEmpty()) {
+            throw new DiaryConflictException();
+        }
     }
 
     private void flushEntries() {

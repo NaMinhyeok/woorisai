@@ -43,6 +43,9 @@ class DiaryEntryComment {
     @Column(name = "version", nullable = false)
     private long version;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     private DiaryEntryComment(
             long diaryEntryId,
             long authorId,
@@ -75,6 +78,24 @@ class DiaryEntryComment {
 
     void requireDeletionBy(long actorId) {
         requireAuthor(actorId);
+    }
+
+    void deleteBy(long actorId, Instant deletedAt) {
+        requireAuthor(actorId);
+        markDeleted(deletedAt);
+    }
+
+    void deleteWithParent(Instant deletedAt) {
+        markDeleted(deletedAt);
+    }
+
+    boolean isActive() {
+        return deletedAt == null;
+    }
+
+    private void markDeleted(Instant deletedAt) {
+        Instant requested = Objects.requireNonNull(deletedAt, "deletedAt");
+        this.deletedAt = requested.isBefore(createdAt) ? createdAt : requested;
     }
 
     private void requireAuthor(long actorId) {

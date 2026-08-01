@@ -41,6 +41,9 @@ class DiaryEntry {
     @Column(name = "version", nullable = false)
     private long version;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     private DiaryEntry(long authorId, DiaryEntryContent content, Instant createdAt) {
         if (authorId <= 0) {
             throw new IllegalArgumentException("Diary entry author is invalid");
@@ -68,6 +71,16 @@ class DiaryEntry {
 
     void requireDeletionBy(long actorId) {
         requireAuthor(actorId);
+    }
+
+    void deleteBy(long actorId, Instant deletedAt) {
+        requireAuthor(actorId);
+        Instant requested = Objects.requireNonNull(deletedAt, "deletedAt");
+        this.deletedAt = requested.isBefore(createdAt) ? createdAt : requested;
+    }
+
+    boolean isActive() {
+        return deletedAt == null;
     }
 
     private void requireAuthor(long actorId) {

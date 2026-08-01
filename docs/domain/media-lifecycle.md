@@ -121,6 +121,12 @@ DB commit 뒤 staging/final object 삭제를 best effort로 수행한다.
 - DB transaction 뒤 삭제에 실패한 staging/final object
 - Diary replacement/delete 뒤 남은 final object
 
+Diary entry delete는 soft delete이므로 `media_attachment` 행 자체가 남는다. Parent 행이 살아
+있어 `ON DELETE CASCADE`가 동작하지 않기 때문이고, 그만큼 R2 object도 물리 삭제 때보다 오래
+남는다. 삭제 표시된 entry는 조회에서 제외되어 attachment도 노출되지 않으므로 이를 accepted
+orphan으로 다룬다. Attachment까지 삭제 표시로 바꾸려면 `(diary_entry_id, position)` 부분 유니크
+인덱스가 slot을 영구 점유하지 않도록 `AND deleted_at IS NULL`을 함께 넣어야 한다.
+
 Bucket 규모, 비용이나 privacy 위험이 이 선택을 감당하지 못한다는 증거가 생기면 이 문서와
 관련 schema·운영 문서에 retention, list/delete 권한, idempotency, recovery와 observability의
 선택 근거를 함께 정리한다.

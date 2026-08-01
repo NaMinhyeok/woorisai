@@ -189,8 +189,11 @@ class DiaryConcurrencyPostgresTest {
             releaseDelete.countDown();
             assertThat(delete.get(5, TimeUnit.SECONDS)).isEqualTo(Completed.INSTANCE);
             assertThat(create.get(5, TimeUnit.SECONDS)).isInstanceOf(DiaryConflictException.class);
-            assertThat(jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM woorisai.diary_entry WHERE id = ?",
+            assertThat(jdbc.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM woorisai.diary_entry
+                    WHERE id = ? AND deleted_at IS NULL
+                    """,
                     Long.class,
                     ENTRY_ID)).isZero();
             assertThat(commentCount()).isZero();
