@@ -74,7 +74,7 @@ class CleanSchemaPostgresMigrationTest {
                     """);
         }
 
-        var v2Result = flyway().migrate();
+        var v2Result = flywayAt(MigrationVersion.fromVersion("2")).migrate();
         assertThat(v2Result.migrationsExecuted).isOne();
 
         try (Connection connection = connection()) {
@@ -99,6 +99,9 @@ class CleanSchemaPostgresMigrationTest {
             execute(connection, "DELETE FROM woorisai.relationship_score WHERE id = 9010");
             execute(connection, "DELETE FROM woorisai.participant WHERE id IN (9001, 9002)");
         }
+
+        var v3Result = flyway().migrate();
+        assertThat(v3Result.migrationsExecuted).isOne();
     }
 
     @AfterAll
@@ -144,6 +147,41 @@ class CleanSchemaPostgresMigrationTest {
                             "diary_entry_comment:int8:NO",
                             "relationship_score:int8:NO"
                     );
+            assertThat(queryStrings(connection, """
+                    SELECT table_name || ':' || udt_name || ':' || is_nullable
+                    FROM information_schema.columns
+                    WHERE table_schema = 'woorisai'
+                      AND column_name = 'deleted_at'
+                    ORDER BY table_name
+                    """))
+                    .containsExactly(
+                            "diary_entry:timestamptz:YES",
+                            "diary_entry_comment:timestamptz:YES",
+                            "participant:timestamptz:YES",
+                            "score_change:timestamptz:YES",
+                            "score_change_comment:timestamptz:YES"
+                    );
+
+            assertThat(queryStrings(connection, """
+                    SELECT indexname
+                    FROM pg_indexes
+                    WHERE schemaname = 'woorisai'
+                      AND indexdef LIKE '%deleted_at IS NULL%'
+                    ORDER BY indexname
+                    """))
+                    .containsExactly(
+                            "diary_entry_comment_live_thread_idx",
+                            "diary_entry_live_list_idx"
+                    );
+
+            assertThat(queryInt(connection, """
+                    SELECT COUNT(*)
+                    FROM information_schema.columns
+                    WHERE table_schema = 'woorisai'
+                      AND column_name = 'deleted_at'
+                      AND column_default IS NOT NULL
+                    """))
+                    .isZero();
             assertThat(queryInt(connection, """
                     SELECT COUNT(*)
                     FROM information_schema.columns
@@ -466,6 +504,41 @@ class CleanSchemaPostgresMigrationTest {
                     WHERE id = '40000000-0000-4000-8000-000000000003'
                     """))
                     .isZero();
+        }
+    }
+
+    @Test
+    void rejectsATombstoneRecordedBeforeItsRowWasCreated() throws Exception {
+        try (Connection connection = connection()) {
+            execute(connection, """
+                    INSERT INTO woorisai.participant (id, slot, display_name, created_at)
+                    VALUES (9101, 1, 'tombstone-check-one', TIMESTAMPTZ '2026-07-21 00:00:00Z')
+                    """);
+            execute(connection, """
+                    INSERT INTO woorisai.diary_entry (id, author_id, content, created_at)
+                    VALUES (9140, 9101, 'tombstone check', TIMESTAMPTZ '2026-07-21 00:00:03Z')
+                    """);
+
+            assertConstraintViolation(connection, "23514", "diary_entry_deleted_at_ck", """
+                    UPDATE woorisai.diary_entry
+                    SET deleted_at = TIMESTAMPTZ '2026-07-20 23:59:59Z'
+                    WHERE id = 9140
+                    """);
+
+            execute(connection, """
+                    UPDATE woorisai.diary_entry
+                    SET deleted_at = TIMESTAMPTZ '2026-07-21 00:00:04Z'
+                    WHERE id = 9140
+                    """);
+            assertThat(queryInt(connection, """
+                    SELECT COUNT(*)
+                    FROM woorisai.diary_entry
+                    WHERE id = 9140 AND deleted_at IS NOT NULL
+                    """))
+                    .isOne();
+
+            execute(connection, "DELETE FROM woorisai.diary_entry WHERE id = 9140");
+            execute(connection, "DELETE FROM woorisai.participant WHERE id = 9101");
         }
     }
 
