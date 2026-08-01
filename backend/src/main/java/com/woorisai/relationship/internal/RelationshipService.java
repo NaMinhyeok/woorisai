@@ -20,7 +20,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +47,7 @@ class RelationshipService {
 
     @Transactional(readOnly = true)
     public RelationshipScoresResponse relationshipScores(long actorId) {
-        RelationshipContext relationship = relationship(actorId);
+        Relationship relationship = relationship(actorId);
         return new RelationshipScoresResponse(
                 participant(relationship.self(), relationship),
                 participant(relationship.partner(), relationship),
@@ -60,7 +59,7 @@ class RelationshipService {
     public ScoreChangeHistoryResponse scoreChanges(
             long actorId,
             int pageNumber) {
-        RelationshipContext relationship = relationship(actorId);
+        Relationship relationship = relationship(actorId);
         Page<ScoreChange> page = scoreChanges
                 .findByRelationshipScoreIdInOrderByCreatedAtDescIdDesc(
                         relationship.scoreIds(),
@@ -91,7 +90,7 @@ class RelationshipService {
     public ScoreChangeCreatedResponse changeScore(
             long actorId,
             ChangeScoreCommand command) {
-        RelationshipContext relationship = relationship(actorId);
+        Relationship relationship = relationship(actorId);
         RelationshipScore outgoing = relationship.outgoing();
 
         Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
@@ -126,7 +125,7 @@ class RelationshipService {
     public ScoreChangeThreadResponse scoreChange(
             long actorId,
             long scoreChangeId) {
-        RelationshipContext relationship = relationship(actorId);
+        Relationship relationship = relationship(actorId);
         ScoreChange change = ownedScoreChange(scoreChangeId, relationship);
         List<ScoreChangeComment> thread =
                 comments.findByScoreChangeIdOrderByCreatedAtAscIdAsc(scoreChangeId);
@@ -152,7 +151,7 @@ class RelationshipService {
             long actorId,
             long scoreChangeId,
             CreateScoreCommentCommand command) {
-        RelationshipContext relationship = relationship(actorId);
+        Relationship relationship = relationship(actorId);
         ownedScoreChange(scoreChangeId, relationship);
 
         Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
@@ -175,52 +174,27 @@ class RelationshipService {
         return new ScoreChangeCommentCreatedResponse(view);
     }
 
-    private RelationshipContext relationship(long actorId) {
-        CanonicalParticipants pair = canonicalParticipants(actorId);
-        RelationshipScorePair scores;
-        try {
-            scores = RelationshipScorePair.orient(
-                    pair.self().id(),
-                    pair.partner().id(),
-                    relationshipScores.findAllByOrderBySourceParticipantIdAsc());
-        } catch (RelationshipScorePairUnavailableException exception) {
-            throw new RelationshipUnavailableException(exception);
-        }
-        return new RelationshipContext(
-                pair.self(),
-                pair.partner(),
-                pair.canonicalPair(),
-                scores);
+    private Relationship relationship(long actorId) {
+        return Relationship.of(actorId, canonicalPair(), scoresInSourceOrder());
     }
 
-    private CanonicalParticipants canonicalParticipants(long actorId) {
-        CanonicalParticipantPair pair;
+    private CanonicalParticipantPair canonicalPair() {
         try {
-            pair = participants.canonicalPair();
+            return participants.canonicalPair();
         } catch (ParticipantPairUnavailableException exception) {
             throw new RelationshipUnavailableException(exception);
         }
-        ParticipantReference self = pair.findById(actorId)
-                .orElseThrow(RelationshipForbiddenException::new);
-        ParticipantReference partner = pair.partnerOf(self.id())
-                .orElseThrow(RelationshipUnavailableException::new);
-        return new CanonicalParticipants(self, partner, pair);
     }
 
-    private ScoreChange ownedScoreChange(
-            long scoreChangeId,
-            RelationshipContext relationship) {
+    private List<RelationshipScore> scoresInSourceOrder() {
+        return relationshipScores.findAllByOrderBySourceParticipantIdAsc();
+    }
+
+    private ScoreChange ownedScoreChange(long scoreChangeId, Relationship relationship) {
         ScoreChange change = scoreChanges.findById(scoreChangeId)
                 .orElseThrow(RelationshipNotFoundException::new);
-        relationshipScoreFor(change, relationship);
+        relationship.scoreOf(change);
         return change;
-    }
-
-    private RelationshipScore relationshipScoreFor(
-            ScoreChange change,
-            RelationshipContext relationship) {
-        return relationship.scoreById(change.getRelationshipScoreId())
-                .orElseThrow(RelationshipUnavailableException::new);
     }
 
     private void attachScoreMedia(long actorId, long scoreChangeId, List<UUID> uploadIds) {
@@ -289,8 +263,8 @@ class RelationshipService {
             ScoreChange change,
             long commentCount,
             List<MediaView> attachments,
-            RelationshipContext relationship) {
-        RelationshipScore score = relationshipScoreFor(change, relationship);
+            Relationship relationship) {
+        RelationshipScore score = relationship.scoreOf(change);
         return new ScoreChangeView(
                 change.getId(),
                 participant(score.getSourceParticipantId(), relationship),
@@ -307,7 +281,7 @@ class RelationshipService {
     private ScoreChangeCommentView scoreComment(
             ScoreChangeComment comment,
             List<MediaView> attachments,
-            RelationshipContext relationship) {
+            Relationship relationship) {
         String content = comment.getContent();
         if (content == null && attachments.isEmpty()) {
             throw new RelationshipUnavailableException();
@@ -322,7 +296,7 @@ class RelationshipService {
 
     private RelationshipScoreView score(
             RelationshipScore score,
-            RelationshipContext relationship) {
+            Relationship relationship) {
         return new RelationshipScoreView(
                 participant(score.getSourceParticipantId(), relationship),
                 participant(score.getTargetParticipantId(), relationship),
@@ -332,47 +306,12 @@ class RelationshipService {
 
     private ParticipantView participant(
             ParticipantReference participant,
-            RelationshipContext relationship) {
+            Relationship relationship) {
         return participant(participant.id(), relationship);
     }
 
-    private ParticipantView participant(long participantId, RelationshipContext relationship) {
-        ParticipantReference reference = relationship.participantById(participantId)
-                .orElseThrow(RelationshipUnavailableException::new);
-        return ParticipantView.from(
-                reference,
-                reference.id() == relationship.self().id());
-    }
-
-    private record CanonicalParticipants(
-            ParticipantReference self,
-            ParticipantReference partner,
-            CanonicalParticipantPair canonicalPair) {}
-
-    private record RelationshipContext(
-            ParticipantReference self,
-            ParticipantReference partner,
-            CanonicalParticipantPair participants,
-            RelationshipScorePair scores) {
-
-        RelationshipScore outgoing() {
-            return scores.outgoing();
-        }
-
-        RelationshipScore incoming() {
-            return scores.incoming();
-        }
-
-        Set<Long> scoreIds() {
-            return scores.ids();
-        }
-
-        java.util.Optional<RelationshipScore> scoreById(long scoreId) {
-            return scores.findById(scoreId);
-        }
-
-        java.util.Optional<ParticipantReference> participantById(long participantId) {
-            return participants.findById(participantId);
-        }
+    private ParticipantView participant(long participantId, Relationship relationship) {
+        ParticipantReference reference = relationship.participantById(participantId);
+        return ParticipantView.from(reference, relationship.isSelf(reference.id()));
     }
 }
