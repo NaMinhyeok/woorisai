@@ -181,7 +181,7 @@ class DiaryCleanSchemaH2Test {
         assertThatThrownBy(() -> diary.createEntry(
                         FIRST,
                         CreateDiaryEntryCommand.from("rollback", List.of(FIRST_UPLOAD))))
-                .isInstanceOf(InvalidDiaryRequestException.class);
+                .isInstanceOf(DiaryMediaUploadNotFoundException.class);
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM woorisai.diary_entry", Long.class)).isZero();
 
@@ -189,7 +189,7 @@ class DiaryCleanSchemaH2Test {
         assertThatThrownBy(() -> diary.createEntry(
                         FIRST,
                         CreateDiaryEntryCommand.from("rollback", List.of(FIRST_UPLOAD))))
-                .isInstanceOf(InvalidDiaryRequestException.class);
+                .isInstanceOf(DiaryMediaForbiddenException.class);
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM woorisai.diary_entry", Long.class)).isZero();
 
@@ -197,7 +197,7 @@ class DiaryCleanSchemaH2Test {
         assertThatThrownBy(() -> diary.createEntry(
                         FIRST,
                         CreateDiaryEntryCommand.from("rollback", List.of(FIRST_UPLOAD))))
-                .isInstanceOf(InvalidDiaryRequestException.class);
+                .isInstanceOf(DiaryConflictException.class);
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM woorisai.diary_entry", Long.class)).isZero();
 

@@ -7,11 +7,6 @@ import com.woorisai.media.AttachedMediaQuery.AttachedMediaUnavailableException;
 import com.woorisai.media.AttachedMediaQuery.InvalidAttachedMediaQueryException;
 import com.woorisai.media.DiaryEntryMediaParent;
 import com.woorisai.media.MediaAttachmentMutation;
-import com.woorisai.media.MediaAttachmentMutation.InvalidMediaAttachmentRequestException;
-import com.woorisai.media.MediaAttachmentMutation.MediaAttachmentConflictException;
-import com.woorisai.media.MediaAttachmentMutation.MediaAttachmentForbiddenException;
-import com.woorisai.media.MediaAttachmentMutation.MediaAttachmentUnavailableException;
-import com.woorisai.media.MediaAttachmentMutation.MediaUploadNotFoundException;
 import com.woorisai.media.ReplaceDiaryEntryMediaCommand;
 import com.woorisai.participant.CanonicalParticipantPair;
 import com.woorisai.participant.ParticipantDirectory;
@@ -276,17 +271,8 @@ class DiaryService {
     }
 
     private void replaceDiaryMedia(long actorId, long entryId, List<UUID> uploadIds) {
-        try {
-            mediaMutation.replaceDiaryEntry(
-                    new ReplaceDiaryEntryMediaCommand(actorId, entryId, uploadIds));
-        } catch (InvalidMediaAttachmentRequestException
-                | MediaUploadNotFoundException
-                | MediaAttachmentForbiddenException
-                | MediaAttachmentConflictException exception) {
-            throw new InvalidDiaryRequestException();
-        } catch (MediaAttachmentUnavailableException exception) {
-            throw new DiaryUnavailableException(exception);
-        }
+        DiaryMediaFailures.translating(() -> mediaMutation.replaceDiaryEntry(
+                new ReplaceDiaryEntryMediaCommand(actorId, entryId, uploadIds)));
     }
 
     private DiaryEntryListItemResponse listItem(

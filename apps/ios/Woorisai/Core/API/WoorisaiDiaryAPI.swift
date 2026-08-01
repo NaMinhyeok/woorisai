@@ -296,6 +296,8 @@ public struct WoorisaiDiaryAPI: DiaryServing, Sendable {
       case .badRequest(let response): throw Self.mapProblem(response)
       case .unauthorized(let response): throw Self.mapProblem(response)
       case .forbidden(let response): throw Self.mapProblem(response)
+      case .notFound(let response): throw Self.mapProblem(response)
+      case .conflict(let response): throw Self.mapProblem(response)
       case .unsupportedMediaType(let response): throw Self.mapProblem(response)
       case .serviceUnavailable(let response): throw Self.mapProblem(response)
       case .undocumented(let statusCode, _):
