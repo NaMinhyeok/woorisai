@@ -8,7 +8,9 @@ import org.springframework.data.repository.query.Param;
 
 interface ScoreChangeCommentRepository extends JpaRepository<ScoreChangeComment, Long> {
 
-    List<ScoreChangeComment> findByScoreChangeIdOrderByCreatedAtAscIdAsc(long scoreChangeId);
+    // Thread order is a domain rule, not a row order: ScoreChangeComment.IN_THREAD_ORDER
+    // owns it so the reader states the contract once instead of spelling it into a name.
+    List<ScoreChangeComment> findByScoreChangeId(long scoreChangeId);
 
     @Query("""
             select comment.scoreChangeId as scoreChangeId, count(comment.id) as commentCount

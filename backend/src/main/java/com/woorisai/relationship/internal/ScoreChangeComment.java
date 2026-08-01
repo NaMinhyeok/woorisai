@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Comparator;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,6 +19,12 @@ import org.hibernate.annotations.Immutable;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "score_change_comment")
 class ScoreChangeComment {
+
+    // The thread is a flat chronological conversation between the two participants;
+    // id only breaks a tie between comments written in the same instant.
+    static final Comparator<ScoreChangeComment> IN_THREAD_ORDER =
+            Comparator.comparing(ScoreChangeComment::getCreatedAt)
+                    .thenComparing(ScoreChangeComment::getId);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
