@@ -7,11 +7,6 @@ import com.woorisai.media.AttachedMediaQuery;
 import com.woorisai.media.AttachedMediaQuery.AttachedMediaUnavailableException;
 import com.woorisai.media.AttachedMediaQuery.InvalidAttachedMediaQueryException;
 import com.woorisai.media.MediaAttachmentMutation;
-import com.woorisai.media.MediaAttachmentMutation.InvalidMediaAttachmentRequestException;
-import com.woorisai.media.MediaAttachmentMutation.MediaAttachmentConflictException;
-import com.woorisai.media.MediaAttachmentMutation.MediaAttachmentForbiddenException;
-import com.woorisai.media.MediaAttachmentMutation.MediaAttachmentUnavailableException;
-import com.woorisai.media.MediaAttachmentMutation.MediaUploadNotFoundException;
 import com.woorisai.media.ScoreChangeMediaParent;
 import com.woorisai.media.ScoreCommentMediaParent;
 import com.woorisai.participant.CanonicalParticipantPair;
@@ -229,37 +224,13 @@ class RelationshipService {
     }
 
     private void attachScoreMedia(long actorId, long scoreChangeId, List<UUID> uploadIds) {
-        try {
-            mediaMutation.attachScoreChange(
-                    new AttachScoreChangeMediaCommand(actorId, scoreChangeId, uploadIds));
-        } catch (InvalidMediaAttachmentRequestException exception) {
-            throw new InvalidRelationshipRequestException();
-        } catch (MediaUploadNotFoundException exception) {
-            throw new RelationshipNotFoundException();
-        } catch (MediaAttachmentForbiddenException exception) {
-            throw new RelationshipForbiddenException();
-        } catch (MediaAttachmentConflictException exception) {
-            throw new RelationshipConflictException();
-        } catch (MediaAttachmentUnavailableException exception) {
-            throw new RelationshipUnavailableException(exception);
-        }
+        RelationshipMediaFailures.translating(() -> mediaMutation.attachScoreChange(
+                new AttachScoreChangeMediaCommand(actorId, scoreChangeId, uploadIds)));
     }
 
     private void attachCommentMedia(long actorId, long commentId, List<UUID> uploadIds) {
-        try {
-            mediaMutation.attachScoreComment(
-                    new AttachScoreCommentMediaCommand(actorId, commentId, uploadIds));
-        } catch (InvalidMediaAttachmentRequestException exception) {
-            throw new InvalidRelationshipRequestException();
-        } catch (MediaUploadNotFoundException exception) {
-            throw new RelationshipNotFoundException();
-        } catch (MediaAttachmentForbiddenException exception) {
-            throw new RelationshipForbiddenException();
-        } catch (MediaAttachmentConflictException exception) {
-            throw new RelationshipConflictException();
-        } catch (MediaAttachmentUnavailableException exception) {
-            throw new RelationshipUnavailableException(exception);
-        }
+        RelationshipMediaFailures.translating(() -> mediaMutation.attachScoreComment(
+                new AttachScoreCommentMediaCommand(actorId, commentId, uploadIds)));
     }
 
     private Map<Long, List<AttachedMedia>> scoreMedia(List<ScoreChange> changes) {
