@@ -1,5 +1,6 @@
 package com.woorisai.relationship.internal;
 
+import com.woorisai.support.paging.PageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -28,7 +29,7 @@ class RelationshipController {
     }
 
     @GetMapping("/score-changes")
-    ResponseEntity<ScoreChangeHistoryResponse> scoreChanges(
+    ResponseEntity<PageResponse<ScoreChangeView>> scoreChanges(
             @AuthenticationPrincipal(errorOnInvalidType = true) Long actorId,
             @RequestParam(defaultValue = "1") int pageNumber) {
         requirePositive(pageNumber);

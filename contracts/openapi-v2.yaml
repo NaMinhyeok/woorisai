@@ -1428,14 +1428,16 @@ components:
       properties:
         results:
           type: array
-          maxItems: 20
           items:
             $ref: "#/components/schemas/ScoreChange"
         paging:
-          $ref: "#/components/schemas/RelationshipPaging"
-    RelationshipPaging:
+          $ref: "#/components/schemas/Paging"
+    Paging:
       type: object
       additionalProperties: false
+      description: >-
+        Page metadata shared by every paged endpoint. pageSize is the size the server chose
+        for this response, not a value the client may assume or request.
       required:
         - pageNumber
         - pageSize
@@ -1449,8 +1451,7 @@ components:
         pageSize:
           type: integer
           format: int32
-          enum:
-            - 20
+          minimum: 1
         hasNext:
           type: boolean
         totalCount:
@@ -1611,31 +1612,14 @@ components:
       additionalProperties: false
       required:
         - results
-        - pageNumber
-        - pageSize
-        - hasNext
-        - totalCount
+        - paging
       properties:
         results:
           type: array
-          maxItems: 20
           items:
             $ref: "#/components/schemas/DiaryEntryResponse"
-        pageNumber:
-          type: integer
-          format: int32
-          minimum: 1
-        pageSize:
-          type: integer
-          format: int32
-          enum:
-            - 20
-        hasNext:
-          type: boolean
-        totalCount:
-          type: integer
-          format: int64
-          minimum: 0
+        paging:
+          $ref: "#/components/schemas/Paging"
     DiaryEntryResponse:
       type: object
       additionalProperties: false

@@ -537,10 +537,7 @@ private enum DiaryWireFixtures {
       body: .json(
         .init(
           results: [entry],
-          pageNumber: 1,
-          pageSize: ._20,
-          hasNext: false,
-          totalCount: 1
+          paging: .init(pageNumber: 1, pageSize: 20, hasNext: false, totalCount: 1)
         )
       )
     )
@@ -575,10 +572,7 @@ private enum DiaryWireFixtures {
         body: .json(
           .init(
             results: [entry],
-            pageNumber: 1,
-            pageSize: ._20,
-            hasNext: false,
-            totalCount: 1
+            paging: .init(pageNumber: 1, pageSize: 20, hasNext: false, totalCount: 1)
           )
         )
       )

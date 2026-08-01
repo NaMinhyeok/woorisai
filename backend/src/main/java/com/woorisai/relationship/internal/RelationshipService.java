@@ -15,6 +15,7 @@ import com.woorisai.participant.ParticipantDirectory.ParticipantPairUnavailableE
 import com.woorisai.participant.ParticipantReference;
 import com.woorisai.relationship.RelationshipScoreChanged;
 import com.woorisai.relationship.ScoreChangeCommentCreated;
+import com.woorisai.support.paging.PageResponse;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -56,7 +57,7 @@ class RelationshipService {
     }
 
     @Transactional(readOnly = true)
-    public ScoreChangeHistoryResponse scoreChanges(
+    public PageResponse<ScoreChangeView> scoreChanges(
             long actorId,
             int pageNumber) {
         Relationship relationship = relationship(actorId);
@@ -70,20 +71,11 @@ class RelationshipService {
         List<ScoreChange> changes = page.getContent();
         Map<Long, Long> commentCounts = commentCounts(changes);
         Map<Long, List<AttachedMedia>> attachments = scoreMedia(changes);
-        List<ScoreChangeView> results = changes.stream()
-                .map(change -> scoreChange(
-                        change,
-                        commentCounts.getOrDefault(change.getId(), 0L),
-                        media(attachments, change.getId()),
-                        relationship))
-                .toList();
-        return new ScoreChangeHistoryResponse(
-                results,
-                new ScoreChangeHistoryResponse.Paging(
-                        pageNumber,
-                        HISTORY_PAGE_SIZE,
-                        page.hasNext(),
-                        page.getTotalElements()));
+        return PageResponse.of(page, change -> scoreChange(
+                change,
+                commentCounts.getOrDefault(change.getId(), 0L),
+                media(attachments, change.getId()),
+                relationship));
     }
 
     @Transactional

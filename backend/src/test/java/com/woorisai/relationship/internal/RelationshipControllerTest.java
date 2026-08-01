@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.woorisai.support.error.ApiErrorAdvice;
+import com.woorisai.support.paging.PageResponse;
+import com.woorisai.support.paging.Paging;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -74,9 +76,8 @@ class RelationshipControllerTest {
 
         when(service.relationshipScores(ACTOR)).thenReturn(
                 new RelationshipScoresResponse(self, partner, outgoing, incoming));
-        when(service.scoreChanges(ACTOR, 1)).thenReturn(new ScoreChangeHistoryResponse(
-                List.of(change),
-                new ScoreChangeHistoryResponse.Paging(1, 20, false, 1)));
+        when(service.scoreChanges(ACTOR, 1)).thenReturn(new PageResponse<>(
+                List.of(change), new Paging(1, 20, false, 1)));
         when(service.changeScore(eq(ACTOR), any(ChangeScoreCommand.class))).thenReturn(
                 new ScoreChangeCreatedResponse(change, outgoing));
         when(service.scoreChange(ACTOR, 20)).thenReturn(

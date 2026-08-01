@@ -46,6 +46,9 @@ business module도 참조하지 않고, `@NamedInterface`로 노출면을 좁히
 - Relationship score는 방향성이 있고 0~100이며 participant는 자신의 outgoing score만 바꾼다.
 - Score 현재값, 불변 이력, media 연결과 event publication은 한 transaction이다.
 - Score comment와 diary comment는 두 participant의 평평한 시간순 대화다.
+- 모든 page 응답은 `{ results, paging }`이고 `paging`은 `pageNumber`, `pageSize`, `hasNext`,
+  `totalCount`다. `pageSize`는 server가 정한 결과값이며 client가 요청하거나 특정 값으로
+  가정하지 않는다.
 - Diary는 두 participant가 읽고 작성자만 수정·삭제한다. 게시 시각은 server가 결정한다.
 - `relationship_score`, `diary_entry`, `diary_entry_comment`의 겹친 transaction은 JPA
   `@Version`으로 감지하고 각각 `409 RELATIONSHIP_CONFLICT`, `409 DIARY_CONFLICT`로 반환한다.
