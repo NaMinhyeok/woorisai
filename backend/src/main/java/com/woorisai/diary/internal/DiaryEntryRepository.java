@@ -11,9 +11,9 @@ import org.springframework.data.repository.query.Param;
 
 interface DiaryEntryRepository extends JpaRepository<DiaryEntry, Long> {
 
+    // The list is paged, so liveness and recency must stay in the query: filtering a page
+    // after the fact would return short pages and a total that counts deleted entries.
     Page<DiaryEntry> findAllByDeletedAtIsNullOrderByCreatedAtDescIdDesc(Pageable pageable);
-
-    Optional<DiaryEntry> findByIdAndDeletedAtIsNull(long id);
 
     // Comment creation used to be guarded by diary_entry_comment_entry_fk: deleting the
     // parent physically made an overlapping insert violate the key. Soft delete keeps the

@@ -55,6 +55,17 @@ record DiaryParticipantResponse(int slot, String displayName) {
     }
 }
 
+// Every diary response answers the same two questions about its author: who wrote it,
+// and is that the participant reading it. Resolving them together keeps the pair from
+// drifting apart across the responses that carry both.
+record DiaryAuthorship(DiaryParticipantResponse author, boolean isMine) {
+
+    static DiaryAuthorship of(ParticipantReference author, ParticipantReference actor) {
+        return new DiaryAuthorship(
+                DiaryParticipantResponse.from(author), author.id() == actor.id());
+    }
+}
+
 record DiaryMediaResponse(
         UUID id,
         String kind,
@@ -85,6 +96,22 @@ record DiaryEntryListItemResponse(
     DiaryEntryListItemResponse {
         attachments = List.copyOf(attachments);
     }
+
+    static DiaryEntryListItemResponse of(
+            DiaryEntry entry,
+            DiaryAuthorship authorship,
+            List<DiaryMediaResponse> attachments,
+            long commentCount) {
+        return new DiaryEntryListItemResponse(
+                entry.getId(),
+                authorship.author(),
+                entry.getContent(),
+                entry.getCreatedAt(),
+                entry.getUpdatedAt(),
+                authorship.isMine(),
+                attachments,
+                commentCount);
+    }
 }
 
 record DiaryCommentResponse(
@@ -93,7 +120,18 @@ record DiaryCommentResponse(
         String content,
         Instant createdAt,
         Instant updatedAt,
-        boolean isMine) {}
+        boolean isMine) {
+
+    static DiaryCommentResponse of(DiaryEntryComment comment, DiaryAuthorship authorship) {
+        return new DiaryCommentResponse(
+                comment.getId(),
+                authorship.author(),
+                comment.getContent(),
+                comment.getCreatedAt(),
+                comment.getUpdatedAt(),
+                authorship.isMine());
+    }
+}
 
 record DiaryEntryCommentCreatedResponse(
         long id,
@@ -101,7 +139,19 @@ record DiaryEntryCommentCreatedResponse(
         String content,
         Instant createdAt,
         Instant updatedAt,
-        boolean isMine) {}
+        boolean isMine) {
+
+    static DiaryEntryCommentCreatedResponse of(
+            DiaryEntryComment comment, DiaryAuthorship authorship) {
+        return new DiaryEntryCommentCreatedResponse(
+                comment.getId(),
+                authorship.author(),
+                comment.getContent(),
+                comment.getCreatedAt(),
+                comment.getUpdatedAt(),
+                authorship.isMine());
+    }
+}
 
 record DiaryEntryCommentUpdatedResponse(
         long id,
@@ -109,7 +159,19 @@ record DiaryEntryCommentUpdatedResponse(
         String content,
         Instant createdAt,
         Instant updatedAt,
-        boolean isMine) {}
+        boolean isMine) {
+
+    static DiaryEntryCommentUpdatedResponse of(
+            DiaryEntryComment comment, DiaryAuthorship authorship) {
+        return new DiaryEntryCommentUpdatedResponse(
+                comment.getId(),
+                authorship.author(),
+                comment.getContent(),
+                comment.getCreatedAt(),
+                comment.getUpdatedAt(),
+                authorship.isMine());
+    }
+}
 
 record DiaryEntryCreatedResponse(
         long id,
@@ -123,6 +185,22 @@ record DiaryEntryCreatedResponse(
 
     DiaryEntryCreatedResponse {
         attachments = List.copyOf(attachments);
+    }
+
+    static DiaryEntryCreatedResponse of(
+            DiaryEntry entry,
+            DiaryAuthorship authorship,
+            List<DiaryMediaResponse> attachments,
+            long commentCount) {
+        return new DiaryEntryCreatedResponse(
+                entry.getId(),
+                authorship.author(),
+                entry.getContent(),
+                entry.getCreatedAt(),
+                entry.getUpdatedAt(),
+                authorship.isMine(),
+                attachments,
+                commentCount);
     }
 }
 
@@ -140,6 +218,23 @@ record DiaryEntryDetailResponse(
     DiaryEntryDetailResponse {
         attachments = List.copyOf(attachments);
         comments = List.copyOf(comments);
+    }
+
+    static DiaryEntryDetailResponse of(
+            DiaryEntry entry,
+            DiaryAuthorship authorship,
+            List<DiaryMediaResponse> attachments,
+            List<DiaryCommentResponse> comments) {
+        return new DiaryEntryDetailResponse(
+                entry.getId(),
+                authorship.author(),
+                entry.getContent(),
+                entry.getCreatedAt(),
+                entry.getUpdatedAt(),
+                authorship.isMine(),
+                attachments,
+                comments.size(),
+                comments);
     }
 }
 
@@ -167,5 +262,21 @@ record DiaryEntryUpdatedResponse(
 
     DiaryEntryUpdatedResponse {
         attachments = List.copyOf(attachments);
+    }
+
+    static DiaryEntryUpdatedResponse of(
+            DiaryEntry entry,
+            DiaryAuthorship authorship,
+            List<DiaryMediaResponse> attachments,
+            long commentCount) {
+        return new DiaryEntryUpdatedResponse(
+                entry.getId(),
+                authorship.author(),
+                entry.getContent(),
+                entry.getCreatedAt(),
+                entry.getUpdatedAt(),
+                authorship.isMine(),
+                attachments,
+                commentCount);
     }
 }

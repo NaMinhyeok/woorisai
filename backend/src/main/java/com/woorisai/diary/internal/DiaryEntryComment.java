@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -18,6 +19,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "diary_entry_comment")
 class DiaryEntryComment {
+
+    // The thread is a flat chronological conversation between the two participants;
+    // id only breaks a tie between comments written in the same instant.
+    static final Comparator<DiaryEntryComment> IN_THREAD_ORDER =
+            Comparator.comparing(DiaryEntryComment::getCreatedAt)
+                    .thenComparing(DiaryEntryComment::getId);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

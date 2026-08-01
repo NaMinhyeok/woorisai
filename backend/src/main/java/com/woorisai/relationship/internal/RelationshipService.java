@@ -127,8 +127,9 @@ class RelationshipService {
             long scoreChangeId) {
         Relationship relationship = relationship(actorId);
         ScoreChange change = ownedScoreChange(scoreChangeId, relationship);
-        List<ScoreChangeComment> thread =
-                comments.findByScoreChangeIdOrderByCreatedAtAscIdAsc(scoreChangeId);
+        List<ScoreChangeComment> thread = comments.findByScoreChangeId(scoreChangeId).stream()
+                .sorted(ScoreChangeComment.IN_THREAD_ORDER)
+                .toList();
         Map<Long, List<AttachedMedia>> changeMedia = scoreMedia(List.of(change));
         Map<Long, List<AttachedMedia>> commentMedia = commentMedia(thread);
         List<ScoreChangeCommentView> commentViews = thread.stream()

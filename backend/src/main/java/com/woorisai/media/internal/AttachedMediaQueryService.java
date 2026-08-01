@@ -9,7 +9,9 @@ import com.woorisai.media.MediaKind;
 import com.woorisai.media.ScoreChangeMediaParent;
 import com.woorisai.media.ScoreCommentMediaParent;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,94 +32,67 @@ class AttachedMediaQueryService implements AttachedMediaQuery {
     private static final Set<String> VIDEO_CONTENT_TYPES =
             Set.of("video/mp4", "video/webm", "video/quicktime");
 
+    // Attachment order is a domain contract, not an incidental row order: position defines
+    // what the participants see, and id only breaks a tie the writer should never create.
+    // A null position is left for validateGroup to reject rather than silently sorted away.
+    private static final Comparator<MediaAttachment> BY_ATTACHMENT_ORDER = Comparator
+            .comparing(MediaAttachment::getPosition, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(MediaAttachment::getId);
+
     private final MediaAttachmentRepository attachments;
 
     @Override
     @Transactional(readOnly = true)
     public Map<Long, List<AttachedMedia>> attachmentsForScoreChanges(
             List<ScoreChangeMediaParent> parents) {
-        Map<Long, Long> expected = validParents(
-                parents,
-                ScoreChangeMediaParent::scoreChangeId,
-                ScoreChangeMediaParent::expectedUploaderId);
-        try {
-            List<MediaAttachment> found = expected.isEmpty()
-                    ? List.of()
-                    : attachments
-                            .findAllByPurposeAndStatusAndScoreChangeIdInOrderByScoreChangeIdAscPositionAscIdAsc(
-                                    MediaPurpose.SCORE_CHANGE,
-                                    MediaStatus.READY,
-                                    expected.keySet());
-            return queryGroups(
-                    expected,
-                    found,
-                    MediaAttachment::getScoreChangeId,
-                    MediaAttachmentGroupPolicy.Group.SCORE);
-        } catch (InvalidAttachedMediaQueryException | AttachedMediaUnavailableException exception) {
-            throw exception;
-        } catch (DataAccessException exception) {
-            throw new AttachedMediaUnavailableException(exception);
-        }
+        return attachmentsOf(
+                validParents(
+                        parents,
+                        ScoreChangeMediaParent::scoreChangeId,
+                        ScoreChangeMediaParent::expectedUploaderId),
+                attachments::findAllByScoreChangeIdIn,
+                MediaAttachment::getScoreChangeId,
+                MediaAttachmentGroupPolicy.Group.SCORE);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Map<Long, List<AttachedMedia>> attachmentsForScoreComments(
             List<ScoreCommentMediaParent> parents) {
-        if (parents == null || parents.stream().anyMatch(Objects::isNull)) {
-            throw new InvalidAttachedMediaQueryException();
-        }
-        Map<Long, Long> expectedUploaders = new LinkedHashMap<>();
-        for (ScoreCommentMediaParent parent : parents) {
-            if (parent.scoreCommentId() <= 0
-                    || parent.expectedUploaderId() <= 0
-                    || expectedUploaders.putIfAbsent(
-                                    parent.scoreCommentId(), parent.expectedUploaderId())
-                            != null) {
-                throw new InvalidAttachedMediaQueryException();
-            }
-        }
-        try {
-            List<MediaAttachment> found = expectedUploaders.isEmpty()
-                    ? List.of()
-                    : attachments
-                            .findAllByPurposeAndStatusAndScoreChangeCommentIdInOrderByScoreChangeCommentIdAscPositionAscIdAsc(
-                                    MediaPurpose.SCORE_CHANGE_COMMENT,
-                                    MediaStatus.READY,
-                                    expectedUploaders.keySet());
-            return queryGroups(
-                    expectedUploaders,
-                    found,
-                    MediaAttachment::getScoreChangeCommentId,
-                    MediaAttachmentGroupPolicy.Group.FLEXIBLE);
-        } catch (InvalidAttachedMediaQueryException | AttachedMediaUnavailableException exception) {
-            throw exception;
-        } catch (DataAccessException exception) {
-            throw new AttachedMediaUnavailableException(exception);
-        }
+        return attachmentsOf(
+                validParents(
+                        parents,
+                        ScoreCommentMediaParent::scoreCommentId,
+                        ScoreCommentMediaParent::expectedUploaderId),
+                attachments::findAllByScoreChangeCommentIdIn,
+                MediaAttachment::getScoreChangeCommentId,
+                MediaAttachmentGroupPolicy.Group.FLEXIBLE);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Map<Long, List<AttachedMedia>> attachmentsForDiaryEntries(
             List<DiaryEntryMediaParent> parents) {
-        Map<Long, Long> expected = validParents(
-                parents,
-                DiaryEntryMediaParent::diaryEntryId,
-                DiaryEntryMediaParent::expectedUploaderId);
+        return attachmentsOf(
+                validParents(
+                        parents,
+                        DiaryEntryMediaParent::diaryEntryId,
+                        DiaryEntryMediaParent::expectedUploaderId),
+                attachments::findAllByDiaryEntryIdIn,
+                MediaAttachment::getDiaryEntryId,
+                MediaAttachmentGroupPolicy.Group.FLEXIBLE);
+    }
+
+    private Map<Long, List<AttachedMedia>> attachmentsOf(
+            Map<Long, Long> expectedUploaders,
+            Function<Collection<Long>, List<MediaAttachment>> byParentIds,
+            Function<MediaAttachment, Long> parentId,
+            MediaAttachmentGroupPolicy.Group groupPolicy) {
         try {
-            List<MediaAttachment> found = expected.isEmpty()
+            List<MediaAttachment> found = expectedUploaders.isEmpty()
                     ? List.of()
-                    : attachments
-                            .findAllByPurposeAndStatusAndDiaryEntryIdInOrderByDiaryEntryIdAscPositionAscIdAsc(
-                                    MediaPurpose.DIARY_ENTRY,
-                                    MediaStatus.READY,
-                                    expected.keySet());
-            return queryGroups(
-                    expected,
-                    found,
-                    MediaAttachment::getDiaryEntryId,
-                    MediaAttachmentGroupPolicy.Group.FLEXIBLE);
+                    : byParentIds.apply(expectedUploaders.keySet());
+            return queryGroups(expectedUploaders, found, parentId, groupPolicy);
         } catch (InvalidAttachedMediaQueryException | AttachedMediaUnavailableException exception) {
             throw exception;
         } catch (DataAccessException exception) {
@@ -147,6 +122,7 @@ class AttachedMediaQueryService implements AttachedMediaQuery {
 
         Map<Long, List<AttachedMedia>> result = new LinkedHashMap<>();
         groups.forEach((id, media) -> {
+            media.sort(BY_ATTACHMENT_ORDER);
             validateGroup(media, groupPolicy);
             result.put(id, media.stream().map(this::toAttached).toList());
         });

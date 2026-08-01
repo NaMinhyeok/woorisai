@@ -33,18 +33,13 @@ interface MediaAttachmentRepository extends JpaRepository<MediaAttachment, UUID>
             """)
     List<UUID> findIdsByDiaryEntryId(@Param("diaryEntryId") long diaryEntryId);
 
-    List<MediaAttachment> findAllByPurposeAndStatusAndScoreChangeIdInOrderByScoreChangeIdAscPositionAscIdAsc(
-            MediaPurpose purpose,
-            MediaStatus status,
-            Collection<Long> parentIds);
+    // Purpose, ready status and attachment order are not query conditions: attach time
+    // already binds a parent FK only to a ready, parentless upload of the matching purpose.
+    // Repeating them here hides a row that violates the invariant instead of reporting it,
+    // so the reader loads by parent alone and AttachedMediaQueryService rejects what it must.
+    List<MediaAttachment> findAllByScoreChangeIdIn(Collection<Long> parentIds);
 
-    List<MediaAttachment> findAllByPurposeAndStatusAndScoreChangeCommentIdInOrderByScoreChangeCommentIdAscPositionAscIdAsc(
-            MediaPurpose purpose,
-            MediaStatus status,
-            Collection<Long> parentIds);
+    List<MediaAttachment> findAllByScoreChangeCommentIdIn(Collection<Long> parentIds);
 
-    List<MediaAttachment> findAllByPurposeAndStatusAndDiaryEntryIdInOrderByDiaryEntryIdAscPositionAscIdAsc(
-            MediaPurpose purpose,
-            MediaStatus status,
-            Collection<Long> parentIds);
+    List<MediaAttachment> findAllByDiaryEntryIdIn(Collection<Long> parentIds);
 }
