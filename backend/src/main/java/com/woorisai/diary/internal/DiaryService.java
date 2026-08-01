@@ -51,9 +51,9 @@ class DiaryService {
         Map<Long, Long> commentCounts = commentCounts(content);
         Map<Long, List<DiaryMediaResponse>> media = attachments(content);
         List<DiaryEntryListItemResponse> results = content.stream()
-                .map(entry -> listItem(
+                .map(entry -> DiaryEntryListItemResponse.of(
                         entry,
-                        context,
+                        context.authorshipOf(entry.getAuthorId()),
                         media.get(entry.getId()),
                         commentCounts.getOrDefault(entry.getId(), 0L)))
                 .toList();
@@ -69,23 +69,18 @@ class DiaryService {
     DiaryEntryDetailResponse getEntry(long actorId, long entryId) {
         DiaryContext context = context(actorId);
         DiaryEntry entry = liveEntry(entryId);
-        ParticipantReference author = canonicalAuthor(entry.getAuthorId(), context);
         List<DiaryEntryComment> thread = liveComments(entryId).stream()
                 .sorted(DiaryEntryComment.IN_THREAD_ORDER)
                 .toList();
         List<DiaryCommentResponse> commentResponses = thread.stream()
-                .map(comment -> commentResponse(comment, context))
+                .map(comment -> DiaryCommentResponse.of(
+                        comment, context.authorshipOf(comment.getAuthorId())))
                 .toList();
         List<DiaryMediaResponse> media = attachments(List.of(entry)).get(entryId);
-        return new DiaryEntryDetailResponse(
-                entry.getId(),
-                DiaryParticipantResponse.from(author),
-                entry.getContent(),
-                entry.getCreatedAt(),
-                entry.getUpdatedAt(),
-                entry.getAuthorId() == context.actor().id(),
+        return DiaryEntryDetailResponse.of(
+                entry,
+                context.authorshipOf(entry.getAuthorId()),
                 media,
-                commentResponses.size(),
                 commentResponses);
     }
 
@@ -99,15 +94,8 @@ class DiaryService {
         replaceDiaryMedia(
                 context.actor().id(), entry.getId(), command.mediaUploadIds().values());
         List<DiaryMediaResponse> media = attachments(List.of(entry)).get(entry.getId());
-        return new DiaryEntryCreatedResponse(
-                entry.getId(),
-                DiaryParticipantResponse.from(context.actor()),
-                entry.getContent(),
-                entry.getCreatedAt(),
-                entry.getUpdatedAt(),
-                true,
-                media,
-                0);
+        return DiaryEntryCreatedResponse.of(
+                entry, context.authorshipOf(entry.getAuthorId()), media, 0);
     }
 
     @Transactional
@@ -126,15 +114,8 @@ class DiaryService {
                 .mapToLong(DiaryEntryCommentCount::getCommentCount)
                 .findFirst()
                 .orElse(0);
-        return new DiaryEntryUpdatedResponse(
-                entry.getId(),
-                DiaryParticipantResponse.from(context.actor()),
-                entry.getContent(),
-                entry.getCreatedAt(),
-                entry.getUpdatedAt(),
-                true,
-                media,
-                commentCount);
+        return DiaryEntryUpdatedResponse.of(
+                entry, context.authorshipOf(entry.getAuthorId()), media, commentCount);
     }
 
     @Transactional
@@ -169,7 +150,8 @@ class DiaryService {
                 now()));
         events.publishEvent(new DiaryEntryCommentCreated(
                 context.recipient().id(), entryId));
-        return createdCommentResponse(comment, context.actor());
+        return DiaryEntryCommentCreatedResponse.of(
+                comment, context.authorshipOf(comment.getAuthorId()));
     }
 
     @Transactional
@@ -181,7 +163,8 @@ class DiaryService {
         DiaryEntryComment comment = commentWithParent(commentId, context);
         comment.reviseBy(context.actor().id(), command.content(), now());
         flushComments();
-        return updatedCommentResponse(comment, context.actor());
+        return DiaryEntryCommentUpdatedResponse.of(
+                comment, context.authorshipOf(comment.getAuthorId()));
     }
 
     @Transactional
@@ -197,13 +180,13 @@ class DiaryService {
                 .filter(DiaryEntryComment::isActive)
                 .orElseThrow(DiaryCommentNotFoundException::new);
         entry(comment.getDiaryEntryId(), context);
-        canonicalAuthor(comment.getAuthorId(), context);
+        context.canonicalAuthor(comment.getAuthorId());
         return comment;
     }
 
     private DiaryEntry entry(long entryId, DiaryContext context) {
         DiaryEntry entry = liveEntry(entryId);
-        canonicalAuthor(entry.getAuthorId(), context);
+        context.canonicalAuthor(entry.getAuthorId());
         return entry;
     }
 
@@ -286,60 +269,6 @@ class DiaryService {
                 new ReplaceDiaryEntryMediaCommand(actorId, entryId, uploadIds)));
     }
 
-    private DiaryEntryListItemResponse listItem(
-            DiaryEntry entry,
-            DiaryContext context,
-            List<DiaryMediaResponse> media,
-            long commentCount) {
-        ParticipantReference author = canonicalAuthor(entry.getAuthorId(), context);
-        return new DiaryEntryListItemResponse(
-                entry.getId(),
-                DiaryParticipantResponse.from(author),
-                entry.getContent(),
-                entry.getCreatedAt(),
-                entry.getUpdatedAt(),
-                author.id() == context.actor().id(),
-                media,
-                commentCount);
-    }
-
-    private DiaryCommentResponse commentResponse(
-            DiaryEntryComment comment,
-            DiaryContext context) {
-        ParticipantReference author = canonicalAuthor(comment.getAuthorId(), context);
-        return new DiaryCommentResponse(
-                comment.getId(),
-                DiaryParticipantResponse.from(author),
-                comment.getContent(),
-                comment.getCreatedAt(),
-                comment.getUpdatedAt(),
-                author.id() == context.actor().id());
-    }
-
-    private static DiaryEntryCommentCreatedResponse createdCommentResponse(
-            DiaryEntryComment comment,
-            ParticipantReference author) {
-        return new DiaryEntryCommentCreatedResponse(
-                comment.getId(),
-                DiaryParticipantResponse.from(author),
-                comment.getContent(),
-                comment.getCreatedAt(),
-                comment.getUpdatedAt(),
-                true);
-    }
-
-    private static DiaryEntryCommentUpdatedResponse updatedCommentResponse(
-            DiaryEntryComment comment,
-            ParticipantReference author) {
-        return new DiaryEntryCommentUpdatedResponse(
-                comment.getId(),
-                DiaryParticipantResponse.from(author),
-                comment.getContent(),
-                comment.getCreatedAt(),
-                comment.getUpdatedAt(),
-                true);
-    }
-
     private DiaryContext context(long actorId) {
         CanonicalParticipantPair pair;
         try {
@@ -354,14 +283,6 @@ class DiaryService {
         return new DiaryContext(canonicalActor, recipient, pair);
     }
 
-    private static ParticipantReference canonicalAuthor(
-            long authorId,
-            DiaryContext context) {
-        return context.participants()
-                .findById(authorId)
-                .orElseThrow(DiaryUnavailableException::new);
-    }
-
     private Instant now() {
         return Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
     }
@@ -369,6 +290,16 @@ class DiaryService {
     private record DiaryContext(
             ParticipantReference actor,
             ParticipantReference recipient,
-            CanonicalParticipantPair participants) {}
+            CanonicalParticipantPair participants) {
+
+        ParticipantReference canonicalAuthor(long authorId) {
+            return participants.findById(authorId)
+                    .orElseThrow(DiaryUnavailableException::new);
+        }
+
+        DiaryAuthorship authorshipOf(long authorId) {
+            return DiaryAuthorship.of(canonicalAuthor(authorId), actor);
+        }
+    }
 
 }
