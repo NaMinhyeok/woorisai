@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.woorisai.support.error.ApiErrorAdvice;
+import com.woorisai.testing.PublishedSchema;
 import com.woorisai.support.paging.PageResponse;
 import com.woorisai.support.paging.Paging;
 import java.time.Instant;
@@ -97,7 +98,8 @@ class DiaryControllerTest {
                 .andExpect(jsonPath("$.paging.pageNumber").value(2))
                 .andExpect(jsonPath("$.results[0].id").value(41))
                 .andExpect(jsonPath("$.results[0].attachments[0].id")
-                        .value(UPLOAD_ID.toString()));
+                        .value(UPLOAD_ID.toString()))
+                .andExpect(PublishedSchema.matches("DiaryEntryListResponse"));
         mvc.perform(post("/api/v2/diary-entries")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -108,23 +110,27 @@ class DiaryControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.id").value(41));
+                .andExpect(jsonPath("$.id").value(41))
+                .andExpect(PublishedSchema.matches("DiaryEntryResponse"));
         mvc.perform(get("/api/v2/diary-entries/41"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.comments[0].id").value(51));
+                .andExpect(jsonPath("$.comments[0].id").value(51))
+                .andExpect(PublishedSchema.matches("DiaryEntryDetailResponse"));
         mvc.perform(patch("/api/v2/diary-entries/41")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"mediaUploadIds\":[]}"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.toString()));
+                .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.toString()))
+                .andExpect(PublishedSchema.matches("DiaryEntryUpdatedResponse"));
         mvc.perform(patch("/api/v2/diary-entries/41")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":null,\"mediaUploadIds\":[]}"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.toString()));
+                .andExpect(jsonPath("$.updatedAt").value(UPDATED_AT.toString()))
+                .andExpect(PublishedSchema.matches("DiaryEntryUpdatedResponse"));
         mvc.perform(delete("/api/v2/diary-entries/41"))
                 .andExpect(status().isNoContent())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"));

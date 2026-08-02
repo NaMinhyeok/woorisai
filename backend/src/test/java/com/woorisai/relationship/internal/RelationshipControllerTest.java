@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.woorisai.support.error.ApiErrorAdvice;
+import com.woorisai.testing.PublishedSchema;
 import com.woorisai.support.paging.PageResponse;
 import com.woorisai.support.paging.Paging;
 import java.time.Instant;
@@ -92,31 +93,36 @@ class RelationshipControllerTest {
                 .andExpect(jsonPath("$.self.slot").value(1))
                 .andExpect(jsonPath("$.partner.displayName").value("Fixture Two"))
                 .andExpect(jsonPath("$.outgoing.currentScore").value(51))
-                .andExpect(jsonPath("$.incoming.currentScore").value(70));
+                .andExpect(jsonPath("$.incoming.currentScore").value(70))
+                .andExpect(PublishedSchema.matches("RelationshipScoresResponse"));
 
         mvc.perform(get("/api/v2/score-changes"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(jsonPath("$.results[0].id").value(20))
-                .andExpect(jsonPath("$.paging.pageNumber").value(1));
+                .andExpect(jsonPath("$.paging.pageNumber").value(1))
+                .andExpect(PublishedSchema.matches("ScoreChangeHistoryResponse"));
 
         mvc.perform(post("/api/v2/score-changes")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"delta\":1,\"reason\":\"hello\",\"mediaUploadIds\":[]}"))
                 .andExpect(status().isCreated())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.change.resultingScore").value(51));
+                .andExpect(jsonPath("$.change.resultingScore").value(51))
+                .andExpect(PublishedSchema.matches("ScoreChangeCreatedResponse"));
 
         mvc.perform(get("/api/v2/score-changes/20"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.comments[0].content").value("hello"));
+                .andExpect(jsonPath("$.comments[0].content").value("hello"))
+                .andExpect(PublishedSchema.matches("ScoreChangeThreadResponse"));
 
         mvc.perform(post("/api/v2/score-changes/20/comments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"hello\",\"mediaUploadIds\":[]}"))
                 .andExpect(status().isCreated())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.comment.id").value(30));
+                .andExpect(jsonPath("$.comment.id").value(30))
+                .andExpect(PublishedSchema.matches("ScoreChangeCommentCreatedResponse"));
 
         verify(service).scoreChanges(ACTOR, 1);
         verify(service).changeScore(

@@ -44,6 +44,7 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
 
     developmentOnly("com.h2database:h2")
+    testImplementation("com.networknt:json-schema-validator:1.5.6")
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
