@@ -24,7 +24,7 @@ class DiaryController {
     @GetMapping(
             path = "/api/v2/diary-entries",
             produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<PageResponse<DiaryEntryListItemResponse>> listEntries(
+    ResponseEntity<PageResponse<DiaryEntryResponse>> listEntries(
             @AuthenticationPrincipal(errorOnInvalidType = true) Long actorId,
             @RequestParam(name = "pageNumber", defaultValue = "1") int pageNumber) {
         requirePositive(pageNumber);
@@ -37,7 +37,7 @@ class DiaryController {
             path = "/api/v2/diary-entries",
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<DiaryEntryCreatedResponse> createEntry(
+    ResponseEntity<DiaryEntryResponse> createEntry(
             @AuthenticationPrincipal(errorOnInvalidType = true) Long actorId,
             @RequestBody CreateDiaryEntryRequest request) {
         CreateDiaryEntryCommand command = requireRequest(request).toCommand();
@@ -88,7 +88,7 @@ class DiaryController {
             path = "/api/v2/diary-entries/{entryId}/comments",
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<DiaryEntryCommentCreatedResponse> createComment(
+    ResponseEntity<DiaryCommentResponse> createComment(
             @AuthenticationPrincipal(errorOnInvalidType = true) Long actorId,
             @PathVariable("entryId") long entryId,
             @RequestBody CreateDiaryCommentRequest request) {
@@ -103,7 +103,7 @@ class DiaryController {
             path = "/api/v2/diary-entry-comments/{commentId}",
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<DiaryEntryCommentUpdatedResponse> updateComment(
+    ResponseEntity<DiaryCommentUpdatedResponse> updateComment(
             @AuthenticationPrincipal(errorOnInvalidType = true) Long actorId,
             @PathVariable("commentId") long commentId,
             @RequestBody UpdateDiaryCommentRequest request) {

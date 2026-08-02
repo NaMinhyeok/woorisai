@@ -132,13 +132,13 @@ class DiaryConcurrencyPostgresTest {
                     ENTRY_ID,
                     CreateDiaryCommentCommand.from("second concurrent comment")));
 
-            DiaryEntryCommentCreatedResponse secondResult = second.get(5, TimeUnit.SECONDS);
+            DiaryCommentResponse secondResult = second.get(5, TimeUnit.SECONDS);
             assertThat(secondResult.content()).isEqualTo("second concurrent comment");
             assertThat(first.isDone()).isFalse();
             assertThat(commentCount()).isOne();
 
             releaseFirst.countDown();
-            DiaryEntryCommentCreatedResponse firstResult = first.get(5, TimeUnit.SECONDS);
+            DiaryCommentResponse firstResult = first.get(5, TimeUnit.SECONDS);
 
             assertThat(firstResult.content()).isEqualTo("first concurrent comment");
             assertThat(commentCount()).isEqualTo(2);
@@ -274,7 +274,7 @@ class DiaryConcurrencyPostgresTest {
             assertThat(delete.isDone()).isFalse();
 
             releaseUpdate.countDown();
-            DiaryEntryCommentUpdatedResponse updated = update.get(5, TimeUnit.SECONDS);
+            DiaryCommentUpdatedResponse updated = update.get(5, TimeUnit.SECONDS);
             Object deleteOutcome = delete.get(5, TimeUnit.SECONDS);
 
             assertThat(updated.content()).isEqualTo("updated comment");

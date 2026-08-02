@@ -1,5 +1,7 @@
 package com.woorisai.diary.internal;
 
+import static com.woorisai.diary.internal.DiaryRevisions.requireRevision;
+
 import com.woorisai.media.AttachedMedia;
 import com.woorisai.participant.ParticipantReference;
 import java.time.Instant;
@@ -66,6 +68,19 @@ record DiaryAuthorship(DiaryParticipantResponse author, boolean isMine) {
     }
 }
 
+final class DiaryRevisions {
+
+    private DiaryRevisions() {}
+
+    // Only the author revises, and revising stamps updatedAt. The published *UpdatedResponse
+    // schemas encode both as isMine: true and a non-nullable updatedAt.
+    static void requireRevision(Instant updatedAt, boolean isMine) {
+        if (updatedAt == null || !isMine) {
+            throw new IllegalArgumentException("Revised diary response is invalid");
+        }
+    }
+}
+
 record DiaryMediaResponse(
         UUID id,
         String kind,
@@ -83,7 +98,9 @@ record DiaryMediaResponse(
     }
 }
 
-record DiaryEntryListItemResponse(
+// The read shape shared by the list, create and detail responses. `DiaryEntryResponse` is one
+// published schema serving all three, so one record serves them here too.
+record DiaryEntryResponse(
         long id,
         DiaryParticipantResponse author,
         String content,
@@ -93,16 +110,50 @@ record DiaryEntryListItemResponse(
         List<DiaryMediaResponse> attachments,
         long commentCount) {
 
-    DiaryEntryListItemResponse {
+    DiaryEntryResponse {
         attachments = List.copyOf(attachments);
     }
 
-    static DiaryEntryListItemResponse of(
+    static DiaryEntryResponse of(
             DiaryEntry entry,
             DiaryAuthorship authorship,
             List<DiaryMediaResponse> attachments,
             long commentCount) {
-        return new DiaryEntryListItemResponse(
+        return new DiaryEntryResponse(
+                entry.getId(),
+                authorship.author(),
+                entry.getContent(),
+                entry.getCreatedAt(),
+                entry.getUpdatedAt(),
+                authorship.isMine(),
+                attachments,
+                commentCount);
+    }
+}
+
+// A revision promises more than a read: the published schema pins isMine to true and makes
+// updatedAt non-nullable, because only the author revises and revising sets the timestamp.
+record DiaryEntryUpdatedResponse(
+        long id,
+        DiaryParticipantResponse author,
+        String content,
+        Instant createdAt,
+        Instant updatedAt,
+        boolean isMine,
+        List<DiaryMediaResponse> attachments,
+        long commentCount) {
+
+    DiaryEntryUpdatedResponse {
+        attachments = List.copyOf(attachments);
+        requireRevision(updatedAt, isMine);
+    }
+
+    static DiaryEntryUpdatedResponse of(
+            DiaryEntry entry,
+            DiaryAuthorship authorship,
+            List<DiaryMediaResponse> attachments,
+            long commentCount) {
+        return new DiaryEntryUpdatedResponse(
                 entry.getId(),
                 authorship.author(),
                 entry.getContent(),
@@ -133,7 +184,7 @@ record DiaryCommentResponse(
     }
 }
 
-record DiaryEntryCommentCreatedResponse(
+record DiaryCommentUpdatedResponse(
         long id,
         DiaryParticipantResponse author,
         String content,
@@ -141,66 +192,19 @@ record DiaryEntryCommentCreatedResponse(
         Instant updatedAt,
         boolean isMine) {
 
-    static DiaryEntryCommentCreatedResponse of(
+    DiaryCommentUpdatedResponse {
+        requireRevision(updatedAt, isMine);
+    }
+
+    static DiaryCommentUpdatedResponse of(
             DiaryEntryComment comment, DiaryAuthorship authorship) {
-        return new DiaryEntryCommentCreatedResponse(
+        return new DiaryCommentUpdatedResponse(
                 comment.getId(),
                 authorship.author(),
                 comment.getContent(),
                 comment.getCreatedAt(),
                 comment.getUpdatedAt(),
                 authorship.isMine());
-    }
-}
-
-record DiaryEntryCommentUpdatedResponse(
-        long id,
-        DiaryParticipantResponse author,
-        String content,
-        Instant createdAt,
-        Instant updatedAt,
-        boolean isMine) {
-
-    static DiaryEntryCommentUpdatedResponse of(
-            DiaryEntryComment comment, DiaryAuthorship authorship) {
-        return new DiaryEntryCommentUpdatedResponse(
-                comment.getId(),
-                authorship.author(),
-                comment.getContent(),
-                comment.getCreatedAt(),
-                comment.getUpdatedAt(),
-                authorship.isMine());
-    }
-}
-
-record DiaryEntryCreatedResponse(
-        long id,
-        DiaryParticipantResponse author,
-        String content,
-        Instant createdAt,
-        Instant updatedAt,
-        boolean isMine,
-        List<DiaryMediaResponse> attachments,
-        long commentCount) {
-
-    DiaryEntryCreatedResponse {
-        attachments = List.copyOf(attachments);
-    }
-
-    static DiaryEntryCreatedResponse of(
-            DiaryEntry entry,
-            DiaryAuthorship authorship,
-            List<DiaryMediaResponse> attachments,
-            long commentCount) {
-        return new DiaryEntryCreatedResponse(
-                entry.getId(),
-                authorship.author(),
-                entry.getContent(),
-                entry.getCreatedAt(),
-                entry.getUpdatedAt(),
-                authorship.isMine(),
-                attachments,
-                commentCount);
     }
 }
 
@@ -235,36 +239,5 @@ record DiaryEntryDetailResponse(
                 attachments,
                 comments.size(),
                 comments);
-    }
-}
-
-record DiaryEntryUpdatedResponse(
-        long id,
-        DiaryParticipantResponse author,
-        String content,
-        Instant createdAt,
-        Instant updatedAt,
-        boolean isMine,
-        List<DiaryMediaResponse> attachments,
-        long commentCount) {
-
-    DiaryEntryUpdatedResponse {
-        attachments = List.copyOf(attachments);
-    }
-
-    static DiaryEntryUpdatedResponse of(
-            DiaryEntry entry,
-            DiaryAuthorship authorship,
-            List<DiaryMediaResponse> attachments,
-            long commentCount) {
-        return new DiaryEntryUpdatedResponse(
-                entry.getId(),
-                authorship.author(),
-                entry.getContent(),
-                entry.getCreatedAt(),
-                entry.getUpdatedAt(),
-                authorship.isMine(),
-                attachments,
-                commentCount);
     }
 }
