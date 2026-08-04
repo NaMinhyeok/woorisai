@@ -683,6 +683,36 @@ final class WoorisaiLaunchTests: XCTestCase {
     dismissKeyboard(in: app)
   }
 
+  func testDiaryWithoutCommentsKeepsTheEmptyConversationVisibleOnOpen() {
+    let app = launch(scenario: "diaryWithoutComments")
+    enterPIN("0123", participantSlot: 1, in: app)
+    openDiaryTab(in: app)
+    openDiaryDetail(entryID: 701, in: app)
+
+    let diaryContent = app.staticTexts.matching(
+      NSPredicate(format: "label CONTAINS %@", "댓글이 없을 때는 일기 본문부터")
+    ).firstMatch
+    XCTAssertTrue(diaryContent.waitForExistence(timeout: 5))
+    XCTAssertTrue(
+      diaryContent.isHittable,
+      "댓글이 없는 일기는 상세 진입 직후 일기 본문부터 보여야 합니다."
+    )
+  }
+
+  func testDiaryWithCommentsShowsTheLatestCommentOnOpen() {
+    let app = launch(scenario: "diaryCRUD")
+    enterPIN("0123", participantSlot: 1, in: app)
+    openDiaryTab(in: app)
+    openDiaryDetail(entryID: 501, in: app)
+
+    let latestComment = element("diary.comment.602", in: app)
+    XCTAssertTrue(latestComment.waitForExistence(timeout: 5))
+    XCTAssertTrue(
+      latestComment.isHittable,
+      "댓글이 있는 일기는 상세 진입 직후 최신 댓글이 보여야 합니다."
+    )
+  }
+
   func testSlotTwoReversesDirectionalScoresAndDiaryOwnership() {
     let app = launch(scenario: "adaptiveContent")
     enterPIN("0123", participantSlot: 2, in: app)

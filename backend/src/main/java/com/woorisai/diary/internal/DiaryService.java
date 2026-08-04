@@ -44,14 +44,14 @@ class DiaryService {
     private final Clock clock;
 
     @Transactional(readOnly = true)
-    PageResponse<DiaryEntryListItemResponse> listEntries(long actorId, int pageNumber) {
+    PageResponse<DiaryEntryResponse> listEntries(long actorId, int pageNumber) {
         DiaryContext context = context(actorId);
         Page<DiaryEntry> page = entries.findAllByDeletedAtIsNullOrderByCreatedAtDescIdDesc(
                 PageRequest.of(pageNumber - 1, PAGE_SIZE));
         List<DiaryEntry> content = page.getContent();
         Map<Long, Long> commentCounts = commentCounts(content);
         Map<Long, List<DiaryMediaResponse>> media = attachments(content);
-        return PageResponse.of(page, entry -> DiaryEntryListItemResponse.of(
+        return PageResponse.of(page, entry -> DiaryEntryResponse.of(
                 entry,
                 context.authorshipOf(entry.getAuthorId()),
                 media.get(entry.getId()),
@@ -78,7 +78,7 @@ class DiaryService {
     }
 
     @Transactional
-    DiaryEntryCreatedResponse createEntry(
+    DiaryEntryResponse createEntry(
             long actorId,
             CreateDiaryEntryCommand command) {
         DiaryContext context = context(actorId);
@@ -87,7 +87,7 @@ class DiaryService {
         replaceDiaryMedia(
                 context.actor().id(), entry.getId(), command.mediaUploadIds().values());
         List<DiaryMediaResponse> media = attachments(List.of(entry)).get(entry.getId());
-        return DiaryEntryCreatedResponse.of(
+        return DiaryEntryResponse.of(
                 entry, context.authorshipOf(entry.getAuthorId()), media, 0);
     }
 
@@ -125,7 +125,7 @@ class DiaryService {
     }
 
     @Transactional
-    DiaryEntryCommentCreatedResponse createComment(
+    DiaryCommentResponse createComment(
             long actorId,
             long entryId,
             CreateDiaryCommentCommand command) {
@@ -143,12 +143,12 @@ class DiaryService {
                 now()));
         events.publishEvent(new DiaryEntryCommentCreated(
                 context.recipient().id(), entryId));
-        return DiaryEntryCommentCreatedResponse.of(
+        return DiaryCommentResponse.of(
                 comment, context.authorshipOf(comment.getAuthorId()));
     }
 
     @Transactional
-    DiaryEntryCommentUpdatedResponse updateComment(
+    DiaryCommentUpdatedResponse updateComment(
             long actorId,
             long commentId,
             UpdateDiaryCommentCommand command) {
@@ -156,7 +156,7 @@ class DiaryService {
         DiaryEntryComment comment = commentWithParent(commentId, context);
         comment.reviseBy(context.actor().id(), command.content(), now());
         flushComments();
-        return DiaryEntryCommentUpdatedResponse.of(
+        return DiaryCommentUpdatedResponse.of(
                 comment, context.authorshipOf(comment.getAuthorId()));
     }
 

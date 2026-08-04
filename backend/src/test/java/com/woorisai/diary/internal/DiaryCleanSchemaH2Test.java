@@ -105,7 +105,7 @@ class DiaryCleanSchemaH2Test {
 
     @Test
     void entryCrudPreservesPatchMeaningOwnershipAndDatabaseCascades() {
-        DiaryEntryCreatedResponse created = diary.createEntry(
+        DiaryEntryResponse created = diary.createEntry(
                 FIRST,
                 CreateDiaryEntryCommand.from(
                         "\t 함께 남길 기록 \u3000",
@@ -151,7 +151,7 @@ class DiaryCleanSchemaH2Test {
         assertThatThrownBy(() -> diary.deleteEntry(SECOND, created.id()))
                 .isInstanceOf(DiaryMutationForbiddenException.class);
 
-        DiaryEntryCommentCreatedResponse comment = diary.createComment(
+        DiaryCommentResponse comment = diary.createComment(
                 SECOND,
                 created.id(),
                 CreateDiaryCommentCommand.from("댓글"));
@@ -211,7 +211,7 @@ class DiaryCleanSchemaH2Test {
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM woorisai.diary_entry", Long.class)).isZero();
 
-        DiaryEntryCreatedResponse created = diary.createEntry(
+        DiaryEntryResponse created = diary.createEntry(
                 FIRST, CreateDiaryEntryCommand.from("original", List.of()));
         media.failNext(new MediaAttachmentUnavailableException());
 
@@ -243,9 +243,9 @@ class DiaryCleanSchemaH2Test {
     void commentsAreFlatOrderedAuthorOwnedAndOnlyCreationPublishes() {
         long entryId = diary.createEntry(
                 FIRST, CreateDiaryEntryCommand.from("entry", List.of())).id();
-        DiaryEntryCommentCreatedResponse first = diary.createComment(
+        DiaryCommentResponse first = diary.createComment(
                 SECOND, entryId, CreateDiaryCommentCommand.from(" first "));
-        DiaryEntryCommentCreatedResponse second = diary.createComment(
+        DiaryCommentResponse second = diary.createComment(
                 FIRST, entryId, CreateDiaryCommentCommand.from("second"));
 
         assertThat(applicationEvents.stream(DiaryEntryCommentCreated.class).toList())
@@ -256,7 +256,7 @@ class DiaryCleanSchemaH2Test {
                         FIRST, first.id(), UpdateDiaryCommentCommand.from("forbidden")))
                 .isInstanceOf(DiaryMutationForbiddenException.class);
 
-        DiaryEntryCommentUpdatedResponse updated = diary.updateComment(
+        DiaryCommentUpdatedResponse updated = diary.updateComment(
                 SECOND, first.id(), UpdateDiaryCommentCommand.from(" updated "));
         assertThat(updated.content()).isEqualTo("updated");
         assertThat(updated.updatedAt()).isNotNull();
@@ -288,22 +288,22 @@ class DiaryCleanSchemaH2Test {
 
     @Test
     void softDeletedEntriesLeaveTheListAndTheirCommentsGoWithThem() {
-        DiaryEntryCreatedResponse kept = diary.createEntry(
+        DiaryEntryResponse kept = diary.createEntry(
                 FIRST, CreateDiaryEntryCommand.from("kept entry", List.of()));
-        DiaryEntryCreatedResponse removed = diary.createEntry(
+        DiaryEntryResponse removed = diary.createEntry(
                 FIRST, CreateDiaryEntryCommand.from("removed entry", List.of()));
-        DiaryEntryCommentCreatedResponse orphaned = diary.createComment(
+        DiaryCommentResponse orphaned = diary.createComment(
                 SECOND, removed.id(), CreateDiaryCommentCommand.from("goes with the parent"));
 
         assertThat(diary.listEntries(FIRST, 1).results())
-                .extracting(DiaryEntryListItemResponse::id)
+                .extracting(DiaryEntryResponse::id)
                 .containsExactly(removed.id(), kept.id());
 
         diary.deleteEntry(FIRST, removed.id());
 
-        PageResponse<DiaryEntryListItemResponse> list = diary.listEntries(FIRST, 1);
+        PageResponse<DiaryEntryResponse> list = diary.listEntries(FIRST, 1);
         assertThat(list.results())
-                .extracting(DiaryEntryListItemResponse::id)
+                .extracting(DiaryEntryResponse::id)
                 .containsExactly(kept.id());
         assertThat(list.paging().totalCount()).isOne();
 
@@ -343,8 +343,8 @@ class DiaryCleanSchemaH2Test {
                 "image/png",
                 512)));
 
-        PageResponse<DiaryEntryListItemResponse> firstPage = diary.listEntries(FIRST, 1);
-        PageResponse<DiaryEntryListItemResponse> secondPage = diary.listEntries(FIRST, 2);
+        PageResponse<DiaryEntryResponse> firstPage = diary.listEntries(FIRST, 1);
+        PageResponse<DiaryEntryResponse> secondPage = diary.listEntries(FIRST, 2);
 
         assertThat(firstPage.results()).hasSize(20);
         assertThat(firstPage.results().getFirst().id()).isEqualTo(10_021);
@@ -355,7 +355,7 @@ class DiaryCleanSchemaH2Test {
                 .containsExactly(FIRST_UPLOAD);
         assertThat(firstPage.paging()).isEqualTo(new Paging(1, 20, true, 21));
         assertThat(secondPage.results())
-                .extracting(DiaryEntryListItemResponse::id)
+                .extracting(DiaryEntryResponse::id)
                 .containsExactly(10_001L);
         assertThat(secondPage.paging().hasNext()).isFalse();
     }
@@ -373,7 +373,7 @@ class DiaryCleanSchemaH2Test {
                 SECOND, "2026-07-21T00:00:00Z");
 
         assertThat(diary.listEntries(FIRST, 1).results())
-                .extracting(DiaryEntryListItemResponse::id)
+                .extracting(DiaryEntryResponse::id)
                 .containsExactly(10_002L, 10_001L);
     }
 

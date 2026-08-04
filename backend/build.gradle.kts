@@ -44,6 +44,7 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
 
     developmentOnly("com.h2database:h2")
+    testImplementation("com.networknt:json-schema-validator:1.5.6")
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
@@ -68,6 +69,15 @@ dependencyLocking {
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
+}
+
+val openApiSpec = layout.projectDirectory.file("../contracts/openapi-v2.yaml")
+
+// ErrorCatalogTest reads the published contract instead of restating it, so the spec is an input
+// of every test task: editing it alone must be able to fail the build.
+tasks.withType<Test>().configureEach {
+    systemProperty("woorisai.contract.openapi", openApiSpec.asFile.absolutePath)
+    inputs.file(openApiSpec).withPropertyName("openApiSpec").withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 tasks.named<Test>("test") {

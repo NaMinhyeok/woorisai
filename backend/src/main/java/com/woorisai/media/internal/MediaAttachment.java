@@ -107,19 +107,19 @@ class MediaAttachment {
     }
 
     void attachScoreChange(long parentId) {
-        requireReadyAndParentless();
+        requireAttachableAs(MediaPurpose.SCORE_CHANGE);
         scoreChangeId = parentId;
         position = 0;
     }
 
     void attachScoreComment(long parentId, short requestedPosition) {
-        requireReadyAndParentless();
+        requireAttachableAs(MediaPurpose.SCORE_CHANGE_COMMENT);
         scoreChangeCommentId = parentId;
         position = requestedPosition;
     }
 
     void attachDiaryEntry(long parentId, short requestedPosition) {
-        requireReadyAndParentless();
+        requireAttachableAs(MediaPurpose.DIARY_ENTRY);
         diaryEntryId = parentId;
         position = requestedPosition;
     }
@@ -164,7 +164,11 @@ class MediaAttachment {
         return count;
     }
 
-    private void requireReadyAndParentless() {
+    private void requireAttachableAs(MediaPurpose parent) {
+        if (purpose != parent) {
+            throw new IllegalStateException(
+                    "A " + purpose + " upload cannot be attached to a " + parent + " parent");
+        }
         if (status != MediaStatus.READY || !isParentless()) {
             throw new IllegalStateException("Only parentless ready media can be attached");
         }

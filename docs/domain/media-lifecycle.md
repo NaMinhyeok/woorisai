@@ -81,6 +81,9 @@ Attachment 정본은 DB이며 이 상황을 보완하려 custom CAS/lease/reconc
 
 - UUID row를 잠그고 중복, uploader, purpose, parentless `READY`, kind mix와 count를 다시
   검증한다.
+- Purpose와 parent 열의 대응은 `MediaAttachment`가 소유한다. `attachScoreChange`,
+  `attachScoreComment`와 `attachDiaryEntry`는 자신의 purpose가 아닌 upload를 거부하므로,
+  service 검증을 우회한 경로도 조회 불가능한 parented row를 만들 수 없다.
 - Score change는 image 하나를 position 0에 붙인다.
 - Score comment는 request 순서대로 image 최대 네 개 또는 video 하나를 붙인다.
 - Diary create는 exact list를 붙인다.
