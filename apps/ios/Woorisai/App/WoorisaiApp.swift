@@ -1077,6 +1077,7 @@ private struct UnavailableNotificationInstallationIDProvider:
       case diaryEditorUnknownOutcomeWithPush
       case diaryMediaEditorUnknownOutcome
       case diaryUnknownOutcome
+      case diaryWithoutComments
       case emptyContent
       case failureThenSuccess
       case loading
@@ -1119,6 +1120,10 @@ private struct UnavailableNotificationInstallationIDProvider:
       diaryComments = DebugDiaryFixtures.comments
       if scenario == .diaryMediaEditorUnknownOutcome {
         diaryEntry = DebugDiaryFixtures.mediaEntry
+      }
+      if scenario == .diaryWithoutComments {
+        diaryEntry = DebugDiaryFixtures.entryWithoutComments
+        diaryComments = []
       }
       if let verificationToken = Self.argumentValue(
         named: Self.verificationTokenArgumentName,
@@ -1277,7 +1282,7 @@ private struct UnavailableNotificationInstallationIDProvider:
       case .diaryCRUD, .diaryConflict, .diaryEditorUnknownOutcome,
         .diaryEditorInconclusiveOutcome,
         .diaryEditorUnknownOutcomeWithPush, .diaryMediaEditorUnknownOutcome,
-        .diaryUnknownOutcome:
+        .diaryUnknownOutcome, .diaryWithoutComments:
         baseEntry = diaryEntry
       case .emptyContent:
         baseEntry = nil
@@ -1332,7 +1337,7 @@ private struct UnavailableNotificationInstallationIDProvider:
       case .diaryCRUD, .diaryConflict, .diaryEditorUnknownOutcome,
         .diaryEditorInconclusiveOutcome,
         .diaryEditorUnknownOutcomeWithPush, .diaryMediaEditorUnknownOutcome,
-        .diaryUnknownOutcome, .emptyContent:
+        .diaryUnknownOutcome, .diaryWithoutComments, .emptyContent:
         guard let diaryEntry else { throw WoorisaiAPIError.notFound }
         baseDetail = DiaryEntryDetail(entry: diaryEntry, comments: diaryComments)
       default:
@@ -1948,6 +1953,21 @@ private struct UnavailableNotificationInstallationIDProvider:
       isMine: true,
       attachments: mediaAttachments,
       commentCount: 2
+    )
+    static let entryWithoutComments = DiaryEntry(
+      id: 701,
+      author: author,
+      content: "댓글이 없을 때는 일기 본문부터 읽을 수 있어야 해요. "
+        + String(
+          repeating:
+            "이 기록은 화면을 넘어가도 대화가 아직 시작되지 않았더라도 작성한 내용을 자연스럽게 이어서 확인할 수 있어야 합니다. 자동 스크롤이 빈 대화 영역으로 이동해 본문을 숨기지 않아야 해요. ",
+          count: 12
+        ),
+      createdAt: DebugRelationshipFixtures.timestamp,
+      updatedAt: DebugRelationshipFixtures.timestamp.addingTimeInterval(10),
+      isMine: true,
+      attachments: [],
+      commentCount: 0
     )
     static let comments = [
       DiaryComment(

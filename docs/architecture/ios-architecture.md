@@ -223,6 +223,14 @@ Refresh는 이미 표시된 dashboard, feed와 detail을 비우거나 scroll 위
 최신 댓글로 이동한다. 자신이 방금 보낸 댓글만 commit 확인 후 입력을 비우고 최신 위치로 이동한다.
 "내가 보낸 것"의 판별은 표시 문구가 아니라 typed event가 실어 주는 comment ID로 한다.
 
+두 대화 화면은 최신 위치로 갈 때 개별 댓글이 아니라 콘텐츠 끝의 1pt sentinel을 목표로 하고,
+`Task.yield()` 직후와 약 120ms 뒤 두 번 이동한다. `scrollTo`는 geometry가 이미 알려진 target에만
+정확히 착지하는데 `LazyVStack`의 마지막 댓글은 첫 layout 시점에 실체화되지 않아 추정값으로
+움직이며, 단일 pass는 lazy 콘텐츠가 등록되기 전에 끝나 최신 댓글을 화면 밖에 남긴다. 같은 이유로
+keyboard 위 입력 바의 `safeAreaInset`은 조상 view가 아니라 `ScrollView`에 붙인다 — 조상에 붙이면
+ScrollView가 인식하는 가시 영역 하단이 실제와 달라져 착지점이 입력 바 뒤로 파묻힌다. 착지점은
+sentinel이므로 콘텐츠 하단 padding은 최신 댓글과 입력 바 사이의 빈 틈으로 읽힌다.
+
 대화형 comment 초안은 화면 state가 아니라 model이 scoreChange/entry 단위로 보관한다. 그래서
 글을 쓰다 나가도 초안이 남고, 한 글자 입력했다는 이유로 뒤로가기와 스와이프 백을 없애지
 않는다. 화면 이탈을 잠그는 것은 제출 중, 결과 불명, 그리고 아직 보내지 않은 media가 있을 때뿐이다

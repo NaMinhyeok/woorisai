@@ -20,6 +20,12 @@ struct DiaryDetailView: View {
     case comment
   }
 
+  /// One-point sentinel pinned to the end of the conversation. `scrollTo` can only land exactly
+  /// on a target whose geometry is already known, and the last bubble in a `LazyVStack` has not
+  /// been materialized when the screen first lays out — aiming at it scrolls to an estimate and
+  /// overshoots past the newest comment, so the reader has to drag back up.
+  private static let latestAnchor = "diary.detail.latest"
+
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.dismiss) private var dismiss
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -484,24 +490,40 @@ struct DiaryDetailView: View {
                   .accessibilityIdentifier("diary.comment.\(comment.id)")
                 }
               }
+
+              Color.clear
+                .frame(height: 1)
+                .id(Self.latestAnchor)
+                .accessibilityHidden(true)
             }
             .frame(maxWidth: 680)
             .padding(.horizontal, WoorisaiSpacing.screenGutter)
             .padding(.top, WoorisaiSpacing.medium)
-            .padding(.bottom, WoorisaiSpacing.xLarge)
+            // The bottom sentinel is the scroll target, so this padding sits *below* the landing
+            // point: anything larger reads as a gap between the newest comment and the composer.
+            .padding(.bottom, WoorisaiSpacing.regular)
             .frame(maxWidth: .infinity)
             .dismissesKeyboardOnBackgroundTap()
           }
         }
         .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+          commentComposerBar
+        }
         .refreshable {
           await model.refreshDetail(entryID: entryID)
         }
         .task(id: entryID) {
-          await Task.yield()
-          if let lastID = chronologicalComments.last?.id {
-            proxy.scrollTo(lastID, anchor: .bottom)
+          guard !chronologicalComments.isEmpty else {
+            hasPositionedInitialComments = true
+            return
           }
+          await Task.yield()
+          scrollToLatest(using: proxy, animated: false)
+          // Second pass after layout settles: the first attempt can fire before the lazy content
+          // has registered the bottom sentinel, leaving the newest comment off screen.
+          try? await Task.sleep(for: .milliseconds(120))
+          scrollToLatest(using: proxy, animated: false)
           hasPositionedInitialComments = true
         }
         .onChange(of: chronologicalComments.map(\.id)) { oldIDs, newIDs in
@@ -520,7 +542,7 @@ struct DiaryDetailView: View {
           // not steal the reading position — it gets the "새 댓글 보기" button instead.
           if newID == lastSentCommentID {
             pendingNewCommentID = nil
-            scrollToComment(newID, using: proxy)
+            scrollToLatest(using: proxy, animated: true)
           } else {
             pendingNewCommentID = newID
           }
@@ -544,9 +566,6 @@ struct DiaryDetailView: View {
           }
         }
       }
-    }
-    .safeAreaInset(edge: .bottom, spacing: 0) {
-      commentComposerBar
     }
     // No toast host here: DiaryView owns one host for the whole navigation stack.
     // Scoped to this entry: the diary list stays mounted behind this pushed detail, so an unscoped
@@ -590,6 +609,17 @@ struct DiaryDetailView: View {
     // The API adapter rejects non-chronological detail responses, and model mutations preserve
     // that order. Re-sorting here would otherwise run for every observable draft keystroke.
     model.selectedDetail?.comments ?? []
+  }
+
+  private func scrollToLatest(using proxy: ScrollViewProxy, animated: Bool) {
+    guard model.selectedDetail?.entry.id == entryID else { return }
+    if animated, !reduceMotion {
+      withAnimation(.easeOut(duration: 0.22)) {
+        proxy.scrollTo(Self.latestAnchor, anchor: .bottom)
+      }
+    } else {
+      proxy.scrollTo(Self.latestAnchor, anchor: .bottom)
+    }
   }
 
   private func scrollToComment(_ commentID: Int64, using proxy: ScrollViewProxy) {
