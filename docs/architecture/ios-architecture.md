@@ -129,20 +129,38 @@ purge한다. Scene이 inactive 또는 background가 되면 neutral privacy cover
 state를 먼저 비우고 새 preview load를 막은 뒤 진행 중 작업, cache와 전용 directory를 모두
 정리한다.
 
-저장된 사진과 업로드 preview는 같은 gallery geometry를 사용한다. 한 장은 4:3, 두 장 이상은
-정사각 mosaic, video는 16:9 tile을 기본으로 하며 inline tile에서는 `aspectFill`과 clipping으로
-박스와 이미지 사이 빈 영역을 만들지 않는다. 원본 비율 확인이 필요한 full-screen viewer에서는
-`aspectFit`으로 portrait, landscape와 panorama 전체를 보존하고 pinch, pan, double tap과
-VoiceOver adjustable action으로 확대한다. 회전과 확대 배율 변경 때 pan offset을 다시 제한해
-사진이 화면 밖에 남지 않게 한다. 이 presentation 선택은 wire 계약이나 attachment cardinality를
-바꾸지 않는다. Video는 feed traversal 중 자동 download하지 않고 사용자가 16:9 tile을 누를 때만
-준비한다. 준비된 파일은 temporary filename을 노출하는 system preview 대신 앱이 소유한
-`AVPlayer`/`AVPlayerLayer` full-screen viewer에서 원본 비율로 재생한다. 재생·일시 정지,
-현재/전체 길이를 말하는 VoiceOver 진행값, 명시적인 닫기와 사진 앱 저장 action을 제공하고 임의
-목적지로 내보내는 공유 시트는 두지 않는다. 진행 상태 갱신은 재생 중에만 수행하고 Scene이
-active가 아니면 즉시 멈춰 privacy cover 아래에 유지한다. Decoder가 파일을 열지 못하면 검은 화면에 머물지 않고 오류와 닫기, 파일 다시
-받기를 제공한다. 다시 받기는 손상된 session cache lease의 discard가 끝난 뒤 새 download를
-시작해 같은 파일을 재사용하는 경합을 막는다.
+저장된 사진과 업로드 preview는 같은 gallery geometry를 사용한다. 첨부가 하나면 kind에 맞는
+모양을 쓰고(image 4:3, video 16:9), 둘 이상이면 kind와 무관하게 정사각 mosaic이다. 한 group에
+image와 video가 섞일 수 있으므로 두 비율을 동시에 만족시킬 방법이 없고, "video가 하나라도
+있으면 video layout"이라는 이전 규칙은 mosaic의 나머지 첨부를 화면에서 지웠다. Inline tile은
+`aspectFill`과 clipping으로 박스와 이미지 사이 빈 영역을 만들지 않는다.
+
+Full-screen viewer는 개별 첨부가 아니라 group을 소유한다. 어느 tile로 열어도 그 첨부에서
+시작하고 나머지는 좌우 swipe로 이동하며, 저장·위치·닫기 chrome은 page가 아니라 shell에 둔다 —
+사진과 함께 밀려나면 정작 필요한 순간에 닿을 수 없다. Tile이 viewer를 소유하던 구조에서는
+presentation이 넘겨받은 첨부 하나만 알아서 같은 group의 다음 사진을 보려면 닫고 다시 열어야
+했다. 위치는 점 indicator가 아니라 "2 / 4" 카운터로 표시한다. Chrome이 임의의 사진 위에 놓이는
+만큼 밝은 배경에서 가장 먼저 사라지는 것이 저대비 점이다. Zoom 중인 page의 pan gesture는 확대
+상태에서만 활성화한다. 그러지 않으면 수평 drag마다 pan과 page swipe가 경쟁해 둘 다 신뢰할 수
+없어진다.
+
+원본 비율 확인이 필요한 full-screen viewer에서는 `aspectFit`으로 portrait, landscape와 panorama
+전체를 보존하고 pinch, pan, double tap과 VoiceOver adjustable action으로 확대한다. 회전과 확대
+배율 변경 때 pan offset을 다시 제한해 사진이 화면 밖에 남지 않게 한다. 이 presentation 선택은
+wire 계약이나 attachment cardinality를 바꾸지 않는다. 현재 page만 viewer 해상도로 다시 decode
+하고 이웃 page는 preview 해상도를 유지한다 — 네 장짜리 group을 전부 viewer 해상도로 들고 있으면
+보고 있지도 않은 사진에 수백 MB의 bitmap을 쓴다.
+
+Video는 feed traversal 중 자동 download하지 않고 사용자가 tile을 누를 때만 준비한다. Viewer
+안에서는 현재 page가 될 때가 그 시점이며, image page는 swipe가 spinner에 닿지 않도록 미리
+받는다. 준비된 파일은 temporary filename을 노출하는 system preview 대신 앱이 소유한
+`AVPlayer`/`AVPlayerLayer` viewer page에서 원본 비율로 재생한다. 재생·일시 정지, 현재/전체
+길이를 말하는 VoiceOver 진행값과 사진 앱 저장 action을 제공하고 임의 목적지로 내보내는 공유
+시트는 두지 않는다. 진행 상태 갱신은 재생 중에만 수행하고 Scene이 active가 아니거나 사용자가
+다른 page로 넘어가면 즉시 멈춘다 — page는 살아 있어도 화면 밖 video가 계속 소리를 내면 안 된다.
+Decoder가 파일을 열지 못하면 검은 화면에 머물지 않고 오류와 파일 다시 받기를 제공한다. 다시
+받기는 viewer를 닫지 않고 손상된 session cache lease의 discard가 끝난 뒤 새 download를 시작해
+같은 파일을 재사용하는 경합을 막는다.
 
 첨부 source는 사진 보관함(Photos picker), 카메라 촬영과 파일 앱 세 가지이며 하나의 paperclip
 menu 뒤에 둔다. 세 source는 같은 준비 경로와 같은 정책 검증을 통과한다 — 입구만 늘리고 허용
@@ -195,7 +213,10 @@ media를 내보내는 유일한 경로이며, 저장된 asset은 session을 넘�
 없고, 반대로 함께 남긴 기록을 각자 기기에 보관하지 못하는 제약은 제품 목적과 어긋난다. 이
 결정은 [media lifecycle](../domain/media-lifecycle.md)이 함께 소유한다. 저장은 새 download
 grant를 발급하지 않고 viewer가 이미 검증한 lease file을 그대로 쓰며, `addOnly` 권한만 요청해
-보관함 읽기 권한은 얻지 않는다. iOS는 한 번 거부된 권한을 다시 묻지 못하게 하므로 거부 상태는
+보관함 읽기 권한은 얻지 않는다. 저장 model은 group 전체가 공유하되 자신이 쓴 첨부를 이름으로
+들고 있는다. Photos write는 취소할 수 없어 다음 사진으로 넘어가도 진행 중인 저장이 멈추지 않고,
+주체를 밝히지 않으면 저장되지 않은 사진 위에 "저장했어요"가 뜬다 — 중복 저장과 조용히 빠진
+저장이 정확히 여기서 생긴다. iOS는 한 번 거부된 권한을 다시 묻지 못하게 하므로 거부 상태는
 원인을 밝히고 Settings 경로를 제시한 뒤 사용자가 조치할 때까지 화면에 남긴다. 임의 목적지로
 내보내는 공유 시트는 두지 않는다 — 저장 목적지가 사용자 자신의 보관함으로 한정될 때와 달리
 어디로 나갈지 앱이 알 수 없다.

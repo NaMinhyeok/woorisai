@@ -465,35 +465,25 @@ struct DiaryEntryComposer: View {
           symbol: "photo.on.rectangle"
         )
 
-        MediaAttachmentGallery(
-          items: retainedAttachments,
-          kind: { $0.contentType.lowercased().hasPrefix("image/") ? .image : .video }
-        ) { attachment, format in
-          MediaAttachmentPreview(
-            attachmentID: attachment.id,
-            fileName: attachment.fileName,
-            contentType: attachment.contentType,
-            byteSize: attachment.byteSize,
-            tileFormat: format,
-            onAuthenticationRequired: onAuthenticationRequired
-          )
-          .overlay(alignment: .topTrailing) {
-            Button(role: .destructive) {
-              onRemoveRetainedAttachment(attachment.id)
-            } label: {
-              Image(systemName: "trash.fill")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(WoorisaiColor.Fg.staticWhite)
-                .frame(
-                  width: WoorisaiControlMetric.minimumTapTarget,
-                  height: WoorisaiControlMetric.minimumTapTarget
-                )
-                .background(WoorisaiColor.Bg.scrim, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .padding(WoorisaiSpacing.xSmall)
-            .accessibilityLabel("\(attachment.fileName) 첨부에서 제거")
+        MediaAttachmentPreviewGallery(
+          attachments: retainedAttachments.map(MediaAttachmentDescriptor.init),
+          onAuthenticationRequired: onAuthenticationRequired
+        ) { attachment in
+          Button(role: .destructive) {
+            onRemoveRetainedAttachment(attachment.id)
+          } label: {
+            Image(systemName: "trash.fill")
+              .font(.caption.weight(.bold))
+              .foregroundStyle(WoorisaiColor.Fg.staticWhite)
+              .frame(
+                width: WoorisaiControlMetric.minimumTapTarget,
+                height: WoorisaiControlMetric.minimumTapTarget
+              )
+              .background(WoorisaiColor.Bg.scrim, in: Circle())
           }
+          .buttonStyle(.plain)
+          .padding(WoorisaiSpacing.xSmall)
+          .accessibilityLabel("\(attachment.fileName) 첨부에서 제거")
         }
       }
       .padding(WoorisaiSpacing.regular)

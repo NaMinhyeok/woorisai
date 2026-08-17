@@ -10,8 +10,14 @@ business rule은 [불변식](invariants.md)을 따른다.
 | Purpose | 허용 kind/type | 개별 최대 | Parent 제한 |
 | --- | --- | --- | --- |
 | `SCORE_CHANGE` | JPEG, PNG, WebP image | 10 MiB | Image 0~1개 |
-| `SCORE_CHANGE_COMMENT` | 위 image 또는 MP4, WebM, QuickTime video | Image 10 MiB, video 100 MiB | Image 0~4개 또는 video 1개 |
-| `DIARY_ENTRY` | 위 image 또는 MP4, WebM, QuickTime video | Image 10 MiB, video 100 MiB | Image 0~4개 또는 video 1개 |
+| `SCORE_CHANGE_COMMENT` | 위 image 또는 MP4, WebM, QuickTime video | Image 10 MiB, video 100 MiB | 합계 0~4개, 그중 video 최대 1개 |
+| `DIARY_ENTRY` | 위 image 또는 MP4, WebM, QuickTime video | Image 10 MiB, video 100 MiB | 합계 0~4개, 그중 video 최대 1개 |
+
+Image와 video는 한 group에 함께 붙을 수 있다. Kind가 아니라 개수가 상한이며, video만 따로
+1개로 제한한다. Video는 image의 열 배 크기라 group 하나가 client preview cache 상한을 넘기지
+않도록 묶어 두는 값이고, 이 상한을 올린다면 `PrivateMediaPreviewStore`의 cache 예산을 같은
+작업에서 함께 조정해야 한다. 이 group 규칙의 정본은 `MediaAttachmentGroupPolicy`이며 write와
+read 양쪽이 같은 gate를 통과한다 — 규칙을 좁히면 이미 저장된 group이 읽히지 않는다.
 
 Filename은 path를 제거한 nonblank 최대 255 code point이고 control character를 허용하지 않는다.
 Content type parameter는 제거하고 lowercase로 normalize한다. Expected size는 1 이상이며 complete

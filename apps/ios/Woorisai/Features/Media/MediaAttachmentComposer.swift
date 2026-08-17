@@ -396,7 +396,7 @@ enum MediaAttachmentRuleViolation: Error, Equatable, Sendable {
   case videoNotAllowed
   case tooManyImages(maximum: Int)
   case onlyOneVideoAllowed
-  case mixedMediaNotAllowed
+  case tooManyAttachments(maximum: Int)
 }
 
 struct MediaAttachmentPolicy: Equatable, Sendable {
@@ -415,8 +415,7 @@ struct MediaAttachmentPolicy: Equatable, Sendable {
     case .scoreChange:
       return max(0, 1 - existingKinds.count)
     case .comment, .diaryEntry:
-      if existingKinds.contains(.video) { return 0 }
-      return max(0, 4 - existingKinds.count)
+      return max(0, Self.flexibleMaximum - existingKinds.count)
     }
   }
 
@@ -430,25 +429,19 @@ struct MediaAttachmentPolicy: Equatable, Sendable {
         throw MediaAttachmentRuleViolation.tooManyImages(maximum: 1)
       }
     case .comment, .diaryEntry:
-      if existingKinds.contains(.video) {
-        if kind == .video {
-          throw MediaAttachmentRuleViolation.onlyOneVideoAllowed
-        }
-        throw MediaAttachmentRuleViolation.mixedMediaNotAllowed
+      if kind == .video, existingKinds.contains(.video) {
+        throw MediaAttachmentRuleViolation.onlyOneVideoAllowed
       }
-
-      if kind == .video {
-        guard existingKinds.isEmpty else {
-          throw MediaAttachmentRuleViolation.mixedMediaNotAllowed
-        }
-        return
-      }
-
-      guard existingKinds.count < 4 else {
-        throw MediaAttachmentRuleViolation.tooManyImages(maximum: 4)
+      guard existingKinds.count < Self.flexibleMaximum else {
+        throw MediaAttachmentRuleViolation.tooManyAttachments(maximum: Self.flexibleMaximum)
       }
     }
   }
+
+  /// Mirrors `MediaAttachmentGroupPolicy.Group.FLEXIBLE` on the server, which is the authority.
+  /// The client copy exists to refuse a selection before it costs an upload, never to permit one
+  /// the server would reject.
+  static let flexibleMaximum = 4
 }
 
 @MainActor
@@ -530,24 +523,17 @@ final class MediaAttachmentComposerModel {
   }
 
   func importPickerItems(_ pickerItems: [PhotosPickerItem]) {
-    // Judge the mix on the WHOLE selection up front. Per-item validation processed photos
+    // Judge the video count on the WHOLE selection up front. Per-item validation processed photos
     // first and then silently dropped the video mid-batch — the user saw their photos attach
-    // and their video vanish with only a transient banner.
-    let advertisesVideo = pickerItems.contains { item in
+    // and their video vanish with only a transient banner. Photos and video may now share a
+    // group, so the only batch-level rule left is how many videos it carries.
+    let selectedVideoCount = pickerItems.filter { item in
       item.supportedContentTypes.contains(where: Self.isPotentialPickerVideoType)
-    }
-    let advertisesImage = pickerItems.contains { item in
-      item.supportedContentTypes.contains(where: Self.isSupportedPickerImageType)
-    }
-    if advertisesVideo {
-      if advertisesImage {
-        importFailure = .rule(.mixedMediaNotAllowed)
-        return
-      }
-      if pickerItems.count > 1 {
-        importFailure = .rule(.onlyOneVideoAllowed)
-        return
-      }
+    }.count
+    let attachedVideoCount = allKinds.filter { $0 == .video }.count
+    if selectedVideoCount + attachedVideoCount > 1 {
+      importFailure = .rule(.onlyOneVideoAllowed)
+      return
     }
     startImport(pickerItems, prepare: Self.preparePickerItem)
   }
@@ -1848,8 +1834,8 @@ extension MediaAttachmentComposerModel.ImportFailure {
       return "사진은 최대 \(maximum)장까지 첨부할 수 있어요."
     case .rule(.onlyOneVideoAllowed):
       return "동영상은 한 개만 첨부할 수 있어요."
-    case .rule(.mixedMediaNotAllowed):
-      return "사진과 동영상을 함께 첨부할 수 없어요."
+    case .rule(.tooManyAttachments(let maximum)):
+      return "첨부는 최대 \(maximum)개까지 할 수 있어요."
     }
   }
 }
@@ -1944,7 +1930,14 @@ struct MediaAspectFitImageSurface: View {
         committedOffset = offset
       }
       .gesture(magnifyGesture(imageSize: imageSize, containerSize: proxy.size))
-      .simultaneousGesture(dragGesture(imageSize: imageSize, containerSize: proxy.size))
+      // The pan only exists to move a zoomed image, but a live DragGesture competes with the
+      // viewer's page swipe for every horizontal drag. Masking it out at fit scale hands
+      // unzoomed drags to the pager, and restoring it at zoom keeps the pan from turning into a
+      // page turn while the user is looking around a photo.
+      .simultaneousGesture(
+        dragGesture(imageSize: imageSize, containerSize: proxy.size),
+        including: scale > 1 ? .all : .subviews
+      )
       .onTapGesture(count: 2) {
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
           if scale > 1 {
@@ -2418,56 +2411,39 @@ struct MediaAttachmentPreview: View {
   @Environment(\.privateMediaPreviewLoader) private var previewLoader
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @State private var model: PrivateMediaPreviewModel
-  @State private var isImageViewerPresented = false
-  @State private var isVideoViewerPresented = false
-  @State private var opensImageViewerAfterLoading = false
-  @State private var shouldReloadVideoAfterDismiss = false
-  @State private var isMounted = false
-  /// Viewer-resolution decode of the original file. The tile's `model.image` is decode-bounded
-  /// for scrolling; the full view supports 5x zoom, which upscaled that bounded bitmap into a
-  /// visibly blurry image while "사진 앱에 저장" wrote the sharp original.
-  @State private var viewerImage: UIImage?
-  /// Outlives the viewer presentations — see MediaLibrarySaveControl.model.
-  @State private var librarySaveModel = MediaLibrarySaveModel()
 
-  let attachmentID: UUID
-  let fileName: String
-  let contentType: String
-  let byteSize: Int64
+  let descriptor: MediaAttachmentDescriptor
   let tileFormat: MediaInlineTileFormat
   let onAuthenticationRequired: @MainActor () -> Void
+  /// The tile reports a tap and stops there. Full-screen presentation belongs to the gallery,
+  /// which is the only layer that knows the attachment's siblings and can therefore page.
+  let onOpenViewer: @MainActor (UUID) -> Void
 
   @MainActor
   init(
-    attachmentID: UUID,
-    fileName: String,
-    contentType: String,
-    byteSize: Int64,
+    descriptor: MediaAttachmentDescriptor,
     tileFormat: MediaInlineTileFormat? = nil,
-    onAuthenticationRequired: @escaping @MainActor () -> Void
+    onAuthenticationRequired: @escaping @MainActor () -> Void,
+    onOpenViewer: @escaping @MainActor (UUID) -> Void
   ) {
-    self.attachmentID = attachmentID
-    self.fileName = fileName
-    self.contentType = contentType
-    self.byteSize = byteSize
-    self.tileFormat =
-      tileFormat
-      ?? (contentType.lowercased().hasPrefix("image/") ? .singleImage : .video)
+    self.descriptor = descriptor
+    self.tileFormat = tileFormat ?? (descriptor.isImage ? .singleImage : .video)
+    self.onAuthenticationRequired = onAuthenticationRequired
+    self.onOpenViewer = onOpenViewer
     _model = State(
       initialValue: PrivateMediaPreviewModel(
         descriptor: PrivateMediaPreviewDescriptor(
-          attachmentID: attachmentID,
-          fileName: fileName,
-          contentType: contentType,
-          byteSize: byteSize
+          attachmentID: descriptor.id,
+          fileName: descriptor.fileName,
+          contentType: descriptor.contentType,
+          byteSize: descriptor.byteSize
         )
       )
     )
-    self.onAuthenticationRequired = onAuthenticationRequired
   }
 
   var body: some View {
-    Button(action: openOrLoad) {
+    Button(action: openOrRetry) {
       MediaTileSurface {
         ZStack {
           previewBackground
@@ -2501,123 +2477,23 @@ struct MediaAttachmentPreview: View {
         }
       }
       .aspectRatio(tileFormat.aspectRatio, contentMode: .fit)
-      .accessibilityIdentifier("media.tile.\(attachmentID.uuidString).surface")
+      .accessibilityIdentifier("media.tile.\(descriptor.id.uuidString).surface")
     }
     .buttonStyle(.plain)
     .accessibilityLabel(previewAccessibilityLabel)
     .accessibilityValue(previewAccessibilityValue)
     .accessibilityHint("비공개 파일을 앱 안에서 안전하게 미리 봅니다.")
-    .accessibilityIdentifier("media.inline.\(attachmentID.uuidString)")
-    .task(id: attachmentID) {
-      if isImage, model.localURL == nil, model.state == .idle {
+    .accessibilityIdentifier("media.inline.\(descriptor.id.uuidString)")
+    .task(id: descriptor.id) {
+      if descriptor.isImage, model.localURL == nil, model.state == .idle {
         model.load(using: previewLoader, decodeMaxPixelSize: tileFormat.decodeMaxPixelSize)
       }
     }
     .onChange(of: model.state) { _, state in
-      switch state {
-      case .loaded:
-        if isImage, opensImageViewerAfterLoading, model.localURL != nil {
-          opensImageViewerAfterLoading = false
-          isImageViewerPresented = true
-        } else if !isImage {
-          isVideoViewerPresented = model.localURL != nil
-        }
-      case .authenticationRequired:
-        opensImageViewerAfterLoading = false
-        onAuthenticationRequired()
-      case .idle, .notFound, .unavailable, .invalidContent, .failed:
-        opensImageViewerAfterLoading = false
-      case .loading:
-        break
-      }
-    }
-    .fullScreenCover(isPresented: $isImageViewerPresented) {
-      ZStack {
-        WoorisaiColor.Bg.immersive.ignoresSafeArea()
-
-        if let image = viewerImage ?? model.image {
-          MediaAspectFitImageSurface(
-            image: image,
-            accessibilityName: "첨부 사진 \(fileName) 전체 보기"
-          )
-          .padding(.vertical, WoorisaiSpacing.xLarge)
-          .accessibilityIdentifier("media.viewer")
-        }
-      }
-      .task {
-        guard viewerImage == nil, let localURL = model.localURL else { return }
-        // 4,096px covers a 3x screen at the viewer's maximum zoom while still bounding decoded
-        // memory for oversized originals.
-        viewerImage = await Task.detached(priority: .userInitiated) {
-          MediaImagePreview.thumbnail(fromFileAt: localURL, maximumPixelSize: 4_096)
-        }.value
-      }
-      .onDisappear {
-        viewerImage = nil
-      }
-      .overlay(alignment: .topLeading) {
-        if let localURL = model.localURL,
-          MediaLibrarySaveModel.supportsPhotoLibrary(contentType: contentType)
-        {
-          MediaLibrarySaveControl(model: librarySaveModel, fileURL: localURL, isImage: true)
-            .padding(WoorisaiSpacing.regular)
-        }
-      }
-      .overlay(alignment: .topTrailing) {
-        Button {
-          isImageViewerPresented = false
-        } label: {
-          Image(systemName: "xmark")
-            .font(.body.weight(.bold))
-            .foregroundStyle(WoorisaiColor.Fg.staticWhite)
-            .frame(
-              width: WoorisaiControlMetric.minimumTapTarget,
-              height: WoorisaiControlMetric.minimumTapTarget
-            )
-            .background(WoorisaiColor.Bg.scrim, in: Circle())
-        }
-        .buttonStyle(.plain)
-        .padding(WoorisaiSpacing.regular)
-        .accessibilityLabel("사진 전체 보기 닫기")
-        .accessibilityIdentifier("media.viewer.close")
-      }
-    }
-    .fullScreenCover(
-      isPresented: $isVideoViewerPresented,
-      onDismiss: {
-        guard shouldReloadVideoAfterDismiss, isMounted else {
-          shouldReloadVideoAfterDismiss = false
-          return
-        }
-        shouldReloadVideoAfterDismiss = false
-        model.reloadDiscardingCurrentLease(using: previewLoader, decodeMaxPixelSize: tileFormat.decodeMaxPixelSize)
-      }
-    ) {
-      if let localURL = model.localURL {
-        PrivateVideoViewer(
-          url: localURL,
-          fileName: fileName,
-          contentType: contentType,
-          librarySaveModel: librarySaveModel,
-          onRetry: {
-            shouldReloadVideoAfterDismiss = true
-            isVideoViewerPresented = false
-          },
-          onClose: {
-            isVideoViewerPresented = false
-          }
-        )
-      }
-    }
-    .onAppear {
-      isMounted = true
+      guard state == .authenticationRequired else { return }
+      onAuthenticationRequired()
     }
     .onDisappear {
-      isMounted = false
-      opensImageViewerAfterLoading = false
-      shouldReloadVideoAfterDismiss = false
-      isImageViewerPresented = false
-      isVideoViewerPresented = false
       model.clear()
     }
     .accessibilityElement(children: .contain)
@@ -2638,13 +2514,13 @@ struct MediaAttachmentPreview: View {
         }
     } else {
       ZStack {
-        WoorisaiColor.bg(.init(isImage: isImage))
+        WoorisaiColor.bg(.init(isImage: descriptor.isImage))
 
         VStack(spacing: WoorisaiSpacing.small) {
-          Image(systemName: isImage ? "photo.fill" : "play.circle.fill")
-            .font(.system(size: isImage ? 34 : 42))
-            .foregroundStyle(WoorisaiColor.fg(.init(isImage: isImage)))
-          Text(fileName)
+          Image(systemName: descriptor.isImage ? "photo.fill" : "play.circle.fill")
+            .font(.system(size: descriptor.isImage ? 34 : 42))
+            .foregroundStyle(WoorisaiColor.fg(.init(isImage: descriptor.isImage)))
+          Text(descriptor.fileName)
             .font(.footnote.weight(.semibold))
             .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
             .lineLimit(1)
@@ -2654,13 +2530,10 @@ struct MediaAttachmentPreview: View {
     }
   }
 
-  private var isImage: Bool {
-    contentType.lowercased().hasPrefix("image/")
-  }
-
   private var previewAccessibilityLabel: String {
-    guard model.localURL != nil else { return "첨부 파일 \(fileName) 불러오기" }
-    return isImage ? "첨부 사진 \(fileName) 크게 보기" : "첨부 동영상 \(fileName) 열기"
+    guard descriptor.isImage else { return "첨부 동영상 \(descriptor.fileName) 열기" }
+    guard model.localURL != nil else { return "첨부 사진 \(descriptor.fileName) 불러오기" }
+    return "첨부 사진 \(descriptor.fileName) 크게 보기"
   }
 
   private var failureMessage: String? {
@@ -2676,30 +2549,20 @@ struct MediaAttachmentPreview: View {
 
   private var previewAccessibilityValue: String {
     if model.state == .loading {
-      return isImage ? "사진을 불러오는 중" : "동영상을 준비하는 중, 누르면 취소"
+      return "사진을 불러오는 중"
     }
     return failureMessage ?? ""
   }
 
-  private func openOrLoad() {
-    if model.localURL != nil {
-      if isImage {
-        isImageViewerPresented = true
-      } else {
-        isVideoViewerPresented = true
-      }
-    } else if isImage {
-      opensImageViewerAfterLoading = true
-      if model.state != .loading {
-        model.load(using: previewLoader, decodeMaxPixelSize: tileFormat.decodeMaxPixelSize)
-      }
-    } else if model.state == .loading {
-      // A video download (up to 100 MB) previously offered no way out but scrolling the tile
-      // off screen. Tapping the loading tile again cancels it.
-      model.clear()
-    } else {
-      model.load(using: previewLoader, decodeMaxPixelSize: tileFormat.decodeMaxPixelSize)
+  /// A tile whose own thumbnail failed is asking to be retried, not opened — the viewer would
+  /// reach the same store and surface the same failure one layer deeper. Everything else is a
+  /// request to see the group full screen, including a video the tile never downloads.
+  private func openOrRetry() {
+    guard descriptor.isImage, failureMessage != nil else {
+      onOpenViewer(descriptor.id)
+      return
     }
+    model.load(using: previewLoader, decodeMaxPixelSize: tileFormat.decodeMaxPixelSize)
   }
 }
 
@@ -2709,22 +2572,25 @@ struct MediaAttachmentPreview: View {
 /// The control keeps its own outcome copy instead of routing through `WoorisaiToast`: the toast is
 /// success-only by design (it hardcodes a checkmark), and a blocked permission is exactly the case
 /// the user must be told about.
-private struct MediaLibrarySaveControl: View {
-  /// Owned by the attachment tile, not this control: a Photos write cannot be cancelled, so a
-  /// save that outlives a dismissed viewer must keep its outcome visible on the next open —
-  /// otherwise the user saves again and duplicates the asset.
+struct MediaLibrarySaveControl: View {
+  /// Owned by the viewer, not this control: a Photos write cannot be cancelled, so a save that
+  /// outlives a dismissed viewer must keep its outcome visible on the next open — otherwise the
+  /// user saves again and duplicates the asset.
   let model: MediaLibrarySaveModel
 
+  /// The attachment this control speaks for. The model is shared across the whole group, so an
+  /// outcome is only this control's to show when the model wrote this subject.
+  let subjectID: UUID
   let fileURL: URL
   let isImage: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
       Button {
-        model.save(fileURL: fileURL, isImage: isImage)
+        model.save(subjectID: subjectID, fileURL: fileURL, isImage: isImage)
       } label: {
         Group {
-          if model.state == .saving {
+          if isSaving {
             ProgressView()
               .tint(WoorisaiColor.Fg.staticWhite)
           } else {
@@ -2743,6 +2609,8 @@ private struct MediaLibrarySaveControl: View {
       .disabled(model.state == .saving)
       .accessibilityLabel(isImage ? "사진을 사진 앱에 저장" : "동영상을 사진 앱에 저장")
       .accessibilityIdentifier("media.viewer.save")
+      // Disabled while any subject is being written — a second write cannot start anyway, and a
+      // live-looking button that does nothing is worse than one that says so.
 
       if let outcome = outcomeMessage {
         VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
@@ -2782,7 +2650,12 @@ private struct MediaLibrarySaveControl: View {
     // finishes regardless. Resetting here only erased the outcome and invited a duplicate save.
   }
 
+  private var isSaving: Bool {
+    model.state == .saving && model.subjectID == subjectID
+  }
+
   private var outcomeMessage: (message: String, offersSettingsLink: Bool)? {
+    guard model.subjectID == subjectID else { return nil }
     switch model.state {
     case .idle, .saving:
       return nil
@@ -2809,7 +2682,11 @@ private struct MediaLibrarySaveControl: View {
   }
 }
 
-private struct PrivateVideoViewer: View {
+/// Playback surface for one video inside the viewer.
+///
+/// Save and close belong to the viewer shell: this is one page among several, and chrome that
+/// slid off with the video would be unreachable exactly when a mixed group made it necessary.
+struct PrivateVideoViewer: View {
   @Environment(\.scenePhase) private var scenePhase
   @State private var player: AVPlayer
   @State private var currentSeconds = 0.0
@@ -2820,26 +2697,21 @@ private struct PrivateVideoViewer: View {
 
   let fileURL: URL
   let fileName: String
-  let contentType: String
-  let librarySaveModel: MediaLibrarySaveModel
+  /// A page the user swiped away from keeps its player alive but must not keep making sound.
+  let isCurrent: Bool
   let onRetry: () -> Void
-  let onClose: () -> Void
 
   init(
     url: URL,
     fileName: String,
-    contentType: String,
-    librarySaveModel: MediaLibrarySaveModel,
-    onRetry: @escaping () -> Void,
-    onClose: @escaping () -> Void
+    isCurrent: Bool,
+    onRetry: @escaping () -> Void
   ) {
     _player = State(initialValue: AVPlayer(url: url))
     fileURL = url
     self.fileName = fileName
-    self.contentType = contentType
-    self.librarySaveModel = librarySaveModel
+    self.isCurrent = isCurrent
     self.onRetry = onRetry
-    self.onClose = onClose
   }
 
   var body: some View {
@@ -2913,30 +2785,6 @@ private struct PrivateVideoViewer: View {
       .background(WoorisaiColor.Bg.scrimStrong, in: RoundedRectangle(cornerRadius: WoorisaiRadius.medium))
       .padding(WoorisaiSpacing.regular)
     }
-    .overlay(alignment: .topLeading) {
-      if playbackFailureMessage == nil,
-        MediaLibrarySaveModel.supportsPhotoLibrary(contentType: contentType)
-      {
-        MediaLibrarySaveControl(model: librarySaveModel, fileURL: fileURL, isImage: false)
-          .padding(WoorisaiSpacing.regular)
-      }
-    }
-    .overlay(alignment: .topTrailing) {
-      Button(action: onClose) {
-        Image(systemName: "xmark")
-          .font(.body.weight(.bold))
-          .foregroundStyle(WoorisaiColor.Fg.staticWhite)
-          .frame(
-            width: WoorisaiControlMetric.minimumTapTarget,
-            height: WoorisaiControlMetric.minimumTapTarget
-          )
-          .background(WoorisaiColor.Bg.scrim, in: Circle())
-      }
-      .buttonStyle(.plain)
-      .padding(WoorisaiSpacing.regular)
-      .accessibilityLabel("동영상 전체 보기 닫기")
-      .accessibilityIdentifier("media.videoViewer.close")
-    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("media.videoViewer")
     .task {
@@ -2969,6 +2817,11 @@ private struct PrivateVideoViewer: View {
     }
     .onChange(of: scenePhase) { _, phase in
       if phase != .active {
+        pausePlayback()
+      }
+    }
+    .onChange(of: isCurrent) { _, current in
+      if !current {
         pausePlayback()
       }
     }

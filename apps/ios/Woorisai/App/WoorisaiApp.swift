@@ -1087,6 +1087,7 @@ private struct UnavailableNotificationInstallationIDProvider:
       case pagedHistoryFailure
       case mediaRich
       case mediaCorruptVideoThenRecovery
+      case mediaMixedGroup
       case relationship
       case relationshipCommentUnknownOutcomeWithPush
       case relationshipConflict
@@ -1213,6 +1214,7 @@ private struct UnavailableNotificationInstallationIDProvider:
         usesManyHistory: scenario == .manyHistory,
         usesPagedHistory: scenario == .pagedHistoryFailure,
         usesMedia: scenario == .mediaRich || scenario == .mediaCorruptVideoThenRecovery,
+        usesMixedMedia: scenario == .mediaMixedGroup,
         currentSlot: authenticatedSlot
       )
     }
@@ -1245,6 +1247,8 @@ private struct UnavailableNotificationInstallationIDProvider:
         thread = DebugRelationshipFixtures.longReasonThread
       case .mediaRich, .mediaCorruptVideoThenRecovery:
         thread = DebugRelationshipFixtures.mediaThread
+      case .mediaMixedGroup:
+        thread = DebugRelationshipFixtures.mixedMediaThread
       default:
         thread = DebugRelationshipFixtures.thread
       }
@@ -1720,9 +1724,62 @@ private struct UnavailableNotificationInstallationIDProvider:
       createdAt: timestamp.addingTimeInterval(2),
       attachments: [videoMedia]
     )
+    static let mixedVideoMedia = RelationshipMedia(
+      id: UUID(uuidString: "10000000-0000-0000-0000-000000000006")!,
+      kind: .video,
+      fileName: "mixed-memory.mp4",
+      contentType: "video/mp4",
+      byteSize: 2_679
+    )
+    static let mixedFirstImageMedia = RelationshipMedia(
+      id: UUID(uuidString: "10000000-0000-0000-0000-000000000007")!,
+      kind: .image,
+      fileName: "mixed-portrait-walk.jpg",
+      contentType: "image/jpeg",
+      byteSize: 32_000
+    )
+    static let mixedSecondImageMedia = RelationshipMedia(
+      id: UUID(uuidString: "10000000-0000-0000-0000-000000000008")!,
+      kind: .image,
+      fileName: "mixed-square-snack.jpg",
+      contentType: "image/jpeg",
+      byteSize: 32_000
+    )
+    /// A group holding both kinds, with the video in the middle.
+    ///
+    /// The layout used to pick the video shape whenever any video was present, and that shape
+    /// renders only the first attachment — a mixed group silently lost its neighbours. The video
+    /// sits at position 1 so a regression drops attachments on both sides of it.
+    ///
+    /// This lives in its own thread rather than alongside the other media comments. The thread
+    /// scrolls to its newest comment on entry, so appending here would push the existing fixtures
+    /// off screen and break tests that have nothing to do with mixing.
+    static let mediaMixedComment = RelationshipScoreComment(
+      id: 804,
+      author: partner,
+      content: "사진과 영상을 같이 올려도 하나도 빠지지 않아야 해요.",
+      createdAt: timestamp.addingTimeInterval(1),
+      attachments: [mixedFirstImageMedia, mixedVideoMedia, mixedSecondImageMedia]
+    )
     static let mediaThread = RelationshipScoreThread(
       change: mediaChange,
       comments: [mediaComment, mediaVideoComment]
+    )
+    static let mixedMediaChange = RelationshipScoreChange(
+      id: 801,
+      sourceParticipant: current,
+      targetParticipant: partner,
+      changedBy: current,
+      delta: 4,
+      resultingScore: 74,
+      reason: "함께 산책해서 마음이 몽글몽글해졌어",
+      createdAt: timestamp,
+      commentCount: 1,
+      attachments: []
+    )
+    static let mixedMediaThread = RelationshipScoreThread(
+      change: mixedMediaChange,
+      comments: [mediaMixedComment]
     )
 
     static func authenticatedParticipant(
@@ -1766,6 +1823,7 @@ private struct UnavailableNotificationInstallationIDProvider:
       usesManyHistory: Bool = false,
       usesPagedHistory: Bool = false,
       usesMedia: Bool = false,
+      usesMixedMedia: Bool = false,
       currentSlot: ParticipantSlot = .one
     ) -> RelationshipScoreChangePage {
       let firstPageChange: RelationshipScoreChange
@@ -1773,6 +1831,8 @@ private struct UnavailableNotificationInstallationIDProvider:
         firstPageChange = adaptiveChange
       } else if usesLongReason {
         firstPageChange = longReasonChange
+      } else if usesMixedMedia {
+        firstPageChange = mixedMediaChange
       } else if usesMedia {
         firstPageChange = mediaChange
       } else {
