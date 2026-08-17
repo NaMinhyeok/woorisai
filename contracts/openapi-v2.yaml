@@ -1505,8 +1505,8 @@ components:
           uniqueItems: true
           description: >-
             Completed, parentless SCORE_CHANGE_COMMENT uploads owned by the authenticated
-            participant. The final group is empty, up to four images, or exactly one video;
-            images and video cannot be mixed.
+            participant. The final group holds at most four attachments, of which at most one
+            may be a video; images and video may be mixed.
           items:
             $ref: "#/components/schemas/CanonicalUuid"
     ScoreChangeCommentCreatedResponse:
@@ -1554,8 +1554,8 @@ components:
           uniqueItems: true
           description: >-
             Completed, parentless DIARY_ENTRY uploads owned by the authenticated author.
-            The final group is empty, up to four images, or exactly one video; images and
-            video cannot be mixed.
+            The final group holds at most four attachments, of which at most one may be a
+            video; images and video may be mixed.
           items:
             $ref: "#/components/schemas/CanonicalUuid"
     UpdateDiaryEntryRequest:
@@ -1581,8 +1581,8 @@ components:
           description: >-
             Null or omission preserves attachments; an empty array clears them; otherwise
             this is the exact final ordered group. Newly attached uploads must be completed
-            DIARY_ENTRY uploads owned by the author. The final group is up to four images or
-            exactly one video; images and video cannot be mixed.
+            DIARY_ENTRY uploads owned by the author. The final group holds at most four
+            attachments, of which at most one may be a video; images and video may be mixed.
           items:
             $ref: "#/components/schemas/CanonicalUuid"
     CreateDiaryCommentRequest:

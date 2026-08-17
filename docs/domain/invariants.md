@@ -113,7 +113,8 @@ comment는 계속 함께 commit된다.
 - Image는 JPEG/PNG/WebP, video는 MP4/WebM/QuickTime을 지원한다.
 - Image 최대 크기는 10 MiB, video는 100 MiB다.
 - Score change는 image 0~1개다.
-- Score comment와 diary entry는 image 0~4개 또는 video 정확히 1개다. 혼합하지 않는다.
+- Score comment와 diary entry는 attachment 0~4개이며 그중 video는 최대 1개다. Image와 video를
+  함께 첨부할 수 있다.
 - Upload UUID는 unique하고 request 순서를 `position=0..n-1`로 보존한다.
 - Uploader, purpose와 kind는 parent write와 일치해야 한다.
 - Attachment mutation은 caller transaction에 mandatory로 참여한다.

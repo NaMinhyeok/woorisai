@@ -777,6 +777,11 @@ final class WoorisaiLaunchTests: XCTestCase {
       within: relationshipComment,
       in: app
     )
+    assertViewerPagesAcrossTheWholeGroup(
+      Self.relationshipMediaFixtures,
+      within: relationshipComment,
+      in: app
+    )
     let relationshipVideoComment = element("relationship.thread.comment.803", in: app)
     scrollToVisible(relationshipVideoComment, in: app, maximumSwipes: 20)
     assertVideoViewerRoundTrips(
@@ -793,6 +798,31 @@ final class WoorisaiLaunchTests: XCTestCase {
     assertSquareMediaTilesAndViewerRoundTrips(
       Self.diaryMediaFixtures,
       within: app,
+      in: app
+    )
+    assertViewerPagesAcrossTheWholeGroup(
+      Self.diaryMediaFixtures,
+      within: app,
+      in: app
+    )
+  }
+
+  func testMixedAttachmentGroupKeepsEveryKindAndPagesAcrossThem() {
+    let app = launch(scenario: "mediaMixedGroup")
+    enterPIN("0123", participantSlot: 1, in: app)
+    XCTAssertTrue(element("relationship.loaded", in: app).waitForExistence(timeout: 5))
+
+    // The whole card is now the navigation link; its center can land on an inner media tile
+    // button, which wins the tap. Tap the (non-interactive) reason text to navigate.
+    let mediaHistory = element("relationship.history.reason.801", in: app)
+    scrollToHittable(mediaHistory, in: app, maximumSwipes: 20)
+    mediaHistory.tap()
+    XCTAssertTrue(element("relationship.thread.loaded", in: app).waitForExistence(timeout: 5))
+
+    let mixedComment = element("relationship.thread.comment.804", in: app)
+    scrollToVisible(mixedComment, in: app, maximumSwipes: 20)
+    assertMixedGroupKeepsEveryAttachmentAndPagesAcrossKinds(
+      within: mixedComment,
       in: app
     )
   }
@@ -827,7 +857,7 @@ final class WoorisaiLaunchTests: XCTestCase {
       playPause.tap()
     }
     XCTAssertTrue(failure.waitForExistence(timeout: 10))
-    XCTAssertTrue(element("media.videoViewer.close", in: app).exists)
+    XCTAssertTrue(element("media.viewer.close", in: app).exists)
 
     let retry = element("media.videoViewer.retry", in: app)
     XCTAssertTrue(retry.waitForExistence(timeout: 5))
@@ -852,7 +882,7 @@ final class WoorisaiLaunchTests: XCTestCase {
       )
     )
 
-    let close = element("media.videoViewer.close", in: app)
+    let close = element("media.viewer.close", in: app)
     XCTAssertTrue(close.waitForExistence(timeout: 5))
     close.tap()
     XCTAssertTrue(viewer.waitForNonExistence(timeout: 5))
@@ -1520,6 +1550,161 @@ final class WoorisaiLaunchTests: XCTestCase {
     }
   }
 
+  /// Opening any tile in a group must reach the rest by swiping.
+  ///
+  /// The viewer used to belong to the tile, so it only ever held the one attachment it was handed
+  /// and every photo in a group cost a close and a re-open. This asserts the group — not the file
+  /// — is what the viewer moves through, in both directions, without being dismissed on the way.
+  private func assertViewerPagesAcrossTheWholeGroup(
+    _ fixtures: [MediaFixture],
+    within container: XCUIElement,
+    in app: XCUIApplication,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    guard let first = fixtures.first, fixtures.count > 1 else {
+      XCTFail("Paging needs a group of at least two attachments", file: file, line: line)
+      return
+    }
+
+    let entry = container.descendants(matching: .button).matching(
+      NSPredicate(format: "label CONTAINS %@", first.fileName)
+    ).firstMatch
+    XCTAssertTrue(entry.waitForExistence(timeout: 10), file: file, line: line)
+    scrollToHittable(entry, in: app, maximumSwipes: 20)
+    XCTAssertTrue(waitForEnabled(entry, timeout: 10), file: file, line: line)
+    entry.tap()
+
+    let position = element("media.viewer.position", in: app)
+    XCTAssertTrue(position.waitForExistence(timeout: 10), file: file, line: line)
+    XCTAssertEqual(
+      position.label,
+      "첨부 \(fixtures.count)개 중 1번째",
+      file: file,
+      line: line
+    )
+
+    for expected in 2...fixtures.count {
+      app.swipeLeft()
+      XCTAssertTrue(
+        waitForLabel(position, equalTo: "첨부 \(fixtures.count)개 중 \(expected)번째"),
+        "A swipe must advance the viewer to attachment \(expected) instead of closing it",
+        file: file,
+        line: line
+      )
+    }
+
+    for expected in stride(from: fixtures.count - 1, through: 1, by: -1) {
+      app.swipeRight()
+      XCTAssertTrue(
+        waitForLabel(position, equalTo: "첨부 \(fixtures.count)개 중 \(expected)번째"),
+        "Paging back must reach attachment \(expected)",
+        file: file,
+        line: line
+      )
+    }
+
+    let close = element("media.viewer.close", in: app)
+    XCTAssertTrue(close.waitForExistence(timeout: 5), file: file, line: line)
+    close.tap()
+    XCTAssertTrue(position.waitForNonExistence(timeout: 5), file: file, line: line)
+  }
+
+  /// A group holding both kinds must keep every attachment and page across them.
+  ///
+  /// The inline layout used to choose the video shape whenever any video was present, and that
+  /// shape renders only the first attachment — so a mixed group silently lost its neighbours
+  /// before the viewer was ever involved. The fixture puts the video between two photos so a
+  /// regression drops attachments on both sides of it.
+  private func assertMixedGroupKeepsEveryAttachmentAndPagesAcrossKinds(
+    within container: XCUIElement,
+    in app: XCUIApplication,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    let fileNames = [
+      "mixed-portrait-walk.jpg",
+      "mixed-memory.mp4",
+      "mixed-square-snack.jpg",
+    ]
+
+    for fileName in fileNames {
+      let tile = container.descendants(matching: .button).matching(
+        NSPredicate(format: "label CONTAINS %@", fileName)
+      ).firstMatch
+      XCTAssertTrue(
+        tile.waitForExistence(timeout: 10),
+        "\(fileName) must survive a group that also holds the other kind",
+        file: file,
+        line: line
+      )
+      scrollToHittable(tile, in: app, maximumSwipes: 20)
+      XCTAssertEqual(tile.frame.width, tile.frame.height, accuracy: 3, file: file, line: line)
+    }
+
+    let entry = container.descendants(matching: .button).matching(
+      NSPredicate(format: "label CONTAINS %@", fileNames[0])
+    ).firstMatch
+    scrollToHittable(entry, in: app, maximumSwipes: 20)
+    XCTAssertTrue(waitForEnabled(entry, timeout: 10), file: file, line: line)
+    entry.tap()
+
+    let position = element("media.viewer.position", in: app)
+    XCTAssertTrue(position.waitForExistence(timeout: 10), file: file, line: line)
+    XCTAssertEqual(position.label, "첨부 3개 중 1번째", file: file, line: line)
+
+    // Save, position and close share one row over an arbitrary photo. Overlapping chrome would
+    // put a control under another exactly where the user reaches for it.
+    let close = element("media.viewer.close", in: app)
+    XCTAssertTrue(close.waitForExistence(timeout: 5), file: file, line: line)
+    XCTAssertFalse(
+      position.frame.intersects(close.frame),
+      "The position counter must not sit under the close button",
+      file: file,
+      line: line
+    )
+    let save = element("media.viewer.save", in: app)
+    if save.waitForExistence(timeout: 10) {
+      XCTAssertFalse(
+        position.frame.intersects(save.frame),
+        "The position counter must not sit under the save button",
+        file: file,
+        line: line
+      )
+      XCTAssertFalse(
+        save.frame.intersects(close.frame),
+        "Save and close must not overlap",
+        file: file,
+        line: line
+      )
+    }
+
+    app.swipeLeft()
+    XCTAssertTrue(
+      waitForLabel(position, equalTo: "첨부 3개 중 2번째"),
+      "A swipe must reach the video sitting between two photos",
+      file: file,
+      line: line
+    )
+    XCTAssertTrue(
+      element("media.videoViewer.player", in: app).waitForExistence(timeout: 20),
+      "The video page must prepare its player once it becomes the current page",
+      file: file,
+      line: line
+    )
+
+    app.swipeLeft()
+    XCTAssertTrue(
+      waitForLabel(position, equalTo: "첨부 3개 중 3번째"),
+      "Paging past a video must continue to the photo after it",
+      file: file,
+      line: line
+    )
+
+    close.tap()
+    XCTAssertTrue(position.waitForNonExistence(timeout: 5), file: file, line: line)
+  }
+
   private func assertVideoViewerRoundTrips(
     attachmentID: String,
     fileName: String,
@@ -1561,7 +1746,7 @@ final class WoorisaiLaunchTests: XCTestCase {
       XCTAssertTrue(playPause.waitForExistence(timeout: 5), file: file, line: line)
       let progress = element("media.videoViewer.progress", in: app)
       XCTAssertTrue(progress.waitForExistence(timeout: 5), file: file, line: line)
-      let close = element("media.videoViewer.close", in: app)
+      let close = element("media.viewer.close", in: app)
       XCTAssertTrue(close.waitForExistence(timeout: 5), file: file, line: line)
 
       XCTAssertEqual(progress.label, "동영상 재생 진행", file: file, line: line)

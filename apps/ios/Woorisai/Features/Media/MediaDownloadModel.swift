@@ -785,6 +785,14 @@ final class MediaLibrarySaveModel {
 
   private(set) var state: State = .idle
 
+  /// Which attachment the current state describes.
+  ///
+  /// One model serves a whole viewer group, and a Photos write cannot be cancelled — swiping to
+  /// the next photo does not stop the one already in flight. Without naming the subject, an
+  /// outcome reported after the swipe reads as "this photo is saved" over a photo that is not,
+  /// which is exactly how a duplicate save or a silently skipped one happens.
+  private(set) var subjectID: UUID?
+
   @ObservationIgnored
   private let authorize: @Sendable () async -> PHAuthorizationStatus
 
@@ -805,9 +813,10 @@ final class MediaLibrarySaveModel {
     self.write = write
   }
 
-  func save(fileURL: URL, isImage: Bool) {
+  func save(subjectID: UUID, fileURL: URL, isImage: Bool) {
     guard state != .saving else { return }
     task?.cancel()
+    self.subjectID = subjectID
     state = .saving
     let authorize = authorize
     let write = write
@@ -835,12 +844,14 @@ final class MediaLibrarySaveModel {
   /// Returns the model to idle once the outcome has been shown, so the next tap can report again.
   func acknowledge() {
     state = .idle
+    subjectID = nil
   }
 
   func cancel() {
     task?.cancel()
     task = nil
     state = .idle
+    subjectID = nil
   }
 
   /// Whether Photos can represent this content type as an asset.

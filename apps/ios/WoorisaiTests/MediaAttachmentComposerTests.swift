@@ -29,33 +29,52 @@ struct MediaAttachmentComposerTests {
   }
 
   @Test
-  func diaryAndCommentAcceptFourImagesOrExactlyOneVideoWithoutMixing() throws {
+  func diaryAndCommentAcceptFourAttachmentsMixedWithAtMostOneVideo() throws {
     for purpose in [MediaPurpose.diaryEntry, .comment] {
       let policy = MediaAttachmentPolicy(purpose: purpose)
 
       try policy.validate(existingKinds: [], adding: .video)
-      #expect(policy.remainingSelectionCapacity(for: [.video]) == 0)
+      #expect(policy.remainingSelectionCapacity(for: [.video]) == 3)
       #expect(
         throws: MediaAttachmentRuleViolation.onlyOneVideoAllowed,
         performing: { try policy.validate(existingKinds: [.video], adding: .video) }
       )
-      #expect(
-        throws: MediaAttachmentRuleViolation.mixedMediaNotAllowed,
-        performing: { try policy.validate(existingKinds: [.video], adding: .image) }
-      )
-      #expect(
-        throws: MediaAttachmentRuleViolation.mixedMediaNotAllowed,
-        performing: { try policy.validate(existingKinds: [.image], adding: .video) }
-      )
+
+      // Photos and one video share a group in either order.
+      try policy.validate(existingKinds: [.video], adding: .image)
+      try policy.validate(existingKinds: [.image], adding: .video)
+      try policy.validate(existingKinds: [.image, .video, .image], adding: .image)
 
       try policy.validate(existingKinds: [.image, .image, .image], adding: .image)
       #expect(policy.remainingSelectionCapacity(for: [.image, .image, .image]) == 1)
+
+      // The ceiling counts attachments, not kinds: a full group refuses either kind.
       #expect(
-        throws: MediaAttachmentRuleViolation.tooManyImages(maximum: 4),
+        throws: MediaAttachmentRuleViolation.tooManyAttachments(maximum: 4),
         performing: {
           try policy.validate(
             existingKinds: [.image, .image, .image, .image],
             adding: .image
+          )
+        }
+      )
+      #expect(
+        throws: MediaAttachmentRuleViolation.tooManyAttachments(maximum: 4),
+        performing: {
+          try policy.validate(
+            existingKinds: [.image, .image, .image, .image],
+            adding: .video
+          )
+        }
+      )
+      // A full group holding the one allowed video reports the video rule, which is the more
+      // specific reason the addition is refused.
+      #expect(
+        throws: MediaAttachmentRuleViolation.onlyOneVideoAllowed,
+        performing: {
+          try policy.validate(
+            existingKinds: [.video, .image, .image, .image],
+            adding: .video
           )
         }
       )
@@ -498,22 +517,39 @@ struct MediaAttachmentComposerTests {
   }
 
   @Test
-  func inlineGalleryUsesStableFormatsForImageCountsAndVideo() {
+  func inlineGalleryUsesStableFormatsForAttachmentCountsAndKinds() {
     #expect(MediaGroupLayout.resolve(kinds: []) == .empty)
     #expect(MediaGroupLayout.resolve(kinds: [.image]) == .singleImage)
-    #expect(MediaGroupLayout.resolve(kinds: [.image, .image]) == .imageMosaic(columns: 2))
+    #expect(MediaGroupLayout.resolve(kinds: [.image, .image]) == .mosaic(columns: 2))
     #expect(
       MediaGroupLayout.resolve(kinds: [.image, .image, .image])
-        == .imageMosaic(columns: 3)
+        == .mosaic(columns: 3)
     )
     #expect(
       MediaGroupLayout.resolve(kinds: [.image, .image, .image, .image])
-        == .imageMosaic(columns: 2)
+        == .mosaic(columns: 2)
     )
     #expect(MediaGroupLayout.resolve(kinds: [.video]) == .video)
     #expect(MediaInlineTileFormat.singleImage.aspectRatio == CGFloat(4) / 3)
-    #expect(MediaInlineTileFormat.mosaicImage.aspectRatio == 1)
+    #expect(MediaInlineTileFormat.mosaic.aspectRatio == 1)
     #expect(MediaInlineTileFormat.video.aspectRatio == CGFloat(16) / 9)
+  }
+
+  /// A mixed group has no aspect ratio that fits both kinds, and the previous rule — any video
+  /// present means the video layout — rendered only the first attachment. Everything past one
+  /// attachment is a square mosaic so no member can be dropped by its neighbours' kinds.
+  @Test
+  func mixedGroupsStayInTheMosaicSoNoAttachmentIsDroppedByItsNeighbours() {
+    #expect(MediaGroupLayout.resolve(kinds: [.image, .video]) == .mosaic(columns: 2))
+    #expect(MediaGroupLayout.resolve(kinds: [.video, .image]) == .mosaic(columns: 2))
+    #expect(
+      MediaGroupLayout.resolve(kinds: [.image, .video, .image])
+        == .mosaic(columns: 3)
+    )
+    #expect(
+      MediaGroupLayout.resolve(kinds: [.image, .image, .video, .image])
+        == .mosaic(columns: 2)
+    )
   }
 
   @Test
@@ -598,20 +634,46 @@ struct MediaAttachmentComposerTests {
 
     #expect(model.canSelectMore)
     #expect(model.pickerSelectionLimit == 1)
+    // The last free slot takes a video even though the retained attachments are all photos.
+    try model.addPreparedAttachment(
+      kind: .video,
+      fileName: "clip.mov",
+      contentType: "video/quicktime",
+      data: Data([0x00])
+    )
+
+    model.setExistingKinds([.image, .image, .image, .image])
+    #expect(!model.canSelectMore)
+  }
+
+  @Test
+  func retainedVideoStillRefusesASecondVideoButNotAPhoto() throws {
+    let model = MediaAttachmentComposerModel(
+      purpose: .diaryEntry,
+      service: ComposerMediaServiceFake(),
+      existingKinds: [.video]
+    )
+
+    #expect(model.canSelectMore)
+    #expect(model.pickerSelectionLimit == 3)
     #expect(
-      throws: MediaAttachmentRuleViolation.mixedMediaNotAllowed,
+      throws: MediaAttachmentRuleViolation.onlyOneVideoAllowed,
       performing: {
         try model.addPreparedAttachment(
           kind: .video,
-          fileName: "clip.mov",
+          fileName: "second.mov",
           contentType: "video/quicktime",
           data: Data([0x00])
         )
       }
     )
 
-    model.setExistingKinds([.image, .image, .image, .image])
-    #expect(!model.canSelectMore)
+    try model.addPreparedAttachment(
+      kind: .image,
+      fileName: "photo.jpg",
+      contentType: "image/jpeg",
+      data: Data([0x00])
+    )
   }
 
   @Test
@@ -1452,7 +1514,11 @@ struct MediaAttachmentComposerTests {
       write: { _, _ in await spy.record() }
     )
 
-    model.save(fileURL: URL(fileURLWithPath: "/dev/null"), isImage: true)
+    model.save(
+      subjectID: UUID(),
+      fileURL: URL(fileURLWithPath: "/dev/null"),
+      isImage: true
+    )
     await composerExpectEventually { model.state == .permissionDenied }
 
     #expect(await spy.writeCount == 0)
@@ -1467,15 +1533,42 @@ struct MediaAttachmentComposerTests {
       write: { url, isImage in await spy.record(url: url, isImage: isImage) }
     )
 
-    model.save(fileURL: fileURL, isImage: false)
+    let subjectID = UUID()
+    model.save(subjectID: subjectID, fileURL: fileURL, isImage: false)
     await composerExpectEventually { model.state == .saved }
 
     #expect(await spy.writeCount == 1)
     #expect(await spy.lastURL == fileURL)
     #expect(await spy.lastIsImage == false)
+    #expect(model.subjectID == subjectID)
 
     model.acknowledge()
     #expect(model.state == .idle)
+    #expect(model.subjectID == nil)
+  }
+
+  /// One save model serves a whole viewer group. A Photos write cannot be cancelled, so paging
+  /// away mid-save leaves an outcome that must stay attached to the file it actually wrote —
+  /// otherwise the next photo claims a save it never got.
+  @Test
+  func aSaveOutcomeNamesTheAttachmentItWroteRatherThanWhicheverPageIsShowing() async {
+    let spy = MediaLibraryWriteSpy()
+    let model = MediaLibrarySaveModel(
+      authorize: { .authorized },
+      write: { url, isImage in await spy.record(url: url, isImage: isImage) }
+    )
+    let saved = UUID()
+    let neighbour = UUID()
+
+    model.save(
+      subjectID: saved,
+      fileURL: URL(fileURLWithPath: "/dev/null"),
+      isImage: true
+    )
+    await composerExpectEventually { model.state == .saved }
+
+    #expect(model.subjectID == saved)
+    #expect(model.subjectID != neighbour)
   }
 }
 

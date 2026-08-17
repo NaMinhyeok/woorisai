@@ -142,20 +142,22 @@ struct DiaryAttachmentGallery: View {
   let onAuthenticationRequired: @MainActor () -> Void
 
   var body: some View {
-    MediaAttachmentGallery(
-      items: attachments,
-      kind: { $0.contentType.lowercased().hasPrefix("image/") ? .image : .video }
-    ) { attachment, format in
-      MediaAttachmentPreview(
-        attachmentID: attachment.id,
-        fileName: attachment.fileName,
-        contentType: attachment.contentType,
-        byteSize: attachment.byteSize,
-        tileFormat: format,
-        onAuthenticationRequired: onAuthenticationRequired
-      )
-    }
+    MediaAttachmentPreviewGallery(
+      attachments: attachments.map(MediaAttachmentDescriptor.init),
+      onAuthenticationRequired: onAuthenticationRequired
+    )
     .accessibilityIdentifier("media.group")
+  }
+}
+
+extension MediaAttachmentDescriptor {
+  init(_ attachment: DiaryAttachment) {
+    self.init(
+      id: attachment.id,
+      fileName: attachment.fileName,
+      contentType: attachment.contentType,
+      byteSize: attachment.byteSize
+    )
   }
 }
 
