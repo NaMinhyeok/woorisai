@@ -15,11 +15,11 @@ class RelationshipCommandsTest {
         UUID commentMedia = UUID.randomUUID();
 
         ChangeScoreCommand change =
-                ChangeScoreCommand.from(1, null, "  reason  ", List.of(scoreMedia));
+                ChangeScoreCommand.from(1L, null, "  reason  ", List.of(scoreMedia));
         CreateScoreCommentCommand comment =
                 CreateScoreCommentCommand.from("  comment  ", List.of(commentMedia));
 
-        assertThat(change.intent()).isEqualTo(ScoreChangeIntent.from(1, null));
+        assertThat(change.intent()).isEqualTo(ScoreChangeIntent.from(1L, null));
         assertThat(change.reason()).isEqualTo("reason");
         assertThat(change.mediaUploadIds()).containsExactly(scoreMedia);
         assertThat(comment.content()).isEqualTo("comment");
@@ -33,17 +33,16 @@ class RelationshipCommandsTest {
 
         assertThatThrownBy(() -> ChangeScoreCommand.from(null, null, null, List.of()))
                 .isInstanceOf(InvalidRelationshipRequestException.class);
-        assertThatThrownBy(() -> ChangeScoreCommand.from(1, 50, null, List.of()))
+        assertThatThrownBy(() -> ChangeScoreCommand.from(1L, 50L, null, List.of()))
                 .isInstanceOf(InvalidRelationshipRequestException.class);
-        assertThatThrownBy(() -> ChangeScoreCommand.from(0, null, null, List.of()))
+        assertThatThrownBy(() -> ChangeScoreCommand.from(0L, null, null, List.of()))
                 .isInstanceOf(InvalidRelationshipRequestException.class);
-        assertThatThrownBy(() -> ChangeScoreCommand.from(null, 101, null, List.of()))
+
+        assertThatThrownBy(() -> ChangeScoreCommand.from(
+                        1L, null, "bad" + nul + "reason", List.of()))
                 .isInstanceOf(InvalidRelationshipRequestException.class);
         assertThatThrownBy(() -> ChangeScoreCommand.from(
-                        1, null, "bad" + nul + "reason", List.of()))
-                .isInstanceOf(InvalidRelationshipRequestException.class);
-        assertThatThrownBy(() -> ChangeScoreCommand.from(
-                        1, null, null, List.of(duplicate, duplicate)))
+                        1L, null, null, List.of(duplicate, duplicate)))
                 .isInstanceOf(InvalidRelationshipRequestException.class);
         assertThatThrownBy(() -> CreateScoreCommentCommand.from(" ", List.of()))
                 .isInstanceOf(InvalidRelationshipRequestException.class);

@@ -11,10 +11,10 @@ final class RelationshipModel {
   }
 
   private struct ScoreSubmissionSnapshot: Equatable, Sendable {
-    let originalScore: Int
+    let originalScore: Int64
     let originalUpdatedAt: Date
     let originalChangeIDs: Set<Int64>
-    let targetScore: Int
+    let targetScore: Int64
     let reason: String?
     let attachmentIDs: [UUID]
     let currentParticipantSlot: ParticipantSlot
@@ -113,7 +113,7 @@ final class RelationshipModel {
   private(set) var scoreOutcomeRequiresConfirmation = false
   private(set) var scoreOutcomeInspectionState: OutcomeInspectionState = .idle
   private(set) var scoreOutcomeInspectionResult: OutcomeInspectionResult = .inconclusive
-  private(set) var unknownOutcomeTargetScore: Int?
+  private(set) var unknownOutcomeTargetScore: Int64?
   private(set) var commentOutcomeRequiresConfirmation = false
   private(set) var commentOutcomeInspectionState: OutcomeInspectionState = .idle
   private(set) var commentOutcomeInspectionResult: OutcomeInspectionResult = .inconclusive
@@ -359,7 +359,7 @@ final class RelationshipModel {
     }
   }
 
-  func canCreateScoreChange(targetScore: Int) -> Bool {
+  func canCreateScoreChange(targetScore: Int64) -> Bool {
     guard loadState == .loaded,
       scoreSubmissionState != .submitting,
       !scoreOutcomeRequiresConfirmation,
@@ -368,12 +368,12 @@ final class RelationshipModel {
     else {
       return false
     }
-    return (0...100).contains(targetScore) && targetScore != outgoingScore
+    return targetScore >= 0 && targetScore != outgoingScore
   }
 
   @discardableResult
   func createScoreChange(
-    targetScore: Int,
+    targetScore: Int64,
     reason: String,
     mediaUploadIDs: [UUID] = []
   ) -> Bool {

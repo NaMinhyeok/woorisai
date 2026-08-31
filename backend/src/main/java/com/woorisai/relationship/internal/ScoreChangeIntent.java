@@ -1,6 +1,6 @@
 package com.woorisai.relationship.internal;
 
-record ScoreChangeIntent(Kind kind, int value) {
+record ScoreChangeIntent(Kind kind, long value) {
 
     enum Kind {
         DELTA,
@@ -11,15 +11,15 @@ record ScoreChangeIntent(Kind kind, int value) {
         if (kind == null) {
             throw new InvalidScoreChangeIntentException();
         }
-        if (kind == Kind.DELTA && (value < -100 || value > 100 || value == 0)) {
+        if (kind == Kind.DELTA && value == 0) {
             throw new InvalidScoreChangeIntentException();
         }
-        if (kind == Kind.TARGET_SCORE && (value < 0 || value > 100)) {
+        if (kind == Kind.TARGET_SCORE && value < 0) {
             throw new InvalidScoreChangeIntentException();
         }
     }
 
-    static ScoreChangeIntent from(Integer delta, Integer targetScore) {
+    static ScoreChangeIntent from(Long delta, Long targetScore) {
         if ((delta == null) == (targetScore == null)) {
             throw new InvalidScoreChangeIntentException();
         }
@@ -28,9 +28,9 @@ record ScoreChangeIntent(Kind kind, int value) {
                 : new ScoreChangeIntent(Kind.TARGET_SCORE, targetScore);
     }
 
-    int resultingScoreFrom(int currentScore) {
+    long resultingScoreFrom(long currentScore) {
         return switch (kind) {
-            case DELTA -> currentScore + value;
+            case DELTA -> Math.addExact(currentScore, value);
             case TARGET_SCORE -> value;
         };
     }

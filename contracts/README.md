@@ -69,6 +69,8 @@ service unavailable로 실패한다. 이 조회는 인증 성공을 뜻하지 �
   validation을 정본으로 삼는다: score 변경의 `delta`/`targetScore` 정확히 하나와 non-zero
   `delta`, score comment의 content-or-media, diary update의 non-empty patch. Backend HTTP test와
   iOS app-owned request validation으로 이 경계를 함께 검증한다.
+- Relationship score와 변경량은 `int64`로 전달한다. Score는 0 이상이고 제품 상한은 없으며,
+  음수 결과와 `int64` overflow는 server가 conflict로 거절한다.
 
 ## 검증
 

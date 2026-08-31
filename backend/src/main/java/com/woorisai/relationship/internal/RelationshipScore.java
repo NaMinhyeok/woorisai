@@ -11,8 +11,6 @@ import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Getter(AccessLevel.PACKAGE)
@@ -31,9 +29,8 @@ class RelationshipScore {
     @Column(name = "target_participant_id", nullable = false, unique = true)
     private long targetParticipantId;
 
-    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "current_score", nullable = false)
-    private int currentScore;
+    private long currentScore;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
@@ -46,14 +43,13 @@ class RelationshipScore {
             long id,
             long sourceParticipantId,
             long targetParticipantId,
-            int currentScore,
+            long currentScore,
             Instant updatedAt) {
         if (id <= 0
                 || sourceParticipantId <= 0
                 || targetParticipantId <= 0
                 || sourceParticipantId == targetParticipantId
                 || currentScore < 0
-                || currentScore > 100
                 || updatedAt == null) {
             throw new IllegalArgumentException("Relationship score state is invalid");
         }
@@ -77,15 +73,19 @@ class RelationshipScore {
                 || targetParticipantId <= 0
                 || sourceParticipantId == targetParticipantId
                 || currentScore < 0
-                || currentScore > 100
                 || updatedAt == null) {
             throw new IllegalStateException("Relationship score state is invalid");
         }
 
-        int previousScore = currentScore;
-        int resultingScore = intent.resultingScoreFrom(previousScore);
-        int delta = resultingScore - previousScore;
-        if (delta == 0 || resultingScore < 0 || resultingScore > 100) {
+        long previousScore = currentScore;
+        long resultingScore;
+        try {
+            resultingScore = intent.resultingScoreFrom(previousScore);
+        } catch (ArithmeticException exception) {
+            throw new RelationshipScoreChangeRejectedException();
+        }
+        long delta = resultingScore - previousScore;
+        if (delta == 0 || resultingScore < 0) {
             throw new RelationshipScoreChangeRejectedException();
         }
 

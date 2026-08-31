@@ -273,7 +273,7 @@ enum WoorisaiColor {
     case decrease
     case unchanged
 
-    init(_ value: Int) {
+    init(_ value: Int64) {
       if value > 0 {
         self = .increase
       } else if value < 0 {

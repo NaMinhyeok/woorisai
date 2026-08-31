@@ -23,7 +23,7 @@ iOS -- HTTPS + Basic --> Spring Boot API --> PostgreSQL / woorisai
 ```
 
 - Backend는 Java 25, Spring Boot 4.1, Spring Modulith와 Spring Data JPA를 사용한다.
-- Flyway가 별도 PostgreSQL `woorisai` schema의 V1/V2를 소유하고 Hibernate는
+- Flyway가 별도 PostgreSQL `woorisai` schema의 forward migration을 소유하고 Hibernate는
   `ddl-auto=validate`만 사용한다.
 - Production business data의 유일한 owner/writer는 Spring과 `woorisai`다. Legacy Django와
   PostgreSQL `public` data는 runtime 또는 rollback source가 아니다.

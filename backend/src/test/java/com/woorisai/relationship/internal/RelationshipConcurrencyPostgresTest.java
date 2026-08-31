@@ -141,7 +141,7 @@ class RelationshipConcurrencyPostgresTest {
                     first.get(5, TimeUnit.SECONDS),
                     second.get(5, TimeUnit.SECONDS));
 
-            assertThat(outcomes).filteredOn(Integer.class::isInstance).containsExactly(1);
+            assertThat(outcomes).filteredOn(Long.class::isInstance).containsExactly(1L);
             assertThat(outcomes)
                     .filteredOn(RelationshipConflictException.class::isInstance)
                     .hasSize(1);
@@ -161,7 +161,7 @@ class RelationshipConcurrencyPostgresTest {
                     FROM woorisai.score_change
                     WHERE relationship_score_id = 10
                     ORDER BY resulting_score
-                    """, Integer.class)).containsExactly(1);
+                    """, Long.class)).containsExactly(1L);
             assertThat(jdbc.queryForObject("""
                     SELECT COUNT(*)
                     FROM woorisai.score_change
@@ -178,7 +178,7 @@ class RelationshipConcurrencyPostgresTest {
         try {
             return relationships.changeScore(
                             FIRST,
-                            ChangeScoreCommand.from(1, null, null, List.of()))
+                            ChangeScoreCommand.from(1L, null, null, List.of()))
                     .change()
                     .resultingScore();
         } catch (RelationshipConflictException exception) {

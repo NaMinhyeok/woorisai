@@ -100,8 +100,11 @@ class CleanSchemaPostgresMigrationTest {
             execute(connection, "DELETE FROM woorisai.participant WHERE id IN (9001, 9002)");
         }
 
-        var v3Result = flyway().migrate();
+        var v3Result = flywayAt(MigrationVersion.fromVersion("3")).migrate();
         assertThat(v3Result.migrationsExecuted).isOne();
+
+        var v4Result = flyway().migrate();
+        assertThat(v4Result.migrationsExecuted).isOne();
     }
 
     @AfterAll
@@ -313,7 +316,7 @@ class CleanSchemaPostgresMigrationTest {
                     INSERT INTO woorisai.relationship_score (
                         id, source_participant_id, target_participant_id, current_score, updated_at
                     ) VALUES (
-                        11, 2, 1, 101, TIMESTAMPTZ '2026-07-21 00:00:00Z'
+                        11, 2, 1, -1, TIMESTAMPTZ '2026-07-21 00:00:00Z'
                     )
                     """);
             assertConstraintViolation(connection, "23503", "score_change_outgoing_owner_fk", """
@@ -329,7 +332,7 @@ class CleanSchemaPostgresMigrationTest {
                         id, relationship_score_id, changed_by_id, delta,
                         resulting_score, reason, created_at
                     ) VALUES (
-                        19, 10, 1, 101, 55, NULL, TIMESTAMPTZ '2026-07-21 00:01:00Z'
+                        19, 10, 1, 0, 55, NULL, TIMESTAMPTZ '2026-07-21 00:01:00Z'
                     )
                     """);
 
@@ -508,6 +511,45 @@ class CleanSchemaPostgresMigrationTest {
     }
 
     @Test
+    void storesNonnegativeScoresBeyondTheInt32Range() throws Exception {
+        try (Connection connection = connection()) {
+            connection.setAutoCommit(false);
+            execute(connection, "TRUNCATE TABLE woorisai.participant CASCADE");
+            execute(connection, """
+                    INSERT INTO woorisai.participant (id, slot, display_name, created_at)
+                    VALUES
+                        (9201, 1, 'wide-score-one', TIMESTAMPTZ '2026-07-21 00:00:00Z'),
+                        (9202, 2, 'wide-score-two', TIMESTAMPTZ '2026-07-21 00:00:01Z')
+                    """);
+            execute(connection, """
+                    INSERT INTO woorisai.relationship_score (
+                        id, source_participant_id, target_participant_id, current_score, updated_at
+                    ) VALUES (
+                        9210, 9201, 9202, 3000000000, TIMESTAMPTZ '2026-07-21 00:00:02Z'
+                    )
+                    """);
+            execute(connection, """
+                    INSERT INTO woorisai.score_change (
+                        id, relationship_score_id, changed_by_id, delta,
+                        resulting_score, reason, created_at
+                    ) VALUES (
+                        9220, 9210, 9201, 2999999950, 3000000000, NULL,
+                        TIMESTAMPTZ '2026-07-21 00:01:00Z'
+                    )
+                    """);
+
+            assertThat(queryLong(connection, """
+                    SELECT resulting_score
+                    FROM woorisai.score_change
+                    WHERE id = 9220
+                    """))
+                    .isEqualTo(3_000_000_000L);
+
+            connection.rollback();
+        }
+    }
+
+    @Test
     void rejectsATombstoneRecordedBeforeItsRowWasCreated() throws Exception {
         try (Connection connection = connection()) {
             execute(connection, """
@@ -614,6 +656,13 @@ class CleanSchemaPostgresMigrationTest {
                 result.add(resultSet.getString(1));
             }
             return result;
+        }
+    }
+
+    private static long queryLong(Connection connection, String sql) throws SQLException {
+        try (var statement = connection.createStatement(); var resultSet = statement.executeQuery(sql)) {
+            resultSet.next();
+            return resultSet.getLong(1);
         }
     }
 

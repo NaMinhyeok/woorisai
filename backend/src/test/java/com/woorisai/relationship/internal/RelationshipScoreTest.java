@@ -16,7 +16,7 @@ class RelationshipScoreTest {
         RelationshipScore score = scoreAt(50);
 
         ScoreChange change = score.change(
-                ScoreChangeIntent.from(10, null), "because", CHANGED_TIME);
+                ScoreChangeIntent.from(10L, null), "because", CHANGED_TIME);
 
         assertThat(change.getRelationshipScoreId()).isEqualTo(10L);
         assertThat(change.getChangedById()).isEqualTo(1L);
@@ -34,7 +34,7 @@ class RelationshipScoreTest {
         RelationshipScore score = scoreAt(50);
 
         ScoreChange change = score.change(
-                ScoreChangeIntent.from(null, 25), null, CHANGED_TIME);
+                ScoreChangeIntent.from(null, 25L), null, CHANGED_TIME);
 
         assertThat(change.getDelta()).isEqualTo(-25);
         assertThat(change.getResultingScore()).isEqualTo(25);
@@ -45,30 +45,38 @@ class RelationshipScoreTest {
     void rejectsMalformedIntentsBeforeTheyReachTheAggregate() {
         assertThatThrownBy(() -> ScoreChangeIntent.from(null, null))
                 .isInstanceOf(InvalidScoreChangeIntentException.class);
-        assertThatThrownBy(() -> ScoreChangeIntent.from(1, 50))
+        assertThatThrownBy(() -> ScoreChangeIntent.from(1L, 50L))
                 .isInstanceOf(InvalidScoreChangeIntentException.class);
-        assertThatThrownBy(() -> ScoreChangeIntent.from(0, null))
+        assertThatThrownBy(() -> ScoreChangeIntent.from(0L, null))
                 .isInstanceOf(InvalidScoreChangeIntentException.class);
-        assertThatThrownBy(() -> ScoreChangeIntent.from(101, null))
-                .isInstanceOf(InvalidScoreChangeIntentException.class);
-        assertThatThrownBy(() -> ScoreChangeIntent.from(null, -1))
-                .isInstanceOf(InvalidScoreChangeIntentException.class);
-        assertThatThrownBy(() -> ScoreChangeIntent.from(null, 101))
+        assertThatThrownBy(() -> ScoreChangeIntent.from(null, -1L))
                 .isInstanceOf(InvalidScoreChangeIntentException.class);
     }
 
     @Test
-    void rejectsNoOpAndOutOfRangeChangesWithoutMutatingTheScore() {
+    void allowsNonnegativeScoresBeyondTheInt32Range() {
+        RelationshipScore score = scoreAt(50);
+
+        ScoreChange change = score.change(
+                ScoreChangeIntent.from(null, 3_000_000_000L), null, CHANGED_TIME);
+
+        assertThat(change.getDelta()).isEqualTo(2_999_999_950L);
+        assertThat(change.getResultingScore()).isEqualTo(3_000_000_000L);
+        assertThat(score.getCurrentScore()).isEqualTo(3_000_000_000L);
+    }
+
+    @Test
+    void rejectsNoOpNegativeAndOverflowingChangesWithoutMutatingTheScore() {
         RelationshipScore score = scoreAt(50);
 
         assertThatThrownBy(() -> score.change(
-                        ScoreChangeIntent.from(null, 50), null, CHANGED_TIME))
+                        ScoreChangeIntent.from(null, 50L), null, CHANGED_TIME))
                 .isInstanceOf(RelationshipScoreChangeRejectedException.class);
         assertThatThrownBy(() -> score.change(
-                        ScoreChangeIntent.from(51, null), null, CHANGED_TIME))
+                        ScoreChangeIntent.from(-51L, null), null, CHANGED_TIME))
                 .isInstanceOf(RelationshipScoreChangeRejectedException.class);
         assertThatThrownBy(() -> score.change(
-                        ScoreChangeIntent.from(-51, null), null, CHANGED_TIME))
+                        ScoreChangeIntent.from(Long.MAX_VALUE, null), null, CHANGED_TIME))
                 .isInstanceOf(RelationshipScoreChangeRejectedException.class);
 
         assertThat(score.getCurrentScore()).isEqualTo(50);
@@ -76,14 +84,14 @@ class RelationshipScoreTest {
     }
 
     @Test
-    void allowsTheInclusiveScoreBoundaries() {
+    void allowsZeroAndTheLegacyHundredPointValue() {
         RelationshipScore lower = scoreAt(50);
         RelationshipScore upper = scoreAt(50);
 
-        assertThat(lower.change(ScoreChangeIntent.from(null, 0), null, CHANGED_TIME)
+        assertThat(lower.change(ScoreChangeIntent.from(null, 0L), null, CHANGED_TIME)
                         .getResultingScore())
                 .isEqualTo(0);
-        assertThat(upper.change(ScoreChangeIntent.from(null, 100), null, CHANGED_TIME)
+        assertThat(upper.change(ScoreChangeIntent.from(null, 100L), null, CHANGED_TIME)
                         .getResultingScore())
                 .isEqualTo(100);
     }
@@ -93,14 +101,14 @@ class RelationshipScoreTest {
         RelationshipScore score = scoreAt(50);
 
         assertThatThrownBy(() -> score.change(
-                        ScoreChangeIntent.from(1, null), "  reason  ", CHANGED_TIME))
+                        ScoreChangeIntent.from(1L, null), "  reason  ", CHANGED_TIME))
                 .isInstanceOf(IllegalArgumentException.class);
 
         assertThat(score.getCurrentScore()).isEqualTo(50);
         assertThat(score.getUpdatedAt()).isEqualTo(INITIAL_TIME);
     }
 
-    private static RelationshipScore scoreAt(int currentScore) {
+    private static RelationshipScore scoreAt(long currentScore) {
         return new RelationshipScore(10, 1, 2, currentScore, INITIAL_TIME);
     }
 }

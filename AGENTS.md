@@ -43,7 +43,8 @@ business module도 참조하지 않고, `@NamedInterface`로 노출면을 좁히
 ## 반드시 보존할 계약
 
 - Participant는 slot 1과 2의 정확히 두 명이다.
-- Relationship score는 방향성이 있고 0~100이며 participant는 자신의 outgoing score만 바꾼다.
+- Relationship score는 방향성이 있는 0 이상의 `int64` 값이며 제품 상한은 없다. Participant는
+  자신의 outgoing score만 바꾼다.
 - Score 현재값, 불변 이력, media 연결과 event publication은 한 transaction이다.
 - Score comment와 diary comment는 두 participant의 평평한 시간순 대화다.
 - 모든 page 응답은 `{ results, paging }`이고 `paging`은 `pageNumber`, `pageSize`, `hasNext`,

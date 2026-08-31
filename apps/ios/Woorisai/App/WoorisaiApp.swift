@@ -1864,10 +1864,13 @@ private struct UnavailableNotificationInstallationIDProvider:
       currentSlot: ParticipantSlot = .one
     ) -> RelationshipScoreChangeCreated {
       let currentScores = orientedScores(currentSlot: currentSlot)
-      let target: Int
+      let target: Int64
       switch draft.mutation {
       case .target(let value): target = value
-      case .delta(let value): target = currentScores.outgoingScore + value
+      case .delta(let value):
+        let (result, overflow) = currentScores.outgoingScore.addingReportingOverflow(value)
+        precondition(!overflow && result >= 0)
+        target = result
       }
       let created = RelationshipScoreChange(
         id: 202,

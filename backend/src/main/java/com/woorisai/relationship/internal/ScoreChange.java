@@ -11,8 +11,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Immutable
@@ -32,13 +30,11 @@ class ScoreChange {
     @Column(name = "changed_by_id", nullable = false)
     private long changedById;
 
-    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "delta", nullable = false)
-    private int delta;
+    private long delta;
 
-    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "resulting_score", nullable = false)
-    private int resultingScore;
+    private long resultingScore;
 
     @Column(name = "reason", length = 200)
     private String reason;
@@ -49,17 +45,14 @@ class ScoreChange {
     ScoreChange(
             long relationshipScoreId,
             long changedById,
-            int delta,
-            int resultingScore,
+            long delta,
+            long resultingScore,
             String reason,
             Instant createdAt) {
         if (relationshipScoreId <= 0
                 || changedById <= 0
-                || delta < -100
-                || delta > 100
                 || delta == 0
                 || resultingScore < 0
-                || resultingScore > 100
                 || createdAt == null) {
             throw new IllegalArgumentException("Recorded score change is invalid");
         }
