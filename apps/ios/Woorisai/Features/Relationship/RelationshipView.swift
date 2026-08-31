@@ -7,7 +7,7 @@ struct RelationshipSubmissionAccessibility: Equatable, Sendable {
 
   static func score(
     state: RelationshipModel.SubmissionState,
-    targetScore: Int,
+    targetScore: Int64,
     canSubmit: Bool,
     isReasonWithinLimit: Bool = true
   ) -> Self {
@@ -84,7 +84,7 @@ struct RelationshipView: View {
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @State private var model: RelationshipModel
   @State private var scoreMediaModel: MediaAttachmentComposerModel
-  @State private var targetScore = 50
+  @State private var targetScore: Int64 = 50
   @State private var reason = ""
   @State private var presentedSheet: RelationshipSheetDestination?
   @Binding private var navigationPath: [RelationshipDestination]
@@ -373,7 +373,7 @@ struct RelationshipView: View {
     eyebrow: String,
     sourceName: String,
     targetName: String,
-    score: Int,
+    score: Int64,
     isMine: Bool,
     identifier: String
   ) -> some View {
@@ -403,10 +403,6 @@ struct RelationshipView: View {
           .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           .lineLimit(2)
           .fixedSize(horizontal: false, vertical: true)
-
-        ProgressView(value: Double(score), total: 100)
-          .tint(WoorisaiColor.fg(.init(isMine: isMine)))
-          .accessibilityHidden(true)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(WoorisaiSpacing.regular)

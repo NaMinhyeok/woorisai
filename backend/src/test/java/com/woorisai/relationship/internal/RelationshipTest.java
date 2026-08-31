@@ -57,7 +57,7 @@ class RelationshipTest {
     void resolvesTheScoreThatOwnsAChange() {
         Relationship relationship = relationshipFor(SLOT_ONE.id());
         ScoreChange change = relationship.outgoing()
-                .change(ScoreChangeIntent.from(10, null), null, NOW);
+                .change(ScoreChangeIntent.from(10L, null), null, NOW);
 
         assertThat(relationship.scoreOf(change)).isEqualTo(relationship.outgoing());
     }
@@ -66,7 +66,7 @@ class RelationshipTest {
     void rejectsAChangeBelongingToAForeignScore() {
         Relationship relationship = relationshipFor(SLOT_ONE.id());
         RelationshipScore foreign = score(99, 1, 2, 50);
-        ScoreChange foreignChange = foreign.change(ScoreChangeIntent.from(1, null), null, NOW);
+        ScoreChange foreignChange = foreign.change(ScoreChangeIntent.from(1L, null), null, NOW);
 
         assertThatThrownBy(() -> relationship.scoreOf(foreignChange))
                 .isInstanceOf(RelationshipUnavailableException.class);

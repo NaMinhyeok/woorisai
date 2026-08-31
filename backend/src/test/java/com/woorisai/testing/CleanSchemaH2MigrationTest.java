@@ -40,7 +40,7 @@ class CleanSchemaH2MigrationTest {
 
         var result = flyway.migrate();
 
-        assertThat(result.migrationsExecuted).isEqualTo(3);
+        assertThat(result.migrationsExecuted).isEqualTo(4);
     }
 
     @AfterEach
@@ -128,6 +128,43 @@ class CleanSchemaH2MigrationTest {
     }
 
     @Test
+    void storesNonnegativeScoresBeyondTheInt32Range() throws Exception {
+        try (Connection connection = connection()) {
+            insertCanonicalParticipants(connection);
+            execute(connection, """
+                    INSERT INTO woorisai.relationship_score (
+                        id, source_participant_id, target_participant_id, current_score, updated_at
+                    ) VALUES (
+                        10, 1, 2, 3000000000,
+                        TIMESTAMP WITH TIME ZONE '2026-07-21 00:00:00Z'
+                    )
+                    """);
+            execute(connection, """
+                    INSERT INTO woorisai.score_change (
+                        id, relationship_score_id, changed_by_id, delta,
+                        resulting_score, reason, created_at
+                    ) VALUES (
+                        20, 10, 1, 2999999950, 3000000000, NULL,
+                        TIMESTAMP WITH TIME ZONE '2026-07-21 00:01:00Z'
+                    )
+                    """);
+
+            assertThat(queryLong(connection, """
+                    SELECT current_score
+                    FROM woorisai.relationship_score
+                    WHERE id = 10
+                    """))
+                    .isEqualTo(3_000_000_000L);
+            assertThat(queryLong(connection, """
+                    SELECT resulting_score
+                    FROM woorisai.score_change
+                    WHERE id = 20
+                    """))
+                    .isEqualTo(3_000_000_000L);
+        }
+    }
+
+    @Test
     void requiresLegacyEmptyReasonAndMediaOnlyCommentTextToBeCopiedAsNull() throws Exception {
         try (Connection connection = connection()) {
             insertCanonicalParticipants(connection);
@@ -149,7 +186,7 @@ class CleanSchemaH2MigrationTest {
                     INSERT INTO woorisai.relationship_score (
                         id, source_participant_id, target_participant_id, current_score, updated_at
                     ) VALUES (
-                        11, 2, 1, 101, TIMESTAMP WITH TIME ZONE '2026-07-21 00:00:00Z'
+                        11, 2, 1, -1, TIMESTAMP WITH TIME ZONE '2026-07-21 00:00:00Z'
                     )
                     """);
 
@@ -287,6 +324,13 @@ class CleanSchemaH2MigrationTest {
                 result.add(resultSet.getString(1));
             }
             return result;
+        }
+    }
+
+    private long queryLong(Connection connection, String sql) throws SQLException {
+        try (var statement = connection.createStatement(); var resultSet = statement.executeQuery(sql)) {
+            resultSet.next();
+            return resultSet.getLong(1);
         }
     }
 

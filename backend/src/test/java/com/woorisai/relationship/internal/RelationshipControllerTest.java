@@ -127,11 +127,41 @@ class RelationshipControllerTest {
         verify(service).scoreChanges(ACTOR, 1);
         verify(service).changeScore(
                 ACTOR,
-                ChangeScoreCommand.from(1, null, "hello", List.of()));
+                ChangeScoreCommand.from(1L, null, "hello", List.of()));
         verify(service).createComment(
                 ACTOR,
                 20,
                 CreateScoreCommentCommand.from("hello", List.of()));
+    }
+
+    @Test
+    void acceptsAndPublishesScoresBeyondTheInt32Range() throws Exception {
+        ParticipantView self = new ParticipantView(1, "Fixture One", true);
+        ParticipantView partner = new ParticipantView(2, "Fixture Two", false);
+        RelationshipScoreView outgoing =
+                new RelationshipScoreView(self, partner, 3_000_000_000L, NOW);
+        ScoreChangeView change = new ScoreChangeView(
+                20,
+                self,
+                partner,
+                self,
+                2_999_999_950L,
+                3_000_000_000L,
+                null,
+                NOW,
+                0,
+                List.of());
+        when(service.changeScore(
+                        ACTOR,
+                        ChangeScoreCommand.from(null, 3_000_000_000L, null, null)))
+                .thenReturn(new ScoreChangeCreatedResponse(change, outgoing));
+
+        mvc.perform(post("/api/v2/score-changes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetScore\":3000000000}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.change.resultingScore").value(3_000_000_000L))
+                .andExpect(PublishedSchema.matches("ScoreChangeCreatedResponse"));
     }
 
     @Test
@@ -237,7 +267,7 @@ class RelationshipControllerTest {
                 List.of());
         when(service.changeScore(
                         ACTOR,
-                        ChangeScoreCommand.from(1, null, null, null)))
+                        ChangeScoreCommand.from(1L, null, null, null)))
                 .thenReturn(new ScoreChangeCreatedResponse(change, outgoing));
 
         mvc.perform(post("/api/v2/score-changes")
@@ -256,7 +286,7 @@ class RelationshipControllerTest {
 
         verify(service).changeScore(
                 ACTOR,
-                ChangeScoreCommand.from(1, null, null, null));
+                ChangeScoreCommand.from(1L, null, null, null));
     }
 
     @Test

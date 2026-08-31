@@ -566,24 +566,24 @@ struct WoorisaiDeltaBadge: View {
     case secondary
   }
 
-  private let value: Int
+  private let value: Int64
   private let prominence: Prominence
 
-  init(_ value: Int, prominence: Prominence = .primary) {
+  init(_ value: Int64, prominence: Prominence = .primary) {
     self.value = value
     self.prominence = prominence
   }
 
   private var delta: WoorisaiColor.Delta { WoorisaiColor.Delta(value) }
 
-  static func label(for value: Int) -> String {
+  static func label(for value: Int64) -> String {
     if value == 0 { return "변화 없음" }
     return value > 0 ? "+\(value)점" : "\(value)점"
   }
 
-  static func accessibilityLabel(for value: Int) -> String {
+  static func accessibilityLabel(for value: Int64) -> String {
     if value == 0 { return "변화 없음" }
-    return value > 0 ? "\(value)점 올라감" : "\(-value)점 내려감"
+    return value > 0 ? "\(value)점 올라감" : "\(value.magnitude)점 내려감"
   }
 
   var body: some View {

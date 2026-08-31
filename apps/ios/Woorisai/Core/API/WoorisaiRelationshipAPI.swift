@@ -16,16 +16,16 @@ public struct RelationshipParticipant: Equatable, Sendable {
 public struct RelationshipScores: Equatable, Sendable {
   public let currentParticipant: RelationshipParticipant
   public let partner: RelationshipParticipant
-  public let outgoingScore: Int
-  public let incomingScore: Int
+  public let outgoingScore: Int64
+  public let incomingScore: Int64
   public let outgoingUpdatedAt: Date
   public let incomingUpdatedAt: Date
 
   public init(
     currentParticipant: RelationshipParticipant,
     partner: RelationshipParticipant,
-    outgoingScore: Int,
-    incomingScore: Int,
+    outgoingScore: Int64,
+    incomingScore: Int64,
     outgoingUpdatedAt: Date,
     incomingUpdatedAt: Date
   ) {
@@ -72,8 +72,8 @@ public struct RelationshipScoreChange: Equatable, Sendable, Identifiable {
   public let sourceParticipant: RelationshipParticipant
   public let targetParticipant: RelationshipParticipant
   public let changedBy: RelationshipParticipant
-  public let delta: Int
-  public let resultingScore: Int
+  public let delta: Int64
+  public let resultingScore: Int64
   public let reason: String?
   public let createdAt: Date
   public let commentCount: Int64
@@ -84,8 +84,8 @@ public struct RelationshipScoreChange: Equatable, Sendable, Identifiable {
     sourceParticipant: RelationshipParticipant,
     targetParticipant: RelationshipParticipant,
     changedBy: RelationshipParticipant,
-    delta: Int,
-    resultingScore: Int,
+    delta: Int64,
+    resultingScore: Int64,
     reason: String?,
     createdAt: Date,
     commentCount: Int64,
@@ -156,8 +156,8 @@ public struct RelationshipScoreThread: Equatable, Sendable {
 }
 
 public enum RelationshipScoreMutation: Equatable, Sendable {
-  case delta(Int)
-  case target(Int)
+  case delta(Int64)
+  case target(Int64)
 }
 
 public struct RelationshipScoreChangeDraft: Equatable, Sendable {
@@ -174,11 +174,11 @@ public struct RelationshipScoreChangeDraft: Equatable, Sendable {
   ) throws {
     switch mutation {
     case .delta(let value):
-      guard (-100...100).contains(value), value != 0 else {
+      guard value != 0 else {
         throw WoorisaiAPIError.invalidRequest
       }
     case .target(let value):
-      guard (0...100).contains(value) else {
+      guard value >= 0 else {
         throw WoorisaiAPIError.invalidRequest
       }
     }
@@ -221,12 +221,12 @@ public struct RelationshipScoreCommentDraft: Equatable, Sendable {
 
 public struct RelationshipScoreChangeCreated: Equatable, Sendable {
   public let change: RelationshipScoreChange
-  public let outgoingScore: Int
+  public let outgoingScore: Int64
   public let outgoingUpdatedAt: Date
 
   public init(
     change: RelationshipScoreChange,
-    outgoingScore: Int,
+    outgoingScore: Int64,
     outgoingUpdatedAt: Date
   ) {
     self.change = change
@@ -328,15 +328,15 @@ extension WoorisaiAPIClient: RelationshipServing {
   public func createScoreChange(
     _ draft: RelationshipScoreChangeDraft
   ) async throws -> RelationshipScoreChangeCreated {
-    let delta: Int32?
-    let targetScore: Int32?
+    let delta: Int64?
+    let targetScore: Int64?
     switch draft.mutation {
     case .delta(let value):
-      delta = Int32(value)
+      delta = value
       targetScore = nil
     case .target(let value):
       delta = nil
-      targetScore = Int32(value)
+      targetScore = value
     }
 
     return try await performRelationshipRequest { client in
@@ -502,8 +502,8 @@ extension WoorisaiAPIClient {
       outgoingTarget == partner,
       incomingSource == partner,
       incomingTarget == current,
-      (0...100).contains(Int(response.outgoing.currentScore)),
-      (0...100).contains(Int(response.incoming.currentScore))
+      response.outgoing.currentScore >= 0,
+      response.incoming.currentScore >= 0
     else {
       throw WoorisaiAPIError.schemaDrift
     }
@@ -511,8 +511,8 @@ extension WoorisaiAPIClient {
     return RelationshipScores(
       currentParticipant: current,
       partner: partner,
-      outgoingScore: Int(response.outgoing.currentScore),
-      incomingScore: Int(response.incoming.currentScore),
+      outgoingScore: response.outgoing.currentScore,
+      incomingScore: response.incoming.currentScore,
       outgoingUpdatedAt: response.outgoing.updatedAt,
       incomingUpdatedAt: response.incoming.updatedAt
     )
@@ -552,18 +552,18 @@ extension WoorisaiAPIClient {
     let change = try mapScoreChange(response.change)
     let outgoingSource = try mapParticipant(response.outgoing.sourceParticipant)
     let outgoingTarget = try mapParticipant(response.outgoing.targetParticipant)
-    guard (0...100).contains(Int(response.outgoing.currentScore)),
+    guard response.outgoing.currentScore >= 0,
       change.sourceParticipant.isCurrentParticipant,
       !change.targetParticipant.isCurrentParticipant,
       outgoingSource == change.sourceParticipant,
       outgoingTarget == change.targetParticipant,
-      Int(response.outgoing.currentScore) == change.resultingScore
+      response.outgoing.currentScore == change.resultingScore
     else {
       throw WoorisaiAPIError.schemaDrift
     }
     return RelationshipScoreChangeCreated(
       change: change,
-      outgoingScore: Int(response.outgoing.currentScore),
+      outgoingScore: response.outgoing.currentScore,
       outgoingUpdatedAt: response.outgoing.updatedAt
     )
   }
@@ -610,8 +610,7 @@ extension WoorisaiAPIClient {
       source.isCurrentParticipant != target.isCurrentParticipant,
       changedBy == source,
       response.delta != 0,
-      (-100...100).contains(Int(response.delta)),
-      (0...100).contains(Int(response.resultingScore)),
+      response.resultingScore >= 0,
       response.commentCount >= 0,
       normalizedReason?.isEmpty != true,
       normalizedReason?.unicodeScalars.count ?? 0
@@ -626,8 +625,8 @@ extension WoorisaiAPIClient {
       sourceParticipant: source,
       targetParticipant: target,
       changedBy: changedBy,
-      delta: Int(response.delta),
-      resultingScore: Int(response.resultingScore),
+      delta: response.delta,
+      resultingScore: response.resultingScore,
       reason: normalizedReason,
       createdAt: response.createdAt,
       commentCount: response.commentCount,

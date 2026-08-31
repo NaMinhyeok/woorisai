@@ -114,7 +114,7 @@ class RelationshipServiceCleanSchemaTest {
         UUID scoreImage = UUID.fromString("61000000-0000-4000-8000-000000000001");
         ScoreChangeCreatedResponse changed = relationships.changeScore(
                 FIRST,
-                ChangeScoreCommand.from(1, null, "  because  ", List.of(scoreImage)));
+                ChangeScoreCommand.from(1L, null, "  because  ", List.of(scoreImage)));
 
         assertThat(changed.change().delta()).isEqualTo(1);
         assertThat(changed.change().reason()).isEqualTo("because");
@@ -181,7 +181,7 @@ class RelationshipServiceCleanSchemaTest {
     void appliesAnAbsoluteTargetOnlyToTheActorsOutgoingDirection() {
         ScoreChangeCreatedResponse changed = relationships.changeScore(
                 SECOND,
-                ChangeScoreCommand.from(null, 80, null, List.of()));
+                ChangeScoreCommand.from(null, 80L, null, List.of()));
 
         assertThat(changed.change().sourceParticipant().slot()).isEqualTo(2);
         assertThat(changed.change().targetParticipant().slot()).isEqualTo(1);
@@ -223,7 +223,7 @@ class RelationshipServiceCleanSchemaTest {
 
         assertThatThrownBy(() -> relationships.changeScore(
                         FIRST,
-                        ChangeScoreCommand.from(1, null, null, List.of())))
+                        ChangeScoreCommand.from(1L, null, null, List.of())))
                 .isInstanceOf(RelationshipConflictException.class);
 
         assertThat(jdbc.queryForObject(
@@ -242,7 +242,7 @@ class RelationshipServiceCleanSchemaTest {
     void rejectsStateConflictsAndNonParticipants() {
         assertThatThrownBy(() -> relationships.changeScore(
                         FIRST,
-                        ChangeScoreCommand.from(null, 50, null, List.of())))
+                        ChangeScoreCommand.from(null, 50L, null, List.of())))
                 .isInstanceOf(RelationshipConflictException.class);
         assertThatThrownBy(() -> relationships.relationshipScores(9_999))
                 .isInstanceOf(RelationshipForbiddenException.class);
@@ -260,7 +260,7 @@ class RelationshipServiceCleanSchemaTest {
     void rejectsValidCommandsThatConflictWithCurrentState() {
         assertThatThrownBy(() -> relationships.changeScore(
                         FIRST,
-                        ChangeScoreCommand.from(51, null, null, List.of())))
+                        ChangeScoreCommand.from(-51L, null, null, List.of())))
                 .isInstanceOf(RelationshipConflictException.class);
 
         assertThat(jdbc.queryForObject(

@@ -10,8 +10,8 @@ record ChangeScoreCommand(
         List<UUID> mediaUploadIds) {
 
     static ChangeScoreCommand from(
-            Integer delta,
-            Integer targetScore,
+            Long delta,
+            Long targetScore,
             String reason,
             List<UUID> mediaUploadIds) {
         try {

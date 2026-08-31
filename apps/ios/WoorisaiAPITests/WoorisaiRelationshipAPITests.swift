@@ -48,7 +48,7 @@ struct WoorisaiRelationshipAPITests {
     })
     let client = WoorisaiAPIClient(relationshipClient: stub)
     let draft = try RelationshipScoreChangeDraft(
-      mutation: .target(75),
+      mutation: .target(3_000_000_000),
       reason: "  새 점수  ",
       mediaUploadIDs: []
     )
@@ -61,7 +61,7 @@ struct WoorisaiRelationshipAPITests {
       return
     }
     #expect(request.delta == nil)
-    #expect(request.targetScore == 75)
+    #expect(request.targetScore == 3_000_000_000)
     #expect(request.reason == "새 점수")
     #expect(request.mediaUploadIds == [])
     #expect(created.change.delta == 5)

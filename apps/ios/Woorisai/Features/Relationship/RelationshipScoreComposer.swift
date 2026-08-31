@@ -9,14 +9,14 @@ struct ScoreComposerSheet: View {
   @State private var confirmsDiscard = false
   @FocusState private var isReasonFocused: Bool
 
-  @Binding private var targetScore: Int
+  @Binding private var targetScore: Int64
   @Binding private var reason: String
 
   @MainActor
   init(
     model: RelationshipModel,
     mediaModel: MediaAttachmentComposerModel,
-    targetScore: Binding<Int>,
+    targetScore: Binding<Int64>,
     reason: Binding<String>
   ) {
     _model = State(initialValue: model)
@@ -138,7 +138,7 @@ struct ScoreComposerSheet: View {
           Text("어떤 마음을 남길까요?")
             .font(.title3.weight(.bold))
             .foregroundStyle(WoorisaiColor.Fg.neutral)
-          Text("0점부터 100점까지 빠르게 고르고, 양옆 버튼으로 한 점씩 다듬어 보세요.")
+          Text("0점 이상 숫자를 직접 입력하거나, 양옆 버튼으로 한 점씩 다듬어 보세요.")
             .font(.footnote)
             .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
         }
@@ -153,28 +153,26 @@ struct ScoreComposerSheet: View {
             targetScore = max(0, targetScore - 1)
           }
 
-          Text("\(targetScore)점")
+          TextField("점수", value: $targetScore, format: .number.grouping(.never))
             .font(.system(.largeTitle, design: .rounded, weight: .bold))
             .foregroundStyle(WoorisaiColor.Fg.brand)
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .contentTransition(.numericText())
-            .accessibilityHidden(true)
+            .accessibilityLabel("목표 점수")
+            .accessibilityValue("\(targetScore)점")
+            .accessibilityIdentifier("relationship.targetScore")
 
           scoreAdjustmentButton(
             symbol: "plus",
             label: "점수 1점 올리기",
             identifier: "relationship.targetScore.increment",
-            isEnabled: targetScore < 100
+            isEnabled: targetScore < Int64.max
           ) {
-            targetScore = min(100, targetScore + 1)
+            targetScore += 1
           }
         }
-
-        Slider(value: scoreSliderValue, in: 0...100, step: 1)
-          .tint(WoorisaiColor.Fg.brandVivid)
-          .accessibilityLabel("목표 점수")
-          .accessibilityValue("\(targetScore)점")
-          .accessibilityIdentifier("relationship.targetScore")
       }
       .padding(WoorisaiSpacing.regular)
     }
@@ -238,7 +236,7 @@ struct ScoreComposerSheet: View {
     .accessibilityIdentifier("relationship.scorePreview")
   }
 
-  private func previewScore(label: String, score: Int) -> some View {
+  private func previewScore(label: String, score: Int64) -> some View {
     VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
       Text(label)
         .font(.caption.weight(.semibold))
@@ -317,14 +315,7 @@ struct ScoreComposerSheet: View {
     .woorisaiKeyboardActionBarSurface()
   }
 
-  private var scoreSliderValue: Binding<Double> {
-    Binding(
-      get: { Double(targetScore) },
-      set: { targetScore = min(100, max(0, Int($0.rounded()))) }
-    )
-  }
-
-  private var currentScore: Int {
+  private var currentScore: Int64 {
     model.scores?.outgoingScore ?? targetScore
   }
 
@@ -372,6 +363,9 @@ struct ScoreComposerSheet: View {
     }
     if mediaModel.isImporting || !mediaModel.isReadyForSubmission {
       return "사진 준비가 끝나면 기록할 수 있어요."
+    }
+    if targetScore < 0 {
+      return "점수는 0점 이상이어야 해요."
     }
     if targetScore == currentScore {
       return "현재 점수와 다른 점수를 골라 주세요."

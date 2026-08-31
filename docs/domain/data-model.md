@@ -39,11 +39,13 @@ canonical pair를 요구한다.
 
 `relationship_score`는 `source_participant_id → target_participant_id` 방향의 현재 점수다.
 Source와 target은 각각 unique이고 서로 달라야 하므로 canonical pair에는 반대 방향 두 행이
-있다. `current_score`는 0~100이고 `version`은 내부 JPA `@Version`이다.
+있다. `current_score`는 제품 상한이 없는 0 이상의 `BIGINT`이고 `version`은 내부 JPA
+`@Version`이다.
 
 `score_change`는 relationship과 actor를 함께 참조한다. Composite FK가 actor와 source
-participant가 같은 관계임을 DB에서도 보존한다. `delta`는 -100~100의 0이 아닌 값이고
-`resulting_score`는 0~100이다. `reason`은 없으면 `NULL`, 있으면 trim 뒤 nonblank 최대 200자다.
+participant가 같은 관계임을 DB에서도 보존한다. `delta`는 0이 아닌 `BIGINT`이고
+`resulting_score`는 0 이상의 `BIGINT`다. `reason`은 없으면 `NULL`, 있으면 trim 뒤 nonblank
+최대 200자다.
 이력은 생성 이후 수정하거나 삭제하지 않는다.
 
 `score_change_comment`는 parent change, author, nullable content와 server timestamp를 가진다.

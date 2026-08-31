@@ -10,8 +10,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 record ChangeScoreRequest(
-        Integer delta,
-        Integer targetScore,
+        Long delta,
+        Long targetScore,
         String reason,
         List<UUID> mediaUploadIds) {
 
@@ -82,14 +82,14 @@ record MediaView(
 record RelationshipScoreView(
         ParticipantView sourceParticipant,
         ParticipantView targetParticipant,
-        int currentScore,
+        long currentScore,
         Instant updatedAt) {
 
     RelationshipScoreView {
         Objects.requireNonNull(sourceParticipant);
         Objects.requireNonNull(targetParticipant);
         Objects.requireNonNull(updatedAt);
-        if (currentScore < 0 || currentScore > 100) {
+        if (currentScore < 0) {
             throw new IllegalArgumentException("Relationship score response is invalid");
         }
     }
@@ -100,8 +100,8 @@ record ScoreChangeView(
         ParticipantView sourceParticipant,
         ParticipantView targetParticipant,
         ParticipantView changedBy,
-        int delta,
-        int resultingScore,
+        long delta,
+        long resultingScore,
         String reason,
         Instant createdAt,
         long commentCount,
@@ -115,10 +115,7 @@ record ScoreChangeView(
         attachments = List.copyOf(attachments);
         if (id <= 0
                 || delta == 0
-                || delta < -100
-                || delta > 100
                 || resultingScore < 0
-                || resultingScore > 100
                 || commentCount < 0) {
             throw new IllegalArgumentException("Score change response is invalid");
         }

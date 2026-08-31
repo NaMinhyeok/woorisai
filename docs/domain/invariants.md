@@ -35,9 +35,10 @@
 ## 관계 점수와 이력
 
 - 두 참가자 사이에는 반대 방향의 score row 두 개가 있다.
-- 점수는 0~100의 방향 값이며 actor는 자신의 outgoing score만 바꾼다.
+- 점수는 0 이상의 방향 값이며 제품 상한은 없다. Actor는 자신의 outgoing score만 바꾼다.
 - 변경 요청은 `delta` 또는 `targetScore` 중 정확히 하나를 사용한다.
-- Delta는 0이 아니어야 한다. 결과가 범위를 벗어나거나 target이 현재 값과 같으면 conflict다.
+- Delta는 0이 아니어야 한다. 결과가 음수이거나 `int64` 연산이 overflow하거나 target이 현재
+  값과 같으면 conflict다.
 - 한 transaction에서 current score의 optimistic version update, immutable change history,
   optional score image와 event publication을 함께 commit하거나 rollback한다.
 - 겹친 write의 loser는 history, attachment와 event를 남기지 않고

@@ -1275,9 +1275,8 @@ components:
           $ref: "#/components/schemas/RelationshipParticipant"
         currentScore:
           type: integer
-          format: int32
+          format: int64
           minimum: 0
-          maximum: 100
         updatedAt:
           type: string
           format: date-time
@@ -1310,17 +1309,14 @@ components:
           type:
             - integer
             - "null"
-          format: int32
-          minimum: -100
-          maximum: 100
+          format: int64
           description: A non-null value must be non-zero
         targetScore:
           type:
             - integer
             - "null"
-          format: int32
+          format: int64
           minimum: 0
-          maximum: 100
         reason:
           type:
             - string
@@ -1363,15 +1359,12 @@ components:
           $ref: "#/components/schemas/RelationshipParticipant"
         delta:
           type: integer
-          format: int32
-          minimum: -100
-          maximum: 100
+          format: int64
           description: Always non-zero; enforced by the server and persisted domain model
         resultingScore:
           type: integer
-          format: int32
+          format: int64
           minimum: 0
-          maximum: 100
         reason:
           type:
             - string

@@ -18,6 +18,7 @@ struct RelationshipModelTests {
     #expect(model.changes == [RelationshipFixtures.change])
     #expect(!model.canCreateScoreChange(targetScore: 70))
     #expect(model.canCreateScoreChange(targetScore: 71))
+    #expect(model.canCreateScoreChange(targetScore: 3_000_000_000))
 
     model.createScoreChange(targetScore: 70, reason: "같은 점수")
 
