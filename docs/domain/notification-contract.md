@@ -11,9 +11,10 @@ publication registry가 담당한다. 작은 recipient 집합에 custom queue/fa
 | --- | --- | --- | --- | --- |
 | `RelationshipScoreChanged` | Relationship target participant | `relationshipScoreChanged` | Score change ID | 새로운 마음 기록이 도착했어요 |
 | `ScoreChangeCommentCreated` | 댓글 작성자의 상대 participant | `scoreChangeCommentCreated` | Parent score change ID | 새로운 댓글이 도착했어요 |
+| `DiaryEntryCreated` | 일기 작성자의 상대 participant | `diaryEntryCreated` | Diary entry ID | 새로운 이야기가 도착했어요 |
 | `DiaryEntryCommentCreated` | 댓글 작성자의 상대 participant | `diaryEntryCommentCreated` | Parent diary entry ID | 새로운 댓글이 도착했어요 |
 
-Diary entry create/update/delete와 comment update/delete는 event를 만들지 않는다. Event에는
+Diary entry update/delete와 comment update/delete는 event를 만들지 않는다. Event에는
 recipient participant ID와 route resource ID만 있다. Producer는 notification type이나 Firebase를
 import하지 않는다.
 
@@ -21,6 +22,7 @@ Listener ID는 outstanding publication과 rollout의 durable compatibility contr
 
 - `notification.relationship-score-changed`
 - `notification.score-change-comment-created`
+- `notification.diary-entry-created`
 - `notification.diary-entry-comment-created`
 
 Listener ID나 event class shape를 바꾸려면 기존 publication을 어떻게 읽고 완료할지 먼저
@@ -37,7 +39,11 @@ Firebase message는 다음 값만 사용한다.
 FCM의 FID target field를 사용하며 registration-token fallback은 없다. Payload와 log에는
 participant 정보, 점수와 reason, 사용자 content, media 정보, FID와 provider response detail을
 넣지 않는다. iOS는 notification tap 뒤 Basic API로 resource를 다시 읽어 권한과 존재 여부를
-확인한다.
+확인한다. `diaryEntryCreated`와 `diaryEntryCommentCreated`는 모두 같은 diary entry detail을
+다시 읽는다. 알 수 없는 `eventType`은 navigation으로 추정하지 않고 무시한다. 새 type의 tap
+routing이 필요하면 iOS consumer를 producer보다 먼저 배포한다. 이전 client가 새 type을 받아도
+generic alert만 표시하고 route를 무시하므로 private content를 노출하거나 잘못된 화면으로
+이동하지 않는다.
 
 ## Transaction과 delivery
 

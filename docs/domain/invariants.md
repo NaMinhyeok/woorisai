@@ -73,7 +73,8 @@
   실패한 transaction은 content, attachment와 event를 모두 rollback하며 자동 재시도하지 않는다.
 - 같은 entry에 독립적인 comment create는 parent version을 갱신하지 않아 함께 commit될 수
   있다.
-- Diary comment 생성만 상대 participant 대상 event를 만든다.
+- Diary entry와 comment 생성은 상대 participant 대상 event를 만든다.
+- Entry/comment update와 delete는 event를 만들지 않는다.
 
 ### 내부 optimistic version의 범위
 
@@ -131,8 +132,8 @@ comment는 계속 함께 commit된다.
 
 ## Notification
 
-- Score change, score comment create와 diary comment create가 상대 participant용 event를
-  만든다.
+- Score change, score comment create, diary entry create와 diary comment create가 상대
+  participant용 event를 만든다.
 - Event는 recipient participant ID와 route resource ID만 운반한다.
 - 잠금 화면 payload에는 participant, score, reason, 사용자 content와 media 정보를 넣지 않는다.
 - Producer write와 event publication은 같은 transaction이다. Listener는 commit 뒤 실행된다.

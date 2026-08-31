@@ -585,6 +585,12 @@ struct NotificationModelTests {
     )
     #expect(
       NotificationPayloadRouter.refetchIntent(
+        eventType: "diaryEntryCreated",
+        resourceID: "202"
+      ) == .diaryEntry(id: 202)
+    )
+    #expect(
+      NotificationPayloadRouter.refetchIntent(
         eventType: "diaryEntryCommentCreated",
         resourceID: "202"
       ) == .diaryEntry(id: 202)
