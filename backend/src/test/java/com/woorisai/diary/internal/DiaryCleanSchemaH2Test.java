@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.woorisai.diary.DiaryEntryCommentCreated;
+import com.woorisai.diary.DiaryEntryCreated;
 import com.woorisai.media.AttachScoreChangeMediaCommand;
 import com.woorisai.media.AttachScoreCommentMediaCommand;
 import com.woorisai.media.AttachedMedia;
@@ -101,6 +102,22 @@ class DiaryCleanSchemaH2Test {
                 VALUES (?, 2, ?, CAST(? AS TIMESTAMP WITH TIME ZONE))
                 """, SECOND, SECOND_PARTICIPANT.displayName(), "2026-07-21T00:00:01Z");
         media.reset();
+    }
+
+    @Test
+    void onlyEntryCreationPublishesForThePartner() {
+        DiaryEntryResponse created = diary.createEntry(
+                FIRST,
+                CreateDiaryEntryCommand.from("함께 남길 기록", List.of(FIRST_UPLOAD)));
+
+        diary.updateEntry(
+                FIRST,
+                created.id(),
+                UpdateDiaryEntryCommand.from("다듬은 기록", null));
+        diary.deleteEntry(FIRST, created.id());
+
+        assertThat(applicationEvents.stream(DiaryEntryCreated.class).toList())
+                .containsExactly(new DiaryEntryCreated(SECOND, created.id()));
     }
 
     @Test
@@ -210,6 +227,7 @@ class DiaryCleanSchemaH2Test {
                 .isInstanceOf(DiaryUnavailableException.class);
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM woorisai.diary_entry", Long.class)).isZero();
+        assertThat(applicationEvents.stream(DiaryEntryCreated.class)).isEmpty();
 
         DiaryEntryResponse created = diary.createEntry(
                 FIRST, CreateDiaryEntryCommand.from("original", List.of()));

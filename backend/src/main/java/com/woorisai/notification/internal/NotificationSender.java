@@ -9,6 +9,7 @@ interface NotificationSender {
     enum NotificationEventType {
         RELATIONSHIP_SCORE_CHANGED("relationshipScoreChanged", "새로운 마음 기록이 도착했어요"),
         SCORE_CHANGE_COMMENT_CREATED("scoreChangeCommentCreated", "새로운 댓글이 도착했어요"),
+        DIARY_ENTRY_CREATED("diaryEntryCreated", "새로운 이야기가 도착했어요"),
         DIARY_ENTRY_COMMENT_CREATED("diaryEntryCommentCreated", "새로운 댓글이 도착했어요");
 
         private final String wireName;

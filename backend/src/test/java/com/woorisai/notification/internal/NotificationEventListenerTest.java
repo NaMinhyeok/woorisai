@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.woorisai.diary.DiaryEntryCommentCreated;
+import com.woorisai.diary.DiaryEntryCreated;
 import com.woorisai.notification.internal.NotificationSender.InvalidNotificationTargetException;
 import com.woorisai.notification.internal.NotificationSender.NotificationDeliveryException;
 import com.woorisai.notification.internal.NotificationSender.NotificationEventType;
@@ -50,6 +51,7 @@ class NotificationEventListenerTest {
 
         listener.relationshipScoreChanged(new RelationshipScoreChanged(2, 41));
         listener.scoreChangeCommentCreated(new ScoreChangeCommentCreated(2, 42));
+        listener.diaryEntryCreated(new DiaryEntryCreated(2, 50));
         listener.diaryEntryCommentCreated(new DiaryEntryCommentCreated(2, 51));
 
         assertThat(sender.messages).containsExactly(
@@ -69,6 +71,14 @@ class NotificationEventListenerTest {
                         SECOND_INSTALLATION_ID,
                         NotificationEventType.SCORE_CHANGE_COMMENT_CREATED,
                         42),
+                new NotificationMessage(
+                        FIRST_INSTALLATION_ID,
+                        NotificationEventType.DIARY_ENTRY_CREATED,
+                        50),
+                new NotificationMessage(
+                        SECOND_INSTALLATION_ID,
+                        NotificationEventType.DIARY_ENTRY_CREATED,
+                        50),
                 new NotificationMessage(
                         FIRST_INSTALLATION_ID,
                         NotificationEventType.DIARY_ENTRY_COMMENT_CREATED,
@@ -144,6 +154,10 @@ class NotificationEventListenerTest {
                 ScoreChangeCommentCreated.class,
                 NotificationEventListener.SCORE_CHANGE_COMMENT_CREATED_LISTENER);
         assertListenerId(
+                "diaryEntryCreated",
+                DiaryEntryCreated.class,
+                NotificationEventListener.DIARY_ENTRY_CREATED_LISTENER);
+        assertListenerId(
                 "diaryEntryCommentCreated",
                 DiaryEntryCommentCreated.class,
                 NotificationEventListener.DIARY_ENTRY_COMMENT_CREATED_LISTENER);
@@ -154,6 +168,9 @@ class NotificationEventListenerTest {
         assertThat(ScoreChangeCommentCreated.class.getRecordComponents())
                 .extracting(component -> component.getName())
                 .containsExactly("recipientParticipantId", "scoreChangeId");
+        assertThat(DiaryEntryCreated.class.getRecordComponents())
+                .extracting(component -> component.getName())
+                .containsExactly("recipientParticipantId", "diaryEntryId");
         assertThat(DiaryEntryCommentCreated.class.getRecordComponents())
                 .extracting(component -> component.getName())
                 .containsExactly("recipientParticipantId", "diaryEntryId");

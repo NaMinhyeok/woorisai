@@ -1,6 +1,7 @@
 package com.woorisai.diary.internal;
 
 import com.woorisai.diary.DiaryEntryCommentCreated;
+import com.woorisai.diary.DiaryEntryCreated;
 import com.woorisai.media.AttachedMedia;
 import com.woorisai.media.AttachedMediaQuery;
 import com.woorisai.media.AttachedMediaQuery.AttachedMediaUnavailableException;
@@ -87,6 +88,8 @@ class DiaryService {
         replaceDiaryMedia(
                 context.actor().id(), entry.getId(), command.mediaUploadIds().values());
         List<DiaryMediaResponse> media = attachments(List.of(entry)).get(entry.getId());
+        events.publishEvent(new DiaryEntryCreated(
+                context.recipient().id(), entry.getId()));
         return DiaryEntryResponse.of(
                 entry, context.authorshipOf(entry.getAuthorId()), media, 0);
     }

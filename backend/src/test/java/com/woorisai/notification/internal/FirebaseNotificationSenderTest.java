@@ -54,6 +54,25 @@ class FirebaseNotificationSenderTest {
     }
 
     @Test
+    void buildsAGenericDiaryEntryCreatedMessage() {
+        FirebaseNotificationSender sender = new FirebaseNotificationSender(
+                mock(FirebaseMessaging.class));
+
+        Message message = sender.message(new NotificationMessage(
+                INSTALLATION_ID,
+                NotificationEventType.DIARY_ENTRY_CREATED,
+                51));
+
+        assertThat(field(message, "data")).isEqualTo(Map.of(
+                "eventType", "diaryEntryCreated",
+                "resourceId", "51"));
+        Notification notification = (Notification) field(message, "notification");
+        assertThat(field(notification, "title")).isEqualTo("우리 사이");
+        assertThat(field(notification, "body")).isEqualTo("새로운 이야기가 도착했어요");
+        assertThat(field(notification, "image")).isNull();
+    }
+
+    @Test
     void treatsOnlyUnregisteredAsAPermanentlyInvalidTarget()
             throws Exception {
         FirebaseMessaging messaging = mock(FirebaseMessaging.class);

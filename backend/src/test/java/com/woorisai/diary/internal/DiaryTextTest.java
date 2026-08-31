@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.woorisai.diary.DiaryEntryCommentCreated;
+import com.woorisai.diary.DiaryEntryCreated;
 import org.junit.jupiter.api.Test;
 
 class DiaryTextTest {
@@ -35,7 +36,19 @@ class DiaryTextTest {
     }
 
     @Test
-    void eventRequiresPositiveIdentifiers() {
+    void entryCreatedEventRequiresPositiveIdentifiers() {
+        DiaryEntryCreated event = new DiaryEntryCreated(1, 2);
+
+        assertThat(event.recipientParticipantId()).isEqualTo(1);
+        assertThat(event.diaryEntryId()).isEqualTo(2);
+        assertThatThrownBy(() -> new DiaryEntryCreated(0, 2))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new DiaryEntryCreated(1, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void commentCreatedEventRequiresPositiveIdentifiers() {
         DiaryEntryCommentCreated event = new DiaryEntryCommentCreated(1, 2);
 
         assertThat(event.recipientParticipantId()).isEqualTo(1);

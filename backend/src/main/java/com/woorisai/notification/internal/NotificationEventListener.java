@@ -1,6 +1,7 @@
 package com.woorisai.notification.internal;
 
 import com.woorisai.diary.DiaryEntryCommentCreated;
+import com.woorisai.diary.DiaryEntryCreated;
 import com.woorisai.notification.internal.NotificationSender.InvalidNotificationTargetException;
 import com.woorisai.notification.internal.NotificationSender.NotificationEventType;
 import com.woorisai.notification.internal.NotificationSender.NotificationMessage;
@@ -18,6 +19,8 @@ class NotificationEventListener {
             "notification.relationship-score-changed";
     static final String SCORE_CHANGE_COMMENT_CREATED_LISTENER =
             "notification.score-change-comment-created";
+    static final String DIARY_ENTRY_CREATED_LISTENER =
+            "notification.diary-entry-created";
     static final String DIARY_ENTRY_COMMENT_CREATED_LISTENER =
             "notification.diary-entry-comment-created";
 
@@ -38,6 +41,14 @@ class NotificationEventListener {
                 event.recipientParticipantId(),
                 NotificationEventType.SCORE_CHANGE_COMMENT_CREATED,
                 event.scoreChangeId());
+    }
+
+    @ApplicationModuleListener(id = DIARY_ENTRY_CREATED_LISTENER)
+    void diaryEntryCreated(DiaryEntryCreated event) {
+        deliver(
+                event.recipientParticipantId(),
+                NotificationEventType.DIARY_ENTRY_CREATED,
+                event.diaryEntryId());
     }
 
     @ApplicationModuleListener(id = DIARY_ENTRY_COMMENT_CREATED_LISTENER)

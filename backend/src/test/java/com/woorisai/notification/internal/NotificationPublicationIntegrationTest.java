@@ -14,7 +14,7 @@ import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.MessagingErrorCode;
 import com.woorisai.WoorisaiApplication;
-import com.woorisai.diary.DiaryEntryCommentCreated;
+import com.woorisai.diary.DiaryEntryCreated;
 import com.woorisai.notification.internal.NotificationSender.InvalidNotificationTargetException;
 import com.woorisai.notification.internal.NotificationSender.NotificationDeliveryException;
 import com.woorisai.notification.internal.NotificationSender.NotificationEventType;
@@ -140,7 +140,7 @@ class NotificationPublicationIntegrationTest {
 
     @Test
     void completesAndDeletesThePublicationWithoutCallingTheSenderWhenThereIsNoFid() {
-        publishAndAssertRecordedBeforeCommit(new DiaryEntryCommentCreated(FIRST, 51));
+        publishAndAssertRecordedBeforeCommit(new DiaryEntryCreated(FIRST, 51));
 
         awaitPublicationCount(0);
         verifyNoInteractions(sender);

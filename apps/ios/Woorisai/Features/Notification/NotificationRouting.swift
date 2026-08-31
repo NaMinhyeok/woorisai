@@ -40,7 +40,7 @@ enum NotificationPayloadRouter {
     switch eventType {
     case "relationshipScoreChanged", "scoreChangeCommentCreated":
       return .scoreChange(id: id)
-    case "diaryEntryCommentCreated":
+    case "diaryEntryCreated", "diaryEntryCommentCreated":
       return .diaryEntry(id: id)
     default:
       return nil
