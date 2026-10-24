@@ -23,4 +23,4 @@ USER 10001:10001
 
 EXPOSE 8080
 
-CMD ["java", "-jar", "/app/woorisai.jar"]
+CMD ["java", "-Xms64m", "-Xmx256m", "-jar", "/app/woorisai.jar"]
