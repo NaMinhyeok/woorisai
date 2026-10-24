@@ -12,7 +12,7 @@
     ]
   },
   "deploy": {
-    "startCommand": "java -jar /app/woorisai.jar",
+    "startCommand": "java -Xms64m -Xmx256m -jar /app/woorisai.jar",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",

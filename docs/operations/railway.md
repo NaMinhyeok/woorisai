@@ -48,8 +48,13 @@ builder context에서 제외한다.
 Runtime image는 non-root UID/GID로 다음 artifact만 실행한다.
 
 ```bash
-java -jar /app/woorisai.jar
+java -Xms64m -Xmx256m -jar /app/woorisai.jar
 ```
+
+`railway.json`의 `startCommand`와 Dockerfile의 `CMD`는 같은 heap 설정을 유지한다. 초기 heap은
+64 MiB, 최대 heap은 256 MiB이며 metaspace, thread stack과 direct buffer 등 heap 밖의 메모리는
+이 상한에 포함되지 않는다. 배포 후 실제 사용량, OOM/restart와 응답 지연을 확인하고 부족하면
+두 설정의 최대 heap을 함께 조정한다. Container 전체 메모리 제한을 heap 상한과 같게 잡지 않는다.
 
 Application은 Railway가 주입한 `PORT`에 bind한다. Java image digest나 start command를 바꾸면
 local image build와 fresh PostgreSQL startup smoke를 함께 수행한다.
