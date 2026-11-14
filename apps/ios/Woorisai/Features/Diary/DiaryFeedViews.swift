@@ -204,16 +204,18 @@ struct DiaryHero: View {
     .accessibilityAddTraits(.isHeader)
   }
 
+  @ViewBuilder
   private var heroSymbol: some View {
-    Image(systemName: symbol)
-      .font(.system(size: 22, weight: .semibold))
-      .foregroundStyle(WoorisaiColor.Fg.brandVivid)
-      .frame(
-        width: WoorisaiControlMetric.minimumTapTarget,
-        height: WoorisaiControlMetric.minimumTapTarget
-      )
-      .background(WoorisaiColor.Bg.brandWeak, in: Circle())
-      .accessibilityHidden(true)
+    if symbol == "book.pages.fill" {
+      WoorisaiCompanions(size: 70)
+    } else {
+      Image(systemName: symbol)
+        .font(.system(size: 22, weight: .semibold))
+        .foregroundStyle(WoorisaiColor.Fg.brandVivid)
+        .frame(width: 52, height: 52)
+        .background(WoorisaiColor.Bg.brandWeak, in: Circle())
+        .accessibilityHidden(true)
+    }
   }
 
   private var heroCopy: some View {

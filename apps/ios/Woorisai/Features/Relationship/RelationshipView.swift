@@ -305,10 +305,7 @@ struct RelationshipView: View {
       if !dynamicTypeSize.isAccessibilitySize {
         Spacer(minLength: WoorisaiSpacing.small)
       }
-      Image(systemName: "heart.circle.fill")
-        .font(.system(.largeTitle, design: .rounded, weight: .semibold))
-        .foregroundStyle(WoorisaiColor.Fg.brandVivid, WoorisaiColor.Fg.brandWeak)
-        .accessibilityHidden(true)
+      WoorisaiCompanions(size: 78)
     }
     .padding(.vertical, WoorisaiSpacing.small)
     .accessibilityElement(children: .combine)

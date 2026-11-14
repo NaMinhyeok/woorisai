@@ -44,10 +44,7 @@ struct BiometricUnlockView: View {
 
   private var brandMark: some View {
     VStack(spacing: WoorisaiSpacing.small) {
-      Image(systemName: "lock.heart")
-        .font(.system(size: 40, weight: .semibold))
-        .foregroundStyle(WoorisaiColor.Fg.brandVivid)
-        .accessibilityHidden(true)
+      WoorisaiCompanions(size: 92)
       Text("우리 둘만의 공간이 잠겨 있어요")
         .font(.title2.bold())
         .foregroundStyle(WoorisaiColor.Fg.neutral)

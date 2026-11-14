@@ -142,23 +142,7 @@ struct LoginOptionsView: View {
   private var brandHeader: some View {
     VStack(spacing: dynamicTypeSize.isAccessibilitySize ? 8 : 10) {
       if !dynamicTypeSize.isAccessibilitySize {
-        ZStack {
-          RoundedRectangle(cornerRadius: WoorisaiRadius.large, style: .continuous)
-            .fill(WoorisaiColor.Bg.layerDefault)
-            .overlay {
-              RoundedRectangle(cornerRadius: WoorisaiRadius.large, style: .continuous)
-                .stroke(WoorisaiColor.Stroke.brandSubtle, lineWidth: 1)
-            }
-            .woorisaiShadow(.s2)
-
-          Image(systemName: "heart.fill")
-            .font(.system(size: 32, weight: .semibold))
-            .foregroundStyle(WoorisaiColor.Fg.brandVivid)
-            .rotationEffect(.degrees(4))
-        }
-        .frame(width: 72, height: 72)
-        .rotationEffect(.degrees(-4))
-        .accessibilityHidden(true)
+        WoorisaiCompanions(size: 96)
 
         Eyebrow("JUST BETWEEN US")
       }
