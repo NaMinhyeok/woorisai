@@ -293,16 +293,19 @@ private struct AppRootView: View {
   }
 
   var body: some View {
-    if let participant = authenticationModel.authenticatedParticipant {
-      authenticatedContent(participant: participant)
-    } else if authenticationModel.isAwaitingBiometricUnlock {
-      BiometricUnlockView(authenticationModel: authenticationModel)
-    } else {
-      LoginOptionsView(
-        model: loginOptionsModel,
-        authenticationModel: authenticationModel
-      )
+    Group {
+      if let participant = authenticationModel.authenticatedParticipant {
+        authenticatedContent(participant: participant)
+      } else if authenticationModel.isAwaitingBiometricUnlock {
+        BiometricUnlockView(authenticationModel: authenticationModel)
+      } else {
+        LoginOptionsView(
+          model: loginOptionsModel,
+          authenticationModel: authenticationModel
+        )
+      }
     }
+    .tint(WoorisaiColor.Fg.brand)
   }
 
   private func authenticatedContent(

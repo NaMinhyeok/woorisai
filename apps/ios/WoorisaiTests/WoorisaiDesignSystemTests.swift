@@ -163,6 +163,32 @@ struct WoorisaiDesignSystemTests {
     UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: style))
   }
 
+  @Test
+  func darkModeUsesAReadableTwilightCanvas() {
+    let background = resolved(WoorisaiColor.Bg.layerBasement, style: .dark)
+    let surface = resolved(WoorisaiColor.Bg.layerDefault, style: .dark)
+    let brightness = relativeLuminance(background)
+
+    #expect(brightness >= 0.05 && brightness <= 0.12)
+    #expect(relativeLuminance(surface) > brightness)
+    #expect(contrastRatio(
+      resolved(WoorisaiColor.Decor.companionPeach, style: .dark), background
+    ) >= Self.nonTextContrast)
+    #expect(contrastRatio(
+      resolved(WoorisaiColor.Decor.companionSprout, style: .dark), background
+    ) >= Self.nonTextContrast)
+  }
+
+  @Test(arguments: interfaceStyles)
+  func companionFacesRemainLegibleOnBothBodies(style: UIUserInterfaceStyle) {
+    for body in [
+      WoorisaiColor.Decor.companionPeach,
+      WoorisaiColor.Decor.companionSprout,
+    ] {
+      expectContrast(WoorisaiColor.Decor.companionFace, on: body, style)
+    }
+  }
+
   // MARK: - CharacterBudget
 
   /// 카운터가 평소에 숨어 있으므로 등장 시점이 곧 이 규칙의 전부다. 화면 안에서는 경계 한 글자를

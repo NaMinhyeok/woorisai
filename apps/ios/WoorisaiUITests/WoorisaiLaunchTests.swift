@@ -63,6 +63,14 @@ final class WoorisaiLaunchTests: XCTestCase {
     continueAfterFailure = false
   }
 
+  func testLoginShowsOriginalCompanions() {
+    let app = launch(scenario: "success")
+
+    let companions = element("woorisai.companions", in: app)
+    XCTAssertTrue(companions.waitForExistence(timeout: 5))
+    XCTAssertEqual(companions.label, "우리사이의 두 친구, 몽이와 새미")
+  }
+
   func testSuccessShowsBothParticipantNames() {
     let app = launch(scenario: "success")
 

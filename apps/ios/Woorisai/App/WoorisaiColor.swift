@@ -8,31 +8,34 @@ import UIKit
 /// 그래서 원색은 값의 보관소로만 남기고, 의미는 전부 ``WoorisaiColor`` 쪽에 적는다.
 private enum WoorisaiPalette {
   /// SwiftUI 밖 chrome(프라이버시 커버)용. 아래 `cream`·`coral`과 같은 값을 유지할 것.
-  static let creamUIColor = adaptiveUIColor(light: (255, 248, 241), dark: (23, 19, 18))
-  static let coralUIColor = adaptiveUIColor(light: (217, 92, 78), dark: (255, 143, 125))
+  static let creamUIColor = adaptiveUIColor(light: (255, 249, 240), dark: (81, 64, 76))
+  static let coralUIColor = adaptiveUIColor(light: (183, 88, 114), dark: (255, 210, 206))
 
   static let cream = Color(uiColor: creamUIColor)
-  static let creamDeep = adaptive(light: (249, 238, 228), dark: (46, 37, 33))
-  static let surface = adaptive(light: (255, 252, 250), dark: (37, 31, 29))
-  static let field = adaptive(light: (255, 251, 248), dark: (48, 40, 37))
-  static let selectedSurface = adaptive(light: (255, 240, 236), dark: (58, 40, 37))
-  static let ink = adaptive(light: (57, 45, 42), dark: (247, 238, 234))
-  static let muted = adaptive(light: (112, 94, 88), dark: (200, 181, 172))
-  static let line = adaptive(light: (160, 139, 130), dark: (142, 114, 104))
+  static let creamDeep = adaptive(light: (249, 238, 228), dark: (99, 78, 90))
+  static let surface = adaptive(light: (255, 253, 248), dark: (120, 97, 108))
+  static let field = adaptive(light: (255, 250, 246), dark: (108, 86, 98))
+  static let selectedSurface = adaptive(light: (255, 233, 232), dark: (119, 83, 95))
+  static let ink = adaptive(light: (75, 57, 61), dark: (255, 249, 241))
+  static let muted = adaptive(light: (121, 95, 96), dark: (255, 241, 234))
+  static let line = adaptive(light: (152, 111, 120), dark: (231, 207, 212))
   static let coral = Color(uiColor: coralUIColor)
-  static let coralDark = adaptive(light: (168, 63, 53), dark: (255, 170, 153))
-  static let coralSoft = adaptive(light: (255, 224, 216), dark: (84, 48, 43))
-  static let rose = adaptive(light: (246, 181, 173), dark: (192, 120, 112))
-  static let sage = adaptive(light: (75, 113, 86), dark: (155, 201, 168))
-  static let sageSoft = adaptive(light: (228, 240, 231), dark: (43, 69, 51))
-  static let success = adaptive(light: (61, 110, 75), dark: (155, 213, 169))
-  static let error = adaptive(light: (180, 35, 24), dark: (255, 180, 171))
-  static let primaryButtonStart = adaptive(light: (193, 64, 52), dark: (183, 62, 52))
-  static let primaryButtonEnd = adaptive(light: (150, 47, 40), dark: (132, 42, 36))
-  static let primaryButtonDisabled = adaptive(light: (132, 102, 97), dark: (140, 108, 102))
+  static let coralDark = adaptive(light: (170, 73, 97), dark: (255, 210, 206))
+  static let coralSoft = adaptive(light: (255, 226, 229), dark: (104, 67, 91))
+  static let rose = adaptive(light: (236, 158, 172), dark: (213, 142, 155))
+  static let companionPeach = adaptive(light: (248, 188, 171), dark: (237, 170, 168))
+  static let companionSprout = adaptive(light: (199, 226, 190), dark: (182, 216, 180))
+  static let companionFace = adaptive(light: (75, 57, 61), dark: (75, 57, 61))
+  static let sage = adaptive(light: (72, 112, 98), dark: (204, 232, 201))
+  static let sageSoft = adaptive(light: (229, 242, 225), dark: (76, 104, 91))
+  static let success = adaptive(light: (61, 110, 75), dark: (181, 218, 182))
+  static let error = adaptive(light: (180, 35, 24), dark: (255, 197, 189))
+  static let primaryButtonStart = adaptive(light: (170, 73, 97), dark: (170, 73, 97))
+  static let primaryButtonEnd = adaptive(light: (137, 55, 78), dark: (137, 55, 78))
+  static let primaryButtonDisabled = adaptive(light: (138, 102, 109), dark: (33, 25, 35))
   // 다크 모드에서 순검정 그림자는 따뜻한 어두운 배경에 묻혀 카드를 납작하게 만든다. 대신 옅은
   // 웜 글로우가 높이로 읽힌다. 투명도는 `WoorisaiElevation`이 단계별로 정한다.
-  static let shadow = adaptive(light: (57, 45, 42), dark: (255, 190, 175))
+  static let shadow = adaptive(light: (106, 69, 80), dark: (255, 205, 212))
 
   private static func adaptive(
     light: (red: Int, green: Int, blue: Int),
@@ -98,8 +101,8 @@ enum WoorisaiColor {
     /// 브랜드 솔리드 배경. 위에 올릴 것은 ``Fg/brandContrast``.
     ///
     /// **흰 글자를 얹는 브랜드 면은 반드시 이 토큰이다.** `Fg` 축의 브랜드 색들은 글자·아이콘용
-    /// 이라 배경으로 돌리면 흰 글자와의 대비가 무너진다 — ``Fg/brandVivid``는 다크모드에서
-    /// 2.2:1, ``Fg/brand``는 1.8:1까지 떨어진다. 이 색은 라이트 5.18:1, 다크 5.60:1을 지킨다.
+    /// 이라 배경으로 돌리면 흰 글자와의 대비가 무너질 수 있다. 밝고 어두운 화면 모두
+    /// 흰 글자와 4.5:1 이상을 지킨다.
     ///
     /// `.buttonStyle(.borderedProminent)`의 `.tint(_:)`도 배경을 칠하므로 여기에 해당한다.
     static let brandSolid = WoorisaiPalette.primaryButtonStart
@@ -142,8 +145,8 @@ enum WoorisaiColor {
     static let brand = WoorisaiPalette.coralDark
     /// 아이콘·틴트 전용의 선명한 브랜드 톤.
     ///
-    /// **본문 텍스트에도, 배경에도 쓰지 않는다.** 크림 배경 위 3.57:1(아이콘은 되지만 본문
-    /// 기준 4.5:1 미달)이고, 이 색을 배경 삼아 흰 글자를 올리면 다크모드에서 2.2:1까지 떨어진다.
+    /// **본문 텍스트에도, 배경에도 쓰지 않는다.** 테마에 따라 본문 대비가 달라지고,
+    /// 이 색을 배경 삼아 흰 글자를 올리면 다크모드에서 대비가 떨어진다.
     /// 글자에는 ``brand``, 배경에는 ``Bg/brandSolid``를 쓸 것.
     static let brandVivid = WoorisaiPalette.coral
     /// 2톤 심볼(`foregroundStyle(_:_:)`)의 보조 톤. 주 톤은 ``brandVivid``.
@@ -354,6 +357,12 @@ enum WoorisaiColor {
 
   /// `WarmBackground`의 분위기 레이어. 의미를 전달하지 않으며 `accessibilityHidden`이다.
   enum Decor {
+    /// 오리지널 두 캐릭터의 몸과 표정. 밝고 어두운 화면 모두 표정 대비를 지킨다.
+    static let companionPeach = WoorisaiPalette.companionPeach
+    static let companionSprout = WoorisaiPalette.companionSprout
+    static let companionFace = WoorisaiPalette.companionFace
+    static let companionLeaf = WoorisaiPalette.sage
+    static let companionCheek = WoorisaiPalette.rose
     static let ambientBrand = WoorisaiPalette.coralSoft
     static let ambientCalm = WoorisaiPalette.sageSoft
     static let dotWarm = WoorisaiPalette.rose

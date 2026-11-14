@@ -20,11 +20,11 @@ enum WoorisaiRadius {
   /// 마스킹 테이프처럼 아주 작은 조각.
   static let xSmall: CGFloat = 4
   /// 버튼·칩.
-  static let small: CGFloat = 12
+  static let small: CGFloat = 16
   /// 카드·필드·말풍선.
-  static let medium: CGFloat = 18
+  static let medium: CGFloat = 22
   /// 큰 카드·시트.
-  static let large: CGFloat = 24
+  static let large: CGFloat = 28
 }
 
 /// 컨트롤 높이 3단.
@@ -226,22 +226,20 @@ struct WarmBackground<Content: View>: View {
       .allowsHitTesting(false)
 
       Canvas { context, size in
-        let dots: [(CGPoint, CGFloat, Color)] = [
-          (CGPoint(x: size.width * 0.12, y: size.height * 0.16), 4, WoorisaiColor.Decor.dotWarm),
-          (CGPoint(x: size.width * 0.88, y: size.height * 0.28), 3, WoorisaiColor.Decor.dotCalm),
-          (CGPoint(x: size.width * 0.18, y: size.height * 0.78), 3, WoorisaiColor.Decor.dotBrand),
+        // Tiny paper-cut sparkles, not character art; keep the page calm behind text.
+        let sparkles: [(CGPoint, CGFloat, Color)] = [
+          (CGPoint(x: size.width * 0.12, y: size.height * 0.16), 6, WoorisaiColor.Decor.dotWarm),
+          (CGPoint(x: size.width * 0.88, y: size.height * 0.28), 5, WoorisaiColor.Decor.dotCalm),
+          (CGPoint(x: size.width * 0.18, y: size.height * 0.78), 5, WoorisaiColor.Decor.dotBrand),
         ]
-        for (point, radius, color) in dots {
-          context.fill(
-            Path(
-              ellipseIn: CGRect(
-                x: point.x - radius,
-                y: point.y - radius,
-                width: radius * 2,
-                height: radius * 2
-              )),
-            with: .color(color.opacity(0.22))
-          )
+        for (point, radius, color) in sparkles {
+          var sparkle = Path()
+          sparkle.move(to: CGPoint(x: point.x, y: point.y - radius))
+          sparkle.addLine(to: CGPoint(x: point.x + radius, y: point.y))
+          sparkle.addLine(to: CGPoint(x: point.x, y: point.y + radius))
+          sparkle.addLine(to: CGPoint(x: point.x - radius, y: point.y))
+          sparkle.closeSubpath()
+          context.fill(sparkle, with: .color(color.opacity(0.28)))
         }
       }
       .ignoresSafeArea()
@@ -332,6 +330,95 @@ struct ParticipantAvatar: View {
   }
 }
 
+/// 복숭아 씨앗 몽이와 잎사귀 새미. 동물 귀 대신 씨앗·잎 실루엣을 쓴 우리사이 캐릭터.
+private struct WoorisaiCompanion: View {
+  enum Kind { case peach, sprout }
+
+  let kind: Kind
+  let size: CGFloat
+
+  var body: some View {
+    ZStack {
+      if kind == .sprout {
+        Ellipse()
+          .fill(WoorisaiColor.Decor.companionLeaf)
+          .frame(width: size * 0.31, height: size * 0.19)
+          .rotationEffect(.degrees(-30))
+          .offset(x: size * 0.13, y: -size * 0.43)
+      } else {
+        Capsule()
+          .fill(WoorisaiColor.Fg.brand)
+          .frame(width: size * 0.09, height: size * 0.17)
+          .rotationEffect(.degrees(18))
+          .offset(y: -size * 0.43)
+      }
+
+      bodyShape
+        .fill(kind == .peach
+          ? WoorisaiColor.Decor.companionPeach
+          : WoorisaiColor.Decor.companionSprout)
+        .overlay {
+          bodyShape.stroke(WoorisaiColor.Decor.companionFace.opacity(0.25), lineWidth: 1)
+        }
+        .frame(width: size * 0.9, height: size * 0.78)
+        .offset(y: size * 0.07)
+
+      HStack(spacing: size * 0.18) {
+        Circle().frame(width: size * 0.065, height: size * 0.065)
+        Circle().frame(width: size * 0.065, height: size * 0.065)
+      }
+      .foregroundStyle(WoorisaiColor.Decor.companionFace)
+      .offset(y: size * 0.06)
+
+      Path { path in
+        path.move(to: CGPoint(x: 0, y: 0))
+        path.addQuadCurve(
+          to: CGPoint(x: size * 0.14, y: 0),
+          control: CGPoint(x: size * 0.07, y: size * 0.1)
+        )
+      }
+      .stroke(WoorisaiColor.Decor.companionFace, style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+      .frame(width: size * 0.14, height: size * 0.1)
+      .offset(y: size * 0.16)
+
+      if kind == .peach {
+        Circle()
+          .fill(WoorisaiColor.Decor.companionCheek.opacity(0.8))
+          .frame(width: size * 0.12, height: size * 0.07)
+          .offset(x: -size * 0.28, y: size * 0.16)
+      }
+    }
+    .frame(width: size, height: size)
+    .accessibilityHidden(true)
+  }
+
+  private var bodyShape: AnyShape {
+    if kind == .peach {
+      AnyShape(Ellipse())
+    } else {
+      AnyShape(RoundedRectangle(cornerRadius: size * 0.32, style: .continuous))
+    }
+  }
+}
+
+/// 두 캐릭터는 장식 요소로만 표시하고 사용자 신원이나 점수 상태를 대신하지 않는다.
+struct WoorisaiCompanions: View {
+  var size: CGFloat = 76
+
+  var body: some View {
+    HStack(alignment: .bottom, spacing: -size * 0.08) {
+      WoorisaiCompanion(kind: .peach, size: size * 0.58)
+        .rotationEffect(.degrees(-8))
+      WoorisaiCompanion(kind: .sprout, size: size * 0.58)
+        .rotationEffect(.degrees(7))
+    }
+    .frame(width: size * 1.08, height: size * 0.8)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("우리사이의 두 친구, 몽이와 새미")
+    .accessibilityIdentifier("woorisai.companions")
+  }
+}
+
 struct PrimaryHeartButton: View {
   @Environment(\.isEnabled) private var environmentIsEnabled
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -376,7 +463,7 @@ struct PrimaryHeartButton: View {
             .accessibilityHidden(true)
         }
       }
-      .font(.headline.weight(.bold))
+      .font(.system(.headline, design: .rounded, weight: .bold))
       .foregroundStyle(WoorisaiColor.Fg.brandContrast)
       .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.primaryHeight)
       .padding(.horizontal, WoorisaiSpacing.regular)
@@ -538,7 +625,7 @@ struct WoorisaiSectionHeading: View {
         .foregroundStyle(WoorisaiColor.Fg.brandVivid)
         .accessibilityHidden(true)
       Text(title)
-        .font(.title3.weight(.bold))
+        .font(.system(.title3, design: .rounded, weight: .bold))
         .foregroundStyle(WoorisaiColor.Fg.neutral)
         .accessibilityAddTraits(.isHeader)
     }
