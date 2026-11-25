@@ -25,6 +25,7 @@ class ErrorCatalogTest {
     private static final List<String> CATALOG_TYPES = List.of(
             "support.error.CommonError",
             "diary.internal.DiaryError",
+            "calendar.internal.CalendarError",
             "relationship.internal.RelationshipError",
             "media.internal.MediaError",
             "notification.internal.NotificationError",

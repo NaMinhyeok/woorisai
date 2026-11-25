@@ -3,6 +3,7 @@ import Foundation
 enum NotificationResourceRefetchIntent: Equatable, Hashable, Sendable {
   case scoreChange(id: Int64)
   case diaryEntry(id: Int64)
+  case calendarEvent(id: Int64)
 }
 
 enum NotificationNavigationDisposition: Equatable, Sendable {
@@ -42,6 +43,8 @@ enum NotificationPayloadRouter {
       return .scoreChange(id: id)
     case "diaryEntryCreated", "diaryEntryCommentCreated":
       return .diaryEntry(id: id)
+    case "calendarEventCreated", "calendarEventUpdated", "calendarEventDeleted":
+      return .calendarEvent(id: id)
     default:
       return nil
     }

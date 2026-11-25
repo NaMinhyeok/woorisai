@@ -79,7 +79,8 @@ public struct WoorisaiAPIClient: LoginOptionsLoading, Sendable {
         BasicAuthorizationMiddleware(
           apiOrigin: apiOrigin,
           credentialStore: credentialStore
-        )
+        ),
+        CalendarRequiredNullableNoteMiddleware()
       ]
     )
     self.client = client

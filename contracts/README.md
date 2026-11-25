@@ -46,6 +46,7 @@ service unavailable로 실패한다. 이 조회는 인증 성공을 뜻하지 �
 | Media | initiate, complete, discard, attached download URL |
 | Relationship | score pair, history, score change, thread, comment create |
 | Diary | entry list/create/detail/update/delete, comment create/update/delete |
+| Calendar | bounded UTC date-range list, create, detail, full replacement, delete |
 | Notification | FID register/unregister |
 
 정확한 method, path, request/response와 상태는 OpenAPI file만 정본으로 관리한다.
@@ -71,6 +72,20 @@ service unavailable로 실패한다. 이 조회는 인증 성공을 뜻하지 �
   iOS app-owned request validation으로 이 경계를 함께 검증한다.
 - Relationship score와 변경량은 `int64`로 전달한다. Score는 0 이상이고 제품 상한은 없으며,
   음수 결과와 `int64` overflow는 server가 conflict로 거절한다.
+
+## Calendar 소비 계약
+
+`listCalendarEvents`, `createCalendarEvent`, `getCalendarEvent`, `updateCalendarEvent`,
+`deleteCalendarEvent`는 고정 operationId다. GET list는 `from`/`to` 양끝 포함 UTC 날짜를 받아
+최대 367일을 조회하고 `CalendarEvent[]`를 직접 반환한다 (paged list가 아니다).
+POST/PUT은 동일한 필수 필드 `title,startAt,endAt,allDay,note,kind` 전체를 보낸다.
+`note`는 비워두려면 명시적인 JSON null을 보낸다. 응답의 `author`는 diary와 같은
+`{slot,displayName}`이며 id는 노출하지 않는다. `MINE`과 `OURS`는 **둘 다 조회**되며
+`MINE`만 최초 작성자 전용 수정·삭제다. `OURS`는 두 참가자 모두 수정·삭제할 수 있다.
+변경 전 kind가 권한을 결정하고 작성자는 고정이다. Push는 일정 내용 없이 generic 문구와
+`eventType`/`resourceId`만 사용한다. 서버가 시각을 저장할 때 원래 UTC offset을 보존한다는
+약속은 없으므로 client는 ISO offset 시각을 instant로 해석한다. `allDay`도 유효한 시각 범위를
+필수로 보낸다. 409는 겹친 write conflict이며 stale 화면 충돌 방지 계약은 아니다.
 
 ## 검증
 

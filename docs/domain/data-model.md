@@ -20,6 +20,7 @@ Clean schema와 단일 writer를 선택한 근거는
 | `relationship` | `score_change_comment` | 점수 변경의 평평한 시간순 댓글 |
 | `diary` | `diary_entry` | 공유 일기 본문과 작성자 |
 | `diary` | `diary_entry_comment` | 일기의 평평한 시간순 댓글 |
+| `calendar` | `calendar_event` | Two-person MINE/OURS schedule, immutable author, soft deletion and optimistic version |
 | `media` | `media_attachment` | Upload와 attachment metadata, parent와 순서 |
 | `notification` | `notification_fid` | Participant가 등록한 Firebase Installation ID |
 | Spring Modulith | `event_publication` | Commit 이후 listener를 위한 publication registry |
@@ -74,6 +75,17 @@ Entry delete는 물리 삭제가 아니라 `deleted_at` 기록이므로 `ON DELE
 
 Persistence version은 public JSON, ETag이나 `If-Match`로 노출하지 않는다. `deleted_at`도
 노출하지 않는다.
+
+## Calendar
+
+`calendar_event`는 identity bigint PK, participant FK `author_id`, 200자 이하 title,
+nullable 2000자 이하 note, offset-bearing 시각 `start_at`/`end_at`, `all_day`,
+`MINE`/`OURS` kind, server timestamps, 내부 `version`과 nullable `deleted_at`을 가진다.
+DB는 비어 있지 않은 title, `end_at > start_at`, 유효 kind와 생성 이후 timestamp를 강제한다.
+`author_id`는 생성 이후 바꾸지 않는다. 삭제는 tombstone이며 live row만 range 조회한다.
+겹친 update/delete는 JPA version으로 감지한다. Range index는 살아 있는 row의 시작·종료
+시각을 대상으로 한다. 작성자는 공개 응답에서 기존 diary와 같은 `{slot, displayName}`으로
+표현하며 DB의 bigint ID는 외부에 노출하지 않는다.
 
 ## Media attachment
 

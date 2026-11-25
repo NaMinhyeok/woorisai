@@ -103,8 +103,10 @@ class CleanSchemaPostgresMigrationTest {
         var v3Result = flywayAt(MigrationVersion.fromVersion("3")).migrate();
         assertThat(v3Result.migrationsExecuted).isOne();
 
-        var v4Result = flyway().migrate();
+        var v4Result = flywayAt(MigrationVersion.fromVersion("4")).migrate();
         assertThat(v4Result.migrationsExecuted).isOne();
+        var v5Result = flyway().migrate();
+        assertThat(v5Result.migrationsExecuted).isOne();
     }
 
     @AfterAll
@@ -122,6 +124,7 @@ class CleanSchemaPostgresMigrationTest {
                     ORDER BY table_name
                     """))
                     .containsExactly(
+                            "calendar_event",
                             "diary_entry",
                             "diary_entry_comment",
                             "event_publication",
@@ -140,12 +143,13 @@ class CleanSchemaPostgresMigrationTest {
                     FROM information_schema.columns
                     WHERE table_schema = 'woorisai'
                       AND table_name IN (
-                          'relationship_score', 'diary_entry', 'diary_entry_comment'
+                          'relationship_score', 'diary_entry', 'diary_entry_comment', 'calendar_event'
                       )
                       AND column_name = 'version'
                     ORDER BY table_name
                     """))
                     .containsExactly(
+                            "calendar_event:int8:NO",
                             "diary_entry:int8:NO",
                             "diary_entry_comment:int8:NO",
                             "relationship_score:int8:NO"
@@ -158,6 +162,7 @@ class CleanSchemaPostgresMigrationTest {
                     ORDER BY table_name
                     """))
                     .containsExactly(
+                            "calendar_event:timestamptz:YES",
                             "diary_entry:timestamptz:YES",
                             "diary_entry_comment:timestamptz:YES",
                             "participant:timestamptz:YES",
@@ -173,6 +178,7 @@ class CleanSchemaPostgresMigrationTest {
                     ORDER BY indexname
                     """))
                     .containsExactly(
+                            "calendar_event_range_idx",
                             "diary_entry_comment_live_thread_idx",
                             "diary_entry_live_list_idx"
                     );
@@ -190,12 +196,12 @@ class CleanSchemaPostgresMigrationTest {
                     FROM information_schema.columns
                     WHERE table_schema = 'woorisai'
                       AND table_name IN (
-                          'relationship_score', 'diary_entry', 'diary_entry_comment'
+                          'relationship_score', 'diary_entry', 'diary_entry_comment', 'calendar_event'
                       )
                       AND column_name = 'version'
                       AND column_default IS NOT NULL
                     """))
-                    .isEqualTo(3);
+                    .isEqualTo(4);
 
             assertThat(queryStrings(connection, """
                     SELECT table_schema
@@ -220,6 +226,7 @@ class CleanSchemaPostgresMigrationTest {
                     ORDER BY table_name
                     """))
                     .containsExactly(
+                            "calendar_event",
                             "diary_entry",
                             "diary_entry_comment",
                             "notification_fid",
@@ -581,6 +588,40 @@ class CleanSchemaPostgresMigrationTest {
 
             execute(connection, "DELETE FROM woorisai.diary_entry WHERE id = 9140");
             execute(connection, "DELETE FROM woorisai.participant WHERE id = 9101");
+        }
+    }
+
+    @Test
+    void calendarConstraintsRejectInvalidIntervalAndKind() throws Exception {
+        try (Connection connection = connection()) {
+            execute(connection, """
+                    INSERT INTO woorisai.participant (id, slot, display_name, created_at)
+                    VALUES (9301, 1, 'calendar-fixture', TIMESTAMPTZ '2026-11-25 00:00:00Z')
+                    ON CONFLICT (slot) DO NOTHING
+                    """);
+            int authorId = queryInt(connection, "SELECT id FROM woorisai.participant WHERE slot = 1");
+            assertConstraintViolation(connection, "23514", "calendar_event_interval_ck", """
+                    INSERT INTO woorisai.calendar_event
+                    (author_id,title,start_at,end_at,all_day,kind,created_at,updated_at,version)
+                    VALUES (%d,'event',TIMESTAMPTZ '2026-11-25 01:00:00Z',
+                      TIMESTAMPTZ '2026-11-25 01:00:00Z',false,'OURS',
+                      TIMESTAMPTZ '2026-11-25 00:00:00Z',TIMESTAMPTZ '2026-11-25 00:00:00Z',0)
+                    """.formatted(authorId));
+            assertConstraintViolation(connection, "23514", "calendar_event_kind_ck", """
+                    INSERT INTO woorisai.calendar_event
+                    (author_id,title,start_at,end_at,all_day,kind,created_at,updated_at,version)
+                    VALUES (%d,'event',TIMESTAMPTZ '2026-11-25 01:00:00Z',
+                      TIMESTAMPTZ '2026-11-25 02:00:00Z',false,'BOTH',
+                      TIMESTAMPTZ '2026-11-25 00:00:00Z',TIMESTAMPTZ '2026-11-25 00:00:00Z',0)
+                    """.formatted(authorId));
+            assertConstraintViolation(connection, "23503", "calendar_event_author_fk", """
+                    INSERT INTO woorisai.calendar_event
+                    (author_id,title,start_at,end_at,all_day,kind,created_at,updated_at,version)
+                    VALUES (9999,'event',TIMESTAMPTZ '2026-11-25 01:00:00Z',
+                      TIMESTAMPTZ '2026-11-25 02:00:00Z',false,'OURS',
+                      TIMESTAMPTZ '2026-11-25 00:00:00Z',TIMESTAMPTZ '2026-11-25 00:00:00Z',0)
+                    """);
+            execute(connection, "DELETE FROM woorisai.participant WHERE id = 9301");
         }
     }
 

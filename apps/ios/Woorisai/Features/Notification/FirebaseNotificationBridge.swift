@@ -150,6 +150,11 @@ final class FirebasePushLifecycleCoordinator: NSObject {
           eventType: "diaryEntryCommentCreated",
           resourceID: String(id)
         )
+      case .calendarEvent(let id):
+        notificationModel.receiveNotification(
+          eventType: "calendarEventUpdated",
+          resourceID: String(id)
+        )
       }
     }
     pendingRefetchIntents.removeAll()

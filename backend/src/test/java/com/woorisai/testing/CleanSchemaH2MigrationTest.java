@@ -40,7 +40,7 @@ class CleanSchemaH2MigrationTest {
 
         var result = flyway.migrate();
 
-        assertThat(result.migrationsExecuted).isEqualTo(4);
+        assertThat(result.migrationsExecuted).isEqualTo(5);
     }
 
     @AfterEach
@@ -58,6 +58,7 @@ class CleanSchemaH2MigrationTest {
                     ORDER BY table_name
                     """))
                     .containsExactly(
+                            "calendar_event",
                             "diary_entry",
                             "diary_entry_comment",
                             "event_publication",

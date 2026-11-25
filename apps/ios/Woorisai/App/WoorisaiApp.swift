@@ -11,6 +11,7 @@ struct WoorisaiApp: App {
   @State private var authenticationModel: AuthenticationModel
   @State private var relationshipModel: RelationshipModel
   @State private var diaryModel: DiaryModel
+  @State private var calendarModel: CalendarModel
   @State private var notificationModel: NotificationModel
   @State private var hasPresentedActiveScene = false
   private let mediaService: any MediaServing
@@ -42,6 +43,7 @@ struct WoorisaiApp: App {
     _diaryModel = State(
       initialValue: DiaryModel(service: services.diaryService)
     )
+    _calendarModel = State(initialValue: CalendarModel(service: services.calendarService))
     _notificationModel = State(
       initialValue: NotificationModel(
         permissions: services.notificationPermissions,
@@ -76,6 +78,7 @@ struct WoorisaiApp: App {
         authenticationModel: authenticationModel,
         relationshipModel: relationshipModel,
         diaryModel: diaryModel,
+        calendarModel: calendarModel,
         notificationModel: notificationModel,
         mediaService: mediaService,
         mediaUploader: mediaUploader,
@@ -252,6 +255,7 @@ private struct AppRootView: View {
   @State private var authenticationModel: AuthenticationModel
   @State private var relationshipModel: RelationshipModel
   @State private var diaryModel: DiaryModel
+  @State private var calendarModel: CalendarModel
   @State private var notificationModel: NotificationModel
   @State private var selectedTab = AuthenticatedTab.relationship
   @State private var relationshipNavigationPath: [RelationshipDestination] = []
@@ -272,6 +276,7 @@ private struct AppRootView: View {
     authenticationModel: AuthenticationModel,
     relationshipModel: RelationshipModel,
     diaryModel: DiaryModel,
+    calendarModel: CalendarModel,
     notificationModel: NotificationModel,
     mediaService: any MediaServing,
     mediaUploader: any PresignedMediaUploading,
@@ -281,6 +286,7 @@ private struct AppRootView: View {
     _authenticationModel = State(initialValue: authenticationModel)
     _relationshipModel = State(initialValue: relationshipModel)
     _diaryModel = State(initialValue: diaryModel)
+    _calendarModel = State(initialValue: calendarModel)
     _notificationModel = State(initialValue: notificationModel)
     let mediaSession = TopLevelMediaSessionCoordinator(
       service: mediaService,
@@ -342,11 +348,20 @@ private struct AppRootView: View {
       }
       .tag(AuthenticatedTab.diary)
 
+      CalendarView(
+        model: calendarModel,
+        participant: participant,
+        onAuthenticationRequired: { requirePINAgain(for: participant) }
+      )
+      .tabItem { Label("일정", systemImage: "calendar") }
+      .tag(AuthenticatedTab.calendar)
+
       AppSettingsView(
         participant: participant,
         notificationState: notificationModel.state,
         canRetryNotifications: notificationModel.canRetryRegistration,
         onRetryNotifications: notificationModel.retryRegistration,
+        calendarWriteNeedsResolution: calendarModel.requiresNavigationProtection,
         canRememberSession: authenticationModel.canOfferRemembering,
         isSessionRemembered: Binding(
           get: { authenticationModel.isSessionRemembered },
@@ -413,6 +428,7 @@ private struct AppRootView: View {
     relationshipModel.scoreSubmissionState == .submitting
       || relationshipModel.commentSubmissionState == .submitting
       || diaryModel.mutationState == .submitting
+      || calendarModel.isMutating
   }
 
   private var isProtectedMutationActive: Bool {
@@ -425,6 +441,7 @@ private struct AppRootView: View {
       || diaryModel.mutationOutcomeRequiresConfirmation
       || diaryModel.hasProtectedManualRetryDraft
       || diaryModel.hasProtectedLocalDraft
+      || calendarModel.uncertainMutation
   }
 
   #if DEBUG
@@ -454,6 +471,7 @@ private struct AppRootView: View {
   /// Lock the app: clear the in-memory session but keep the Keychain vault so Face ID can reopen
   /// it, and keep the push FID registered so notifications keep arriving while locked.
   private func lockSession() {
+    guard !calendarModel.requiresNavigationProtection else { return }
     endSession(
       resetsLoginOptions: true,
       notificationTeardown: { notificationModel.pauseRegistrationForLock() },
@@ -463,6 +481,7 @@ private struct AppRootView: View {
 
   /// Full sign-out: purge the Keychain vault and unregister the push FID. Next launch needs a PIN.
   private func forgetSession() {
+    guard !calendarModel.requiresNavigationProtection else { return }
     endSession(
       resetsLoginOptions: true,
       notificationTeardown: { await notificationModel.unregisterBeforeSignOut() },
@@ -503,6 +522,7 @@ private struct AppRootView: View {
     if resetsLoginOptions { loginOptionsModel.reset() }
     relationshipModel.clear()
     diaryModel.clear()
+    calendarModel.clear()
     Task {
       await Task.yield()
       await prepareTopLevelMediaForSessionEnd(
@@ -513,6 +533,7 @@ private struct AppRootView: View {
       notificationModel.discardPendingRefetchIntents()
       relationshipModel.clear()
       diaryModel.clear()
+      calendarModel.clear()
       await authenticationTeardown()
       isEndingSession = false
     }
@@ -598,6 +619,9 @@ private struct AppRootView: View {
         } else {
           relationshipNavigationPath = [.scoreThread(id)]
         }
+      case .calendarEvent(let id):
+        selectedTab = .calendar
+        calendarModel.openEvent(id: id)
       case .diaryEntry(let id):
         selectedTab = .diary
         diaryModel.reload()
@@ -618,6 +642,7 @@ private struct AppRootView: View {
 private enum AuthenticatedTab: Hashable {
   case relationship
   case diary
+  case calendar
   case settings
 }
 
@@ -630,6 +655,7 @@ private struct AppSettingsView: View {
   let notificationState: NotificationModel.State
   let canRetryNotifications: Bool
   let onRetryNotifications: @MainActor () -> Void
+  let calendarWriteNeedsResolution: Bool
   let canRememberSession: Bool
   @Binding var isSessionRemembered: Bool
   let onLock: @MainActor () -> Void
@@ -697,6 +723,7 @@ private struct AppSettingsView: View {
           }
           .accessibilityHint("작성 중인 글과 첨부를 정리하고 앱을 잠급니다.")
           .accessibilityIdentifier("settings.lock")
+          .disabled(calendarWriteNeedsResolution)
 
           Button(role: .destructive) {
             confirmsForget = true
@@ -706,6 +733,11 @@ private struct AppSettingsView: View {
           }
           .accessibilityHint("이 기기에 저장된 로그인 정보를 삭제하고 로그아웃합니다.")
           .accessibilityIdentifier("settings.forget")
+          .disabled(calendarWriteNeedsResolution)
+          if calendarWriteNeedsResolution {
+            Text("일정 저장 결과를 확인하거나 초안을 정리한 뒤 잠금·로그아웃할 수 있어요.")
+              .font(.footnote)
+          }
         } header: {
           Text("보안")
         } footer: {
@@ -791,6 +823,7 @@ private enum AppDependencies {
           credentialValidator: service,
           relationshipService: service,
           diaryService: service,
+          calendarService: service,
           mediaService: service,
           mediaUploader: WoorisaiUITestPresignedMediaUploader(),
           notificationFIDService: unavailable,
@@ -826,6 +859,7 @@ private enum AppDependencies {
         credentialValidator: client,
         relationshipService: client,
         diaryService: client,
+        calendarService: client,
         mediaService: mediaService,
         mediaUploader: mediaUploader,
         notificationFIDService: client,
@@ -859,6 +893,7 @@ private struct AppServices {
   let credentialValidator: any CredentialValidating
   let relationshipService: any RelationshipServing
   let diaryService: any DiaryServing
+  var calendarService: any CalendarServing = ConfigurationFailureService()
   let mediaService: any MediaServing
   let mediaUploader: any PresignedMediaUploading
   let notificationFIDService: any NotificationFIDServing
@@ -873,7 +908,7 @@ private struct AppServices {
 }
 
 private struct ConfigurationFailureService: LoginOptionsLoading, CredentialValidating,
-  RelationshipServing, DiaryServing, MediaServing, NotificationFIDServing
+  RelationshipServing, DiaryServing, CalendarServing, MediaServing, NotificationFIDServing
 {
   func loadLoginOptions() async throws -> [LoginOption] {
     throw RuntimeConfigurationError.invalidAPIHost
@@ -950,6 +985,12 @@ private struct ConfigurationFailureService: LoginOptionsLoading, CredentialValid
   func deleteDiaryComment(id: Int64) async throws {
     throw RuntimeConfigurationError.invalidAPIHost
   }
+
+  func listCalendarEvents(range: CalendarDateRange) async throws -> [CalendarEvent] { throw RuntimeConfigurationError.invalidAPIHost }
+  func createCalendarEvent(_ draft: CalendarEventDraft) async throws -> CalendarEvent { throw RuntimeConfigurationError.invalidAPIHost }
+  func getCalendarEvent(id: Int64) async throws -> CalendarEvent { throw RuntimeConfigurationError.invalidAPIHost }
+  func updateCalendarEvent(id: Int64, draft: CalendarEventDraft) async throws -> CalendarEvent { throw RuntimeConfigurationError.invalidAPIHost }
+  func deleteCalendarEvent(id: Int64) async throws { throw RuntimeConfigurationError.invalidAPIHost }
 
   func initiateUpload(_ draft: MediaUploadDraft) async throws -> MediaUploadGrant {
     throw RuntimeConfigurationError.invalidAPIHost

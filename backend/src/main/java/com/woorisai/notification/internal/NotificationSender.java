@@ -10,7 +10,10 @@ interface NotificationSender {
         RELATIONSHIP_SCORE_CHANGED("relationshipScoreChanged", "새로운 마음 기록이 도착했어요"),
         SCORE_CHANGE_COMMENT_CREATED("scoreChangeCommentCreated", "새로운 댓글이 도착했어요"),
         DIARY_ENTRY_CREATED("diaryEntryCreated", "새로운 이야기가 도착했어요"),
-        DIARY_ENTRY_COMMENT_CREATED("diaryEntryCommentCreated", "새로운 댓글이 도착했어요");
+        DIARY_ENTRY_COMMENT_CREATED("diaryEntryCommentCreated", "새로운 댓글이 도착했어요"),
+        CALENDAR_EVENT_CREATED("calendarEventCreated", "새로운 일정이 생겼어요"),
+        CALENDAR_EVENT_UPDATED("calendarEventUpdated", "일정이 변경되었어요"),
+        CALENDAR_EVENT_DELETED("calendarEventDeleted", "일정이 삭제되었어요");
 
         private final String wireName;
         private final String body;
