@@ -207,6 +207,11 @@ enum APIOperationAuthorizationPolicy {
     "createDiaryEntryComment",
     "updateDiaryEntryComment",
     "deleteDiaryEntryComment",
+    "listCalendarEvents",
+    "createCalendarEvent",
+    "getCalendarEvent",
+    "updateCalendarEvent",
+    "deleteCalendarEvent",
     "registerNotificationFid",
     "unregisterNotificationFid",
   ]

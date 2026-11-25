@@ -5,6 +5,13 @@ import WoorisaiAPI
 
 @MainActor
 struct NotificationModelTests {
+  @Test
+  func calendarPushRoutesToRefetchIncludingDeletedEvent() {
+    #expect(NotificationPayloadRouter.refetchIntent(eventType: "calendarEventCreated", resourceID: "42") == .calendarEvent(id: 42))
+    #expect(NotificationPayloadRouter.refetchIntent(eventType: "calendarEventUpdated", resourceID: "42") == .calendarEvent(id: 42))
+    #expect(NotificationPayloadRouter.refetchIntent(eventType: "calendarEventDeleted", resourceID: "42") == .calendarEvent(id: 42))
+  }
+
   private let fid = "c123456789012345678901"
 
   @Test

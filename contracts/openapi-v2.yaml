@@ -12,6 +12,7 @@ tags:
   - name: Media
   - name: Relationship
   - name: Diary
+  - name: Calendar
   - name: Notification
 security:
   - BasicAuth: []
@@ -588,6 +589,129 @@ paths:
         "503":
           $ref: "#/components/responses/DiaryOrAuthenticationUnavailable"
 
+  /api/v2/calendar/events:
+    get:
+      tags: [Calendar]
+      summary: List events overlapping an inclusive UTC date range (at most 367 days)
+      operationId: listCalendarEvents
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Both participants' events ordered by start time then ID
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEvent"
+        "400": { $ref: "#/components/responses/InvalidCalendarRequest" }
+        "401": { $ref: "#/components/responses/AuthenticationRequired" }
+        "503": { $ref: "#/components/responses/CalendarOrAuthenticationUnavailable" }
+    post:
+      tags: [Calendar]
+      summary: Create a calendar event; notify the partner after commit
+      operationId: createCalendarEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalendarEventRequest"
+      responses:
+        "201":
+          description: Created event
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEvent"
+        "400": { $ref: "#/components/responses/InvalidCalendarRequest" }
+        "401": { $ref: "#/components/responses/AuthenticationRequired" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "503": { $ref: "#/components/responses/CalendarOrAuthenticationUnavailable" }
+
+  /api/v2/calendar/events/{eventId}:
+    parameters:
+      - name: eventId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/PositiveInt64"
+    get:
+      tags: [Calendar]
+      summary: Read either participant's event
+      operationId: getCalendarEvent
+      responses:
+        "200":
+          description: Event detail
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEvent"
+        "400": { $ref: "#/components/responses/InvalidCalendarRequest" }
+        "401": { $ref: "#/components/responses/AuthenticationRequired" }
+        "404": { $ref: "#/components/responses/CalendarNotFound" }
+        "503": { $ref: "#/components/responses/CalendarOrAuthenticationUnavailable" }
+    put:
+      tags: [Calendar]
+      summary: Replace an event; MINE requires creator, OURS allows either participant
+      operationId: updateCalendarEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalendarEventRequest"
+      responses:
+        "200":
+          description: Replaced event with immutable creator; notify partner after commit
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEvent"
+        "400": { $ref: "#/components/responses/InvalidCalendarRequest" }
+        "401": { $ref: "#/components/responses/AuthenticationRequired" }
+        "403": { $ref: "#/components/responses/CalendarForbidden" }
+        "404": { $ref: "#/components/responses/CalendarNotFound" }
+        "409": { $ref: "#/components/responses/CalendarConflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "503": { $ref: "#/components/responses/CalendarOrAuthenticationUnavailable" }
+    delete:
+      tags: [Calendar]
+      summary: Delete an event; MINE requires creator, OURS allows either participant
+      operationId: deleteCalendarEvent
+      responses:
+        "204":
+          description: Event deleted; notify partner after commit
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/NoStore"
+        "400": { $ref: "#/components/responses/InvalidCalendarRequest" }
+        "401": { $ref: "#/components/responses/AuthenticationRequired" }
+        "403": { $ref: "#/components/responses/CalendarForbidden" }
+        "404": { $ref: "#/components/responses/CalendarNotFound" }
+        "409": { $ref: "#/components/responses/CalendarConflict" }
+        "503": { $ref: "#/components/responses/CalendarOrAuthenticationUnavailable" }
+
   /api/v2/notification-fids:
     post:
       tags:
@@ -708,6 +832,44 @@ components:
         $ref: "#/components/schemas/PositiveInt64"
 
   responses:
+    InvalidCalendarRequest:
+      description: Invalid event fields, identifier or date range
+      headers:
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/InvalidCalendarRequestProblem" }
+    CalendarNotFound:
+      description: Calendar event does not exist or was deleted
+      headers:
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/CalendarNotFoundProblem" }
+    CalendarForbidden:
+      description: MINE event belongs to the other participant
+      headers:
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/CalendarForbiddenProblem" }
+    CalendarConflict:
+      description: Concurrent calendar event mutation
+      headers:
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/CalendarConflictProblem" }
+    CalendarOrAuthenticationUnavailable:
+      description: Authentication or calendar persistence is unavailable
+      headers:
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+      content:
+        application/problem+json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/AuthenticationUnavailableProblem"
+              - $ref: "#/components/schemas/CalendarUnavailableProblem"
     AuthenticationRequired:
       description: Basic credentials are missing, malformed, or do not match
       headers:
@@ -929,6 +1091,50 @@ components:
               - $ref: "#/components/schemas/NotificationFidUnavailableProblem"
 
   schemas:
+    CalendarEventRequest:
+      type: object
+      additionalProperties: false
+      required: [title, startAt, endAt, allDay, note, kind]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Trimmed by server; must remain nonblank
+        startAt: { type: string, format: date-time }
+        endAt:
+          type: string
+          format: date-time
+          description: Must be strictly after startAt as an instant
+        allDay: { type: boolean }
+        note:
+          type: [string, "null"]
+          maxLength: 2000
+        kind:
+          type: string
+          enum: [MINE, OURS]
+    CalendarAuthor:
+      type: object
+      additionalProperties: false
+      required: [slot, displayName]
+      properties:
+        slot: { type: integer, format: int32, enum: [1, 2] }
+        displayName: { type: string, minLength: 1, maxLength: 30 }
+    CalendarEvent:
+      type: object
+      additionalProperties: false
+      required: [id, title, startAt, endAt, allDay, note, kind, author, createdAt, updatedAt]
+      properties:
+        id: { $ref: "#/components/schemas/PositiveInt64" }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        allDay: { type: boolean }
+        note: { type: [string, "null"], maxLength: 2000 }
+        kind: { type: string, enum: [MINE, OURS] }
+        author: { $ref: "#/components/schemas/CalendarAuthor" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     CanonicalUuid:
       type: string
       format: uuid
@@ -2055,6 +2261,51 @@ components:
               enum: [Relationship data is temporarily unavailable.]
             errorCode:
               enum: [RELATIONSHIP_UNAVAILABLE]
+    InvalidCalendarRequestProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title: { enum: [Invalid calendar request] }
+            status: { enum: [400] }
+            detail: { enum: [Invalid calendar request.] }
+            errorCode: { enum: [INVALID_CALENDAR_REQUEST] }
+    CalendarNotFoundProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title: { enum: [Calendar event not found] }
+            status: { enum: [404] }
+            detail: { enum: [Calendar event not found.] }
+            errorCode: { enum: [CALENDAR_NOT_FOUND] }
+    CalendarForbiddenProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title: { enum: [Calendar mutation forbidden] }
+            status: { enum: [403] }
+            detail: { enum: [Calendar mutation forbidden.] }
+            errorCode: { enum: [CALENDAR_FORBIDDEN] }
+    CalendarConflictProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title: { enum: [Calendar conflict] }
+            status: { enum: [409] }
+            detail: { enum: [Calendar conflict.] }
+            errorCode: { enum: [CALENDAR_CONFLICT] }
+    CalendarUnavailableProblem:
+      allOf:
+        - $ref: "#/components/schemas/ApiProblem"
+        - type: object
+          properties:
+            title: { enum: [Calendar unavailable] }
+            status: { enum: [503] }
+            detail: { enum: [Calendar unavailable.] }
+            errorCode: { enum: [CALENDAR_UNAVAILABLE] }
     InvalidDiaryRequestProblem:
       allOf:
         - $ref: "#/components/schemas/ApiProblem"

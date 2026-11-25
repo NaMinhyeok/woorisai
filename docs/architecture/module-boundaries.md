@@ -18,7 +18,8 @@ Repository와 단일 deployable을 선택한 근거는 [시스템 아키텍처](
 | `media` | Upload metadata, object lifecycle, attachment 규칙 | Attachment query/mutation port와 immutable metadata | 없음 |
 | `relationship` | 방향 점수, immutable history, score comment | Privacy-safe score/comment event | `participant`, `media` |
 | `diary` | Entry/comment와 작성자 권한 | Privacy-safe diary-comment event | `participant`, `media` |
-| `notification` | FID 소유권, event listener, Firebase delivery | 공개 Java API 없음; provider와 HTTP adapter는 internal | `relationship`, `diary` |
+| `calendar` | 일정, 공유 권한과 soft deletion | `CalendarEventChanged` (recipient, ID, action only) | `participant` |
+| `notification` | FID 소유권, event listener, Firebase delivery | 공개 Java API 없음; provider와 HTTP adapter는 internal | `relationship`, `diary`, `calendar` |
 
 ```text
 participant  <----- identity
@@ -119,6 +120,15 @@ comment를 소유한다. Public event인 `RelationshipScoreChanged`와
 Participant directory와 media port만 호출한다. Entry/comment entity, repository, HTTP DTO와
 authorization failure는 internal이다. `DiaryEntryCommentCreated`만 notification용 public
 event다.
+
+### `calendar`
+
+`calendar`는 `calendar_event` entity/repository와 MINE/OURS 권한, bounded UTC date range를
+소유한다. `participant`의 canonical pair만 조회하고 notification을 직접 참조하지 않는다.
+생성·수정·삭제를 하나의 past-tense `CalendarEventChanged`로 발행하며 event는 recipient ID,
+resource ID와 action만 실어 내용 노출을 막는다. 수정·삭제에서 `@Version` 충돌을 감지하고
+soft deletion으로 route의 404를 유지한다. 일정 본문이나 DB entity를 module 밖에 노출하지
+않는 대신 notification listener가 action별 generic alert를 매핑한다.
 
 ### `notification`
 

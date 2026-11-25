@@ -5,6 +5,23 @@
 [시스템 아키텍처](../architecture/system-architecture.md), persistence shape는
 [data model](data-model.md)을 따른다.
 
+## 일정
+
+- `calendar_event`의 `MINE`(내 일정)과 `OURS`(우리 일정)은 모두 두 참가자에게 보인다.
+  `MINE`은 최초 작성자만 수정·삭제하고 `OURS`는 둘 다 수정·삭제한다. Kind를 바꿀 때도
+  **변경 전** 권한을 확인하며 작성자는 변경되지 않는다.
+- 필수 title은 앞뒤 공백 제거 후 1~200자, note는 nullable 최대 2000자다.
+  `startAt`과 `endAt`은 명시적 UTC offset을 가진 시각이며 실제 instant로 `endAt > startAt`을
+  요구한다. `allDay`는 표현 플래그이고 시각/종료 구간 규칙은 동일하다.
+- `from`/`to`는 UTC 기준 날짜이며 양끝 날짜를 포함한다. 최대 367개 날짜
+  (`to <= from + 366일`)를 조회하고 이벤트의 반열린 구간 `[startAt,endAt)`이 조회일 구간과
+  실제 겹칠 때만 반환한다. 정렬은 시작 시각 ASC, id ASC다. 무제한 스캔을 허용하지 않는다.
+- 삭제는 tombstone으로 표시하며 조회에서 빠진다. 겹친 수정·삭제는 내부 `@Version`을 통해
+  `409 CALENDAR_CONFLICT`로 처리한다. 이미 커밋된 낡은 화면의 overwrite는 방지하지 않는다.
+- 추가·수정·삭제마다 상대 참가자에게 내용 없는 event를 같은 transaction에서 발행하고
+  push는 commit 이후에 보낸다. 실행 행위자와 수신자는 다르며, 공유 일정 변경도 작성자가
+  아닌 실행자의 상대에게 알린다.
+
 ## 참가자
 
 - 참가자는 정확히 두 명이며 slot 1과 slot 2가 각각 한 명이다.

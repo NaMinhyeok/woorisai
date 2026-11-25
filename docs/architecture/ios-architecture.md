@@ -281,6 +281,31 @@ ID의 집합까지 확인한다. 최신 server 상태가 제출 상태와 정확
 snapshot 위 재전송이나 media 중복 연결을 막는다. Relationship archive pagination은 별도
 loading/error/retry 상태를 표시해 긴 기록을 더 불러오는 실패가 무응답처럼 보이지 않게 한다.
 
+## Calendar 일정
+
+`CalendarServing`의 app-owned event/draft는 생성된 OpenAPI 타입을 `WoorisaiCalendarAPI`에 가두며,
+생성기는 필수 nullable `note`의 nil을 생략하므로 Calendar write middleware가 해당 필드를
+명시적 JSON null로 보낸다(다른 요청은 바꾸지 않는다).
+월 화면은 기기 시간대의 달력 날짜를 보여 준다. 목록 API는 UTC 날짜 구간이므로 local month의
+첫 순간과 마지막 순간을 UTC 날짜로 변환해 양쪽 경계까지 포함해서 조회한다. 날짜별 표시에서는
+`startAt < 다음 날 시작 && endAt > 해당 날 시작`인 일정만 보여 주며 종료 시점은 배타적이다.
+달력의 주 시작 요일은 기기 calendar 설정을 따른다.
+
+두 사람 모두 `내 일정`(MINE)과 `우리 일정`(OURS)을 읽고 만들 수 있다. MINE은 작성자만,
+OURS는 양쪽 모두 수정·삭제할 수 있다. 작성자 정보는 서버의 `author.slot`과 `displayName`을
+사용하며, iOS에서 권한을 숨기더라도 최종 판정은 서버가 한다. 수정 시 종류를 바꾸더라도
+작성자는 변경하지 않는다. 쓰기가 전송 중이거나 결과가 불분명할 때는 다른 쓰기와 자동
+재전송을 잠그고 입력 초안을 유지한다. 결과가 불분명하면 재전송 없이 초안을 정리한다. 화면의 다시 불러오기는 쓰기 결과를 확정하지 않으며,
+사용자가 읽은 서버 목록과 대조한 뒤 새 쓰기를 직접 시작해야 한다. 삭제 push의 대상 GET이 404면 목록을
+다시 읽고 없는 일정으로 안내한다. Push는 `calendarEventCreated/Updated/Deleted`와 숫자 ID만
+route로 삼아 인증된 GET으로 확인하며 알림 본문을 화면 데이터로 쓰지 않는다.
+
+UTC 날짜 API와 local day 표시를 분리하면 여행이나 시간대 전환 때 요청 구간이 한두 날 더
+넓어질 수 있지만 경계 일정 누락은 막는다. 월간 범위가 367일 제한보다 작도록 유지한다.
+시작/종료 시각의 timezone offset은 생성된 client의 ISO8601 transcoder가 실어 나르고,
+앱은 절대 시각 `Date`를 저장한다. 서버가 recurrence나 다중 참석자를 도입하면 모델과
+month-window 계산을 재검토한다.
+
 ## Push와 navigation
 
 Firebase Installation ID는 인증된 participant로 register한다. APNs token 도착과 FID callback은

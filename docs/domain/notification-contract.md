@@ -13,9 +13,13 @@ publication registry가 담당한다. 작은 recipient 집합에 custom queue/fa
 | `ScoreChangeCommentCreated` | 댓글 작성자의 상대 participant | `scoreChangeCommentCreated` | Parent score change ID | 새로운 댓글이 도착했어요 |
 | `DiaryEntryCreated` | 일기 작성자의 상대 participant | `diaryEntryCreated` | Diary entry ID | 새로운 이야기가 도착했어요 |
 | `DiaryEntryCommentCreated` | 댓글 작성자의 상대 participant | `diaryEntryCommentCreated` | Parent diary entry ID | 새로운 댓글이 도착했어요 |
+| `CalendarEventChanged(CREATED)` | 실행자의 상대 participant | `calendarEventCreated` | Calendar event ID | 새로운 일정이 생겼어요 |
+| `CalendarEventChanged(UPDATED)` | 실행자의 상대 participant | `calendarEventUpdated` | Calendar event ID | 일정이 변경되었어요 |
+| `CalendarEventChanged(DELETED)` | 실행자의 상대 participant | `calendarEventDeleted` | Calendar event ID | 일정이 삭제되었어요 |
 
 Diary entry update/delete와 comment update/delete는 event를 만들지 않는다. Event에는
-recipient participant ID와 route resource ID만 있다. Producer는 notification type이나 Firebase를
+recipient participant ID와 route resource ID만 있다. Calendar event에는 추가로 action enum만
+있으며 일정 제목·메모·시간과 작성자 정보는 없다. Producer는 notification type이나 Firebase를
 import하지 않는다.
 
 Listener ID는 outstanding publication과 rollout의 durable compatibility contract다.
@@ -24,6 +28,7 @@ Listener ID는 outstanding publication과 rollout의 durable compatibility contr
 - `notification.score-change-comment-created`
 - `notification.diary-entry-created`
 - `notification.diary-entry-comment-created`
+- `notification.calendar-event-changed`
 
 Listener ID나 event class shape를 바꾸려면 기존 publication을 어떻게 읽고 완료할지 먼저
 결정한다.
@@ -43,7 +48,8 @@ participant 정보, 점수와 reason, 사용자 content, media 정보, FID와 pr
 다시 읽는다. 알 수 없는 `eventType`은 navigation으로 추정하지 않고 무시한다. 새 type의 tap
 routing이 필요하면 iOS consumer를 producer보다 먼저 배포한다. 이전 client가 새 type을 받아도
 generic alert만 표시하고 route를 무시하므로 private content를 노출하거나 잘못된 화면으로
-이동하지 않는다.
+이동하지 않는다. Calendar 삭제 notification의 ID는 이미 삭제된 resource를 가리키므로
+탭 후 404면 일정 목록을 다시 조회한다. 기존 client는 새 calendar eventType을 무시한다.
 
 ## Transaction과 delivery
 

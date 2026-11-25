@@ -1,5 +1,6 @@
 package com.woorisai.notification.internal;
 
+import com.woorisai.calendar.CalendarEventChanged;
 import com.woorisai.diary.DiaryEntryCommentCreated;
 import com.woorisai.diary.DiaryEntryCreated;
 import com.woorisai.notification.internal.NotificationSender.InvalidNotificationTargetException;
@@ -15,6 +16,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class NotificationEventListener {
 
+    static final String CALENDAR_EVENT_CHANGED_LISTENER =
+            "notification.calendar-event-changed";
     static final String RELATIONSHIP_SCORE_CHANGED_LISTENER =
             "notification.relationship-score-changed";
     static final String SCORE_CHANGE_COMMENT_CREATED_LISTENER =
@@ -57,6 +60,16 @@ class NotificationEventListener {
                 event.recipientParticipantId(),
                 NotificationEventType.DIARY_ENTRY_COMMENT_CREATED,
                 event.diaryEntryId());
+    }
+
+    @ApplicationModuleListener(id = CALENDAR_EVENT_CHANGED_LISTENER)
+    void calendarEventChanged(CalendarEventChanged event) {
+        NotificationEventType type = switch (event.action()) {
+            case CREATED -> NotificationEventType.CALENDAR_EVENT_CREATED;
+            case UPDATED -> NotificationEventType.CALENDAR_EVENT_UPDATED;
+            case DELETED -> NotificationEventType.CALENDAR_EVENT_DELETED;
+        };
+        deliver(event.recipientParticipantId(), type, event.calendarEventId());
     }
 
     private void deliver(

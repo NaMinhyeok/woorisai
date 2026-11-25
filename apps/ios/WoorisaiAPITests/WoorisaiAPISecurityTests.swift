@@ -44,14 +44,14 @@ struct WoorisaiAPISecurityTests {
   @Test
   func authorizationPolicyCoversAllGeneratedOperationsExactlyOnce() {
     #expect(APIOperationAuthorizationPolicy.publicOperationIDs.count == 2)
-    #expect(APIOperationAuthorizationPolicy.protectedOperationIDs.count == 19)
+    #expect(APIOperationAuthorizationPolicy.protectedOperationIDs.count == 24)
     #expect(
       APIOperationAuthorizationPolicy.publicOperationIDs.isDisjoint(
         with: APIOperationAuthorizationPolicy.protectedOperationIDs
       ))
     #expect(
       APIOperationAuthorizationPolicy.publicOperationIDs
-        .union(APIOperationAuthorizationPolicy.protectedOperationIDs).count == 21
+        .union(APIOperationAuthorizationPolicy.protectedOperationIDs).count == 26
     )
   }
 

@@ -31,22 +31,26 @@ extension WoorisaiAPIError {
       (400, "INVALID_MEDIA_DOWNLOAD_REQUEST"),
       (400, "INVALID_RELATIONSHIP_REQUEST"),
       (400, "INVALID_DIARY_REQUEST"),
+      (400, "INVALID_CALENDAR_REQUEST"),
       (400, "INVALID_NOTIFICATION_FID"):
       return .invalidRequest
     case (401, "AUTHENTICATION_REQUIRED"):
       return .credentialRejected
     case (403, "MEDIA_UPLOAD_FORBIDDEN"),
       (403, "RELATIONSHIP_FORBIDDEN"),
-      (403, "DIARY_FORBIDDEN"):
+      (403, "DIARY_FORBIDDEN"),
+      (403, "CALENDAR_FORBIDDEN"):
       return .forbidden
     case (404, "MEDIA_UPLOAD_NOT_FOUND"),
       (404, "MEDIA_ATTACHMENT_NOT_FOUND"),
       (404, "RELATIONSHIP_NOT_FOUND"),
-      (404, "DIARY_NOT_FOUND"):
+      (404, "DIARY_NOT_FOUND"),
+      (404, "CALENDAR_NOT_FOUND"):
       return .notFound
     case (409, "MEDIA_UPLOAD_CONFLICT"),
       (409, "RELATIONSHIP_CONFLICT"),
-      (409, "DIARY_CONFLICT"):
+      (409, "DIARY_CONFLICT"),
+      (409, "CALENDAR_CONFLICT"):
       return .conflict
     case (415, "UNSUPPORTED_MEDIA_TYPE"):
       return .unsupportedMediaType
@@ -57,6 +61,7 @@ extension WoorisaiAPIError {
       (503, "MEDIA_DOWNLOAD_UNAVAILABLE"),
       (503, "RELATIONSHIP_UNAVAILABLE"),
       (503, "DIARY_UNAVAILABLE"),
+      (503, "CALENDAR_UNAVAILABLE"),
       (503, "NOTIFICATION_FID_UNAVAILABLE"):
       return .serviceUnavailable
     default:
