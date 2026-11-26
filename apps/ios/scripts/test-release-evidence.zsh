@@ -501,4 +501,56 @@ workflow_bash_path="${test_temp_dir}/workflow-release-step.bash"
 /bin/bash -n "$workflow_bash_path" || \
   test_fail "the TestFlight release step must parse with the system Bash 3.2"
 
+test_fake_group=present
+test_fake_build=absent
+test_fake_state=VALID
+release_ascapi_bearer() { print -- 'fixture-token'; }
+release_ascapi_get() {
+  case "$1" in
+    /v1/apps*) print -r -- '{"data":[{"id":"app-1"}]}' >"$3" ;;
+    /v1/builds*)
+      if [[ "$test_fake_build" == present ]]; then
+        print -r -- "{\"data\":[{\"id\":\"build-22\",\"attributes\":{\"processingState\":\"${test_fake_state}\"}}]}" >"$3"
+      else
+        print -r -- '{"data":[]}' >"$3"
+      fi ;;
+    /v1/betaGroups*)
+      if [[ "$test_fake_group" == present ]]; then
+        print -r -- '{"data":[{"id":"group-1","attributes":{"name":"내부 테스트"}}]}' >"$3"
+      else
+        print -r -- '{"data":[]}' >"$3"
+      fi ;;
+    *) return 1 ;;
+  esac
+}
+release_preflight_testflight '0.1.0' '22' '내부 테스트'
+test_assert_equal 'app-1' "$release_asc_app_id" 'preflight must resolve the exact app'
+test_assert_equal 'group-1' "$release_asc_group_id" 'preflight must resolve the internal group'
+test_fake_group=absent
+if (release_preflight_testflight '0.1.0' '22' '내부 테스트' >/dev/null 2>&1); then
+  test_fail 'missing internal group must stop before upload'
+fi
+test_fake_group=present
+test_fake_build=present
+if (release_preflight_testflight '0.1.0' '22' '내부 테스트' >/dev/null 2>&1); then
+  test_fail 'an existing build number must stop before upload'
+fi
+
+test_fake_build=present
+test_assert_equal 'build-22' "$(release_reconcile_failed_upload '0.1.0' '22' 1)" \
+  'a valid exact build must be recognized after an altool wait failure'
+test_fake_build=absent
+if (release_reconcile_failed_upload '0.1.0' '22' 1 >/dev/null 2>&1); then
+  test_fail 'missing build after upload failure must not be declared successful'
+fi
+test_fake_build=present
+test_fake_state=INVALID
+if (release_reconcile_failed_upload '0.1.0' '22' 1 >/dev/null 2>&1); then
+  test_fail 'invalid processed build must not be declared successful'
+fi
+test_fake_state=PROCESSING
+if (release_reconcile_failed_upload '0.1.0' '22' 1 >/dev/null 2>&1); then
+  test_fail 'still-processing build must not be declared successful'
+fi
+
 print -- "Release evidence and signing tests passed."
