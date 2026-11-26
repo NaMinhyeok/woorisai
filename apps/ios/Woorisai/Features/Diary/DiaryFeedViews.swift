@@ -8,108 +8,57 @@ struct DiaryEntryCard: View {
   let onAuthenticationRequired: @MainActor () -> Void
 
   var body: some View {
-    WarmSurface(cornerRadius: WoorisaiRadius.large) {
-      VStack(alignment: .leading, spacing: WoorisaiSpacing.medium) {
-        NavigationLink(value: entry.id) {
-          VStack(alignment: .leading, spacing: WoorisaiSpacing.medium) {
-            entryHeader
-
-            Text(entry.content)
-              .font(.body)
-              .foregroundStyle(WoorisaiColor.Fg.neutral.opacity(0.9))
-              .lineSpacing(4)
-              .lineLimit(4)
-              .frame(maxWidth: .infinity, alignment: .leading)
-          }
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("diary.entry.\(entry.id).open")
-
-        if !entry.attachments.isEmpty {
-          DiaryAttachmentGallery(
-            attachments: entry.attachments,
-            mediaService: mediaService,
-            onAuthenticationRequired: onAuthenticationRequired
-          )
-        }
-
-        Divider()
-          .overlay(WoorisaiColor.Stroke.neutralWeak)
-
-        if dynamicTypeSize.isAccessibilitySize {
+    VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
+      NavigationLink(value: entry.id) {
+        HStack(alignment: .top, spacing: WoorisaiSpacing.medium) {
           VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
-            entryMetadata
-            conversationLink
+            Text(entry.createdAt, format: .dateTime.month().day().weekday(.abbreviated))
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
+            Text(entry.content.isEmpty ? "사진과 첨부를 남긴 일기" : entry.content)
+              .font(.body)
+              .foregroundStyle(WoorisaiColor.Fg.neutral)
+              .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 4)
+            ViewThatFits(in: .horizontal) {
+              HStack(spacing: WoorisaiSpacing.small) { author; counters }
+                .fixedSize(horizontal: true, vertical: false)
+              VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) { author; counters }
+            }
           }
-        } else {
-          HStack(spacing: WoorisaiSpacing.medium) {
-            entryMetadata
-            Spacer(minLength: 0)
-            conversationLink
-          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          Image(systemName: "chevron.right")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
+            .accessibilityHidden(true)
         }
+        .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
+        .contentShape(Rectangle())
       }
-      .padding(WoorisaiSpacing.regular)
-    }
-    .overlay(alignment: .top) {
-      DiaryPaperTape()
-        .offset(y: -8)
-    }
-    .overlay {
-      if entry.isMine {
-        RoundedRectangle(cornerRadius: WoorisaiRadius.large, style: .continuous)
-          .stroke(WoorisaiColor.stroke(.mine), lineWidth: 1)
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("diary.entry.\(entry.id).open")
+
+      // Media has a different action from reading the entry, so it stays outside the link.
+      if !entry.attachments.isEmpty {
+        DiaryAttachmentGallery(
+          attachments: entry.attachments,
+          mediaService: mediaService,
+          onAuthenticationRequired: onAuthenticationRequired
+        )
       }
     }
-    .padding(.top, WoorisaiSpacing.small)
+    .padding(.vertical, WoorisaiSpacing.small)
+    .overlay(alignment: .bottom) { Divider().accessibilityHidden(true) }
     .accessibilityElement(children: .contain)
   }
 
-  @ViewBuilder
-  private var entryHeader: some View {
-    if dynamicTypeSize.isAccessibilitySize {
-      VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
-        ParticipantAvatar(name: entry.author.displayName, size: 40)
-        authorIdentity
-      }
-    } else {
-      HStack(alignment: .top, spacing: WoorisaiSpacing.medium) {
-        ParticipantAvatar(name: entry.author.displayName, size: 40)
-        authorIdentity
-        Spacer(minLength: WoorisaiSpacing.small)
-        Image(systemName: "heart.fill")
-          .font(.caption)
-          .foregroundStyle(WoorisaiColor.fg(.init(isMine: entry.isMine)))
-          .padding(.top, WoorisaiSpacing.small)
-          .accessibilityHidden(true)
-      }
-    }
+  private var author: some View {
+    Text(entry.isMine ? "\(entry.author.displayName) · 내 기록" : entry.author.displayName)
+      .font(.footnote.weight(.semibold))
+      .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
   }
 
-  private var authorIdentity: some View {
-    VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
-      HStack(spacing: WoorisaiSpacing.small) {
-        Text(entry.author.displayName)
-          .font(.headline)
-          .foregroundStyle(WoorisaiColor.Fg.neutral)
-          .fixedSize(horizontal: false, vertical: true)
-        if entry.isMine {
-          Text("내 기록")
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(WoorisaiColor.Fg.brand)
-            .padding(.horizontal, WoorisaiSpacing.small)
-            .padding(.vertical, WoorisaiSpacing.xSmall)
-            .background(WoorisaiColor.Bg.brandWeak, in: Capsule())
-        }
-      }
-      Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
-        .font(.caption)
-        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
-    }
-  }
-
-  private var entryMetadata: some View {
-    HStack(spacing: WoorisaiSpacing.medium) {
+  private var counters: some View {
+    HStack(spacing: WoorisaiSpacing.small) {
       if !entry.attachments.isEmpty {
         Label("첨부 \(entry.attachments.count)", systemImage: "paperclip")
       }
@@ -117,22 +66,6 @@ struct DiaryEntryCard: View {
     }
     .font(.caption)
     .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
-  }
-
-  private var conversationLink: some View {
-    NavigationLink(value: entry.id) {
-      Label("대화 보기", systemImage: "chevron.right")
-        .font(.caption.weight(.bold))
-        .foregroundStyle(WoorisaiColor.Fg.brand)
-        .frame(
-          maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil,
-          minHeight: WoorisaiControlMetric.minimumTapTarget,
-          alignment: .leading
-        )
-        .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .accessibilityIdentifier("diary.entry.\(entry.id).conversation")
   }
 }
 

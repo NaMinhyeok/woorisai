@@ -334,16 +334,19 @@ struct LoginOptionsView: View {
             lineWidth: isSelected ? 2 : 1
           )
       }
-      .shadow(
-        color: isSelected ? WoorisaiColor.Component.SelectableCard.glow : .clear,
-        radius: 8,
-        y: 3
-      )
+      .overlay(alignment: .topTrailing) {
+        if isSelected {
+          Image(systemName: "checkmark.circle.fill")
+            .foregroundStyle(WoorisaiColor.Fg.brand)
+            .padding(WoorisaiSpacing.small)
+            .accessibilityHidden(true)
+        }
+      }
       .contentShape(RoundedRectangle(cornerRadius: WoorisaiRadius.medium, style: .continuous))
     }
     .buttonStyle(.plain)
     .accessibilityLabel(option.displayName)
-    .accessibilityValue(isSelected ? "선택됨" : "")
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
     .accessibilityIdentifier("loginOptions.participant.\(option.slot)")
   }
 

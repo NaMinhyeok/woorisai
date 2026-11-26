@@ -20,7 +20,6 @@ enum DiaryConflictEditorDisposition: Equatable, Sendable {
 
 struct DiaryView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @State private var model: DiaryModel
   @State private var newEntryMediaModel: MediaAttachmentComposerModel
   @State private var isCreatingEntry = false
@@ -31,7 +30,6 @@ struct DiaryView: View {
   private let mediaUploader: any PresignedMediaUploading
   private let mediaSessionCoordinator: TopLevelMediaSessionCoordinator
 
-  let participant: AuthenticatedParticipant
   let onAuthenticationRequired: @MainActor () -> Void
 
   @MainActor
@@ -42,7 +40,6 @@ struct DiaryView: View {
     mediaUploader: any PresignedMediaUploading,
     mediaSessionCoordinator: TopLevelMediaSessionCoordinator,
     newEntryMediaModel: MediaAttachmentComposerModel,
-    participant: AuthenticatedParticipant,
     onAuthenticationRequired: @escaping @MainActor () -> Void
   ) {
     _model = State(initialValue: model)
@@ -51,7 +48,6 @@ struct DiaryView: View {
     self.mediaService = mediaService
     self.mediaUploader = mediaUploader
     self.mediaSessionCoordinator = mediaSessionCoordinator
-    self.participant = participant
     self.onAuthenticationRequired = onAuthenticationRequired
   }
 
@@ -62,9 +58,7 @@ struct DiaryView: View {
   private var navigationContent: some View {
     NavigationStack(path: $navigationPath) {
       listContent
-        .navigationTitle("우리 일기")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar { createEntryToolbar }
+        .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(for: Int64.self) { entryID in
           DiaryDetailView(
             model: model,
@@ -74,6 +68,7 @@ struct DiaryView: View {
             mediaSessionCoordinator: mediaSessionCoordinator,
             onAuthenticationRequired: onAuthenticationRequired
           )
+          .toolbar(.visible, for: .navigationBar)
         }
     }
     .accessibilityIdentifier("diary.screen")
@@ -89,18 +84,37 @@ struct DiaryView: View {
     }
   }
 
-  @ToolbarContentBuilder
-  private var createEntryToolbar: some ToolbarContent {
-    ToolbarItem(placement: .topBarTrailing) {
-      Button {
-        isCreatingEntry = true
-      } label: {
-        Label("새 일기", systemImage: "square.and.pencil")
-      }
-      .disabled(model.mutationState == .submitting || !canOpenNewEntryComposer)
-      .tint(WoorisaiColor.Fg.brand)
-      .accessibilityIdentifier("diary.createEntry.open")
+  private var createEntryButton: some View {
+    Button {
+      isCreatingEntry = true
+    } label: {
+      Label(isNewEntryDraftDirty ? "이어서 쓰기" : "일기 쓰기", systemImage: "square.and.pencil")
+        .font(.subheadline.weight(.semibold))
+        .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
     }
+    .disabled(model.mutationState == .submitting || !canOpenNewEntryComposer)
+    .tint(WoorisaiColor.Fg.brand)
+    .accessibilityIdentifier("diary.createEntry.open")
+  }
+
+  private var diaryListHeader: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: WoorisaiSpacing.small) {
+        diaryListHeading.fixedSize(horizontal: true, vertical: false)
+        Spacer(minLength: 0)
+        createEntryButton.fixedSize(horizontal: true, vertical: false)
+      }
+      VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
+        diaryListHeading
+        createEntryButton
+      }
+    }
+  }
+
+  private var diaryListHeading: some View {
+    Text("최근 일기")
+      .font(.title3.bold())
+      .accessibilityAddTraits(.isHeader)
   }
 
   private var composerPresentedContent: some View {
@@ -217,14 +231,7 @@ struct DiaryView: View {
     WarmBackground {
       ScrollView {
         LazyVStack(alignment: .leading, spacing: WoorisaiSpacing.regular) {
-          DiaryHero(
-            eyebrow: "OUR DIARY",
-            title: "우리 일기",
-            message: "점수로는 다 담지 못한 오늘의 이야기를 함께 남겨요.",
-            symbol: "book.pages.fill"
-          )
-
-          quickCreateCard
+          if !model.entries.isEmpty { diaryListHeader }
 
           if let notice = model.mutationNotice ?? model.listNotice {
             DiaryMutationStatusCard(
@@ -233,13 +240,6 @@ struct DiaryView: View {
             )
             .accessibilityIdentifier("diary.notice")
           }
-
-          WoorisaiSectionHeading(
-            "차곡차곡 쌓인 이야기",
-            detail: model.entries.isEmpty ? nil : "\(model.totalCount)개의 기록",
-            symbol: "heart.text.square"
-          )
-          .padding(.top, WoorisaiSpacing.small)
 
           if model.entries.isEmpty {
             emptyDiaryCard
@@ -295,66 +295,6 @@ struct DiaryView: View {
     .accessibilityIdentifier("diary.loaded")
   }
 
-  private var quickCreateCard: some View {
-    WarmSurface(cornerRadius: WoorisaiRadius.large) {
-      Group {
-        if dynamicTypeSize.isAccessibilitySize {
-          VStack(alignment: .leading, spacing: WoorisaiSpacing.medium) {
-            quickCreateCopy
-            quickCreateButton
-          }
-        } else {
-          HStack(spacing: WoorisaiSpacing.medium) {
-            ParticipantAvatar(name: participant.displayName, size: 42)
-            quickCreateCopy
-            Spacer(minLength: WoorisaiSpacing.small)
-            quickCreateButton
-          }
-        }
-      }
-      .padding(WoorisaiSpacing.regular)
-    }
-    .overlay(alignment: .top) {
-      DiaryPaperTape()
-        .offset(y: -8)
-    }
-  }
-
-  private var quickCreateCopy: some View {
-    VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
-      Text("\(participant.displayName)님의 오늘은 어땠나요?")
-        .font(.headline)
-        .foregroundStyle(WoorisaiColor.Fg.neutral)
-        .fixedSize(horizontal: false, vertical: true)
-      Text(isNewEntryDraftDirty ? "작성 중인 이야기가 있어요." : "우리 둘만 보는 기록을 남겨요.")
-        .font(.footnote)
-        .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-  }
-
-  private var quickCreateButton: some View {
-    Button {
-      isCreatingEntry = true
-    } label: {
-      Label(
-        isNewEntryDraftDirty ? "이어서 쓰기" : "이야기 쓰기",
-        systemImage: isNewEntryDraftDirty ? "pencil.line" : "square.and.pencil"
-      )
-      .font(.subheadline.weight(.bold))
-      .foregroundStyle(WoorisaiColor.Fg.brandContrast)
-      .frame(
-        maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil,
-        minHeight: WoorisaiControlMetric.minimumTapTarget
-      )
-      .padding(.horizontal, WoorisaiSpacing.regular)
-      .background(WoorisaiColor.Bg.brandSolid, in: Capsule())
-    }
-    .buttonStyle(.plain)
-    .disabled(model.mutationState == .submitting || !canOpenNewEntryComposer)
-    .accessibilityIdentifier("diary.createEntry.prompt")
-  }
-
   private var emptyDiaryCard: some View {
     BrandedStateCard {
       VStack(spacing: WoorisaiSpacing.medium) {
@@ -369,13 +309,13 @@ struct DiaryView: View {
           .font(.callout)
           .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
           .multilineTextAlignment(.center)
-        Button("첫 이야기 남기기") {
+        Button(isNewEntryDraftDirty ? "이어서 쓰기" : "첫 일기 쓰기") {
           isCreatingEntry = true
         }
         .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
         .buttonStyle(.bordered)
         .tint(WoorisaiColor.Fg.brand)
-        .disabled(!canOpenNewEntryComposer)
+        .disabled(model.mutationState == .submitting || !canOpenNewEntryComposer)
         .accessibilityIdentifier("diary.empty.create")
       }
       .accessibilityElement(children: .contain)
@@ -458,12 +398,6 @@ struct DiaryView: View {
     WarmBackground {
       ScrollView {
         VStack(spacing: WoorisaiSpacing.regular) {
-          DiaryHero(
-            eyebrow: "OUR DIARY",
-            title: "우리 일기",
-            message: "점수로는 다 담지 못한 오늘의 이야기를 함께 남겨요.",
-            symbol: "book.pages.fill"
-          )
           content()
         }
         .frame(maxWidth: 680)
@@ -496,6 +430,7 @@ struct DiaryView: View {
           .tint(WoorisaiColor.Bg.brandSolid)
           .foregroundStyle(WoorisaiColor.Fg.brandContrast)
           .accessibilityIdentifier("diary.retry")
+          createEntryButton
         }
         .accessibilityElement(children: .contain)
       }

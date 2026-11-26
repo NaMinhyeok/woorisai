@@ -325,7 +325,27 @@ private struct AppRootView: View {
         mediaUploader: mediaUploader,
         mediaSessionCoordinator: topLevelMediaSession,
         scoreMediaModel: topLevelMediaSession.relationshipScoreComposer,
-        participant: participant,
+        updates: RelationshipHomeUpdates(
+          calendar: calendarModel,
+          diary: diaryModel,
+          canNavigate: !isProtectedMutationActive,
+          openCalendar: { event in
+            guard !isProtectedMutationActive else { return }
+            if let event { calendarModel.openUpcoming(event) }
+            selectedTab = .calendar
+          },
+          openDiary: { id in
+            guard !isProtectedMutationActive else { return }
+            diaryNavigationPath = id.map { [$0] } ?? []
+            selectedTab = .diary
+          }
+        ),
+        refreshUpdates: {
+          guard !isEndingSession, !isProtectedMutationActive else { return }
+          async let calendar: Void = calendarModel.refreshUpcoming()
+          await diaryModel.refresh()
+          await calendar
+        },
         onAuthenticationRequired: { requirePINAgain(for: participant) }
       )
       .tabItem {
@@ -340,7 +360,6 @@ private struct AppRootView: View {
         mediaUploader: mediaUploader,
         mediaSessionCoordinator: topLevelMediaSession,
         newEntryMediaModel: topLevelMediaSession.diaryEntryComposer,
-        participant: participant,
         onAuthenticationRequired: { requirePINAgain(for: participant) }
       )
       .tabItem {
@@ -350,8 +369,7 @@ private struct AppRootView: View {
 
       CalendarView(
         model: calendarModel,
-        participant: participant,
-        onAuthenticationRequired: { requirePINAgain(for: participant) }
+        participant: participant
       )
       .tabItem { Label("일정", systemImage: "calendar") }
       .tag(AuthenticatedTab.calendar)
@@ -400,6 +418,17 @@ private struct AppRootView: View {
     }
     .onChange(of: notificationModel.authenticationRequired) { _, required in
       if required { requirePINAgain(for: participant) }
+    }
+    .task(id: selectedTab) {
+      guard selectedTab == .relationship, !isEndingSession else { return }
+      diaryModel.loadIfNeeded()
+      await calendarModel.refreshUpcoming()
+    }
+    .onChange(of: calendarModel.authenticationRequired) { _, required in
+      if required { requirePINAgain(for: participant) }
+    }
+    .onChange(of: diaryModel.authenticationRequired) { _, required in
+      if required, selectedTab != .diary { requirePINAgain(for: participant) }
     }
     .onChange(of: notificationModel.pendingRefetchIntents) { _, intents in
       consumeNotificationIntents(intents)
@@ -663,18 +692,12 @@ private struct AppSettingsView: View {
 
   var body: some View {
     NavigationStack {
-      List {
+      Form {
         Section {
           HStack(spacing: WoorisaiSpacing.medium) {
             ParticipantAvatar(name: participant.displayName, size: 48)
-            VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
-              Text(participant.displayName)
-                .font(.headline)
-                .foregroundStyle(WoorisaiColor.Fg.neutral)
-              Text("우리 둘만의 공간에 들어와 있어요")
-                .font(.footnote)
-                .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
-            }
+            Text(participant.displayName)
+              .font(.headline)
           }
           .padding(.vertical, WoorisaiSpacing.xSmall)
           .accessibilityElement(children: .combine)
@@ -729,7 +752,6 @@ private struct AppSettingsView: View {
             confirmsForget = true
           } label: {
             Label("이 기기에서 로그인 정보 지우기", systemImage: "trash")
-              .foregroundStyle(WoorisaiColor.Fg.brand)
           }
           .accessibilityHint("이 기기에 저장된 로그인 정보를 삭제하고 로그아웃합니다.")
           .accessibilityIdentifier("settings.forget")
@@ -1114,6 +1136,7 @@ private struct UnavailableNotificationInstallationIDProvider:
     private enum Scenario: String {
       case adaptiveContent
       case authenticationRejectedThenSuccess
+      case calendarUX
       case diaryConflict
       case diaryCRUD
       case diaryEditorUnknownOutcome
@@ -1142,6 +1165,8 @@ private struct UnavailableNotificationInstallationIDProvider:
     }
 
     private let scenario: Scenario
+    var usesCalendarUXFixture: Bool { scenario == .calendarUX }
+    var addedCalendarFixtures: [CalendarEvent] = []
     private let credentialStore: InMemoryCredentialStore
     private var loginAttemptCount = 0
     private var credentialAttemptCount = 0
