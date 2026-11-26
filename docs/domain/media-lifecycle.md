@@ -108,13 +108,15 @@ Position은 0부터 연속이어야 하며 kind/count/type/size가 stored policy
 service unavailable로 취급한다.
 
 `GET /api/v2/media-attachments/{id}/download-url`은 canonical participant가 parented `READY`
-attachment를 요청할 때만 private GET URL을 발급한다. Parentless upload나 불일치 topology를
-노출하지 않는다. Response는 `Cache-Control: no-store`다.
+attachment를 요청할 때만 private GET URL을 발급한다. Diary attachment는 기존 FK를 따라
+같은 DB 조회에서 parent의 `deleted_at`을 확인하며, 삭제된 entry의 첨부에는 `404`를 반환한다.
+Parentless upload나 불일치 topology를 노출하지 않는다. Response는 `Cache-Control: no-store`다.
 
 Grant를 받은 client가 object를 기기에 영구 보관하는 것은 막지 않는다. iOS는 viewer에서 사진 앱
 저장을 제공하며 그 경계와 근거는 [iOS 아키텍처](../architecture/ios-architecture.md)가
-소유한다. Server는 발급 시점의 권한만 판단하고 이미 내려간 사본을 회수하지 않는다. 서로의 미디어를
-이미 볼 수 있는 두 participant 사이에서 회수 가능한 반출 통제는 지키는 위협이 없고, 구현하려면
+소유한다. Server는 발급 요청의 권한만 판단하며 이미 발급된 URL은 TTL까지 유효할 수 있고
+이미 내려간 사본도 회수하지 않는다. 서로의 미디어를 이미 볼 수 있는 두 participant 사이에서
+회수 가능한 반출 통제는 지키는 위협이 없고, 구현하려면
 DRM 수준의 복잡도를 감수해야 한다. `no-store`와 짧은 TTL은 여전히 URL 자체가 credential이기
 때문에 유지한다.
 

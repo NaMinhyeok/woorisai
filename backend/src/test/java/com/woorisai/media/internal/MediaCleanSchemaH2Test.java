@@ -226,6 +226,29 @@ class MediaCleanSchemaH2Test {
     }
 
     @Test
+    void doesNotGrantDiaryAttachmentDownloadsAfterTheParentIsSoftDeleted() {
+        long entryId = 40L;
+        jdbc.update("""
+                INSERT INTO woorisai.diary_entry (id, author_id, content, created_at)
+                VALUES (?, ?, 'fixture diary', CAST(? AS TIMESTAMP WITH TIME ZONE))
+                """, entryId, FIRST, NOW.toString());
+        UUID upload = readyImage(MediaPurpose.DIARY_ENTRY, "diary.png");
+        transactions.executeWithoutResult(ignored -> mutation.replaceDiaryEntry(
+                new ReplaceDiaryEntryMediaCommand(FIRST, entryId, List.of(upload))));
+        assertThat(media.download(SECOND, upload)).isNotNull();
+
+        jdbc.update("""
+                UPDATE woorisai.diary_entry
+                SET deleted_at = CAST(? AS TIMESTAMP WITH TIME ZONE)
+                WHERE id = ?
+                """, NOW.toString(), entryId);
+
+        assertThat(attachedDiaryRows(entryId)).containsExactly(upload + ":0");
+        assertThatThrownBy(() -> media.download(SECOND, upload))
+                .isInstanceOf(MediaAttachmentNotFoundException.class);
+    }
+
+    @Test
     void mutationRequiresTheCallerTransactionAndDiscardDeletesRowsBeforeBestEffortObjects() {
         UUID upload = readyImage(MediaPurpose.SCORE_CHANGE_COMMENT, "standalone.png");
         assertThat(objects.deletedKeys()).containsExactly("pending/" + upload);

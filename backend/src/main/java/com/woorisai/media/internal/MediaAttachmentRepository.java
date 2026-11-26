@@ -11,6 +11,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 interface MediaAttachmentRepository extends JpaRepository<MediaAttachment, UUID> {
+    // Resolve the existing diary FK and its visibility in the same read as the attachment.
+    @Query(value = """
+            select media.*
+            from woorisai.media_attachment media
+            where media.id = :id
+              and (media.diary_entry_id is null or exists (
+                  select 1 from woorisai.diary_entry entry
+                  where entry.id = media.diary_entry_id and entry.deleted_at is null
+              ))
+            """, nativeQuery = true)
+    Optional<MediaAttachment> findByIdWithVisibleParent(@Param("id") UUID id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select media from MediaAttachment media where media.id = :id")
