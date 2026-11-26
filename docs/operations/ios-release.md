@@ -234,8 +234,13 @@ concurrency를 사용한다.
 Archive의 bundle/version/build, production APNs entitlement, `get-task-allow=false`, signature와
 Firebase config 및 embedded profile의 byte identity를 검증한 뒤 같은 archive에서 IPA를 export한다.
 Export는
-`manageAppVersionAndBuildNumber=false`라 입력한 build identity를 바꾸지 않으며, `altool` validate와
-upload `--wait`가 성공해야 workflow를 완료한다.
+`manageAppVersionAndBuildNumber=false`라 입력한 build identity를 바꾸지 않는다. Upload 전에
+App Store Connect에서 build number 미사용과 요청한 내부 테스트 그룹의 존재를 확인한다. `altool`
+validate 뒤 upload `--wait`가 실패하더라도 곧바로 "업로드 실패"로 단정하거나 같은 build number를
+재업로드하지 않는다. 사전 조회에서 없던 정확한 app/version/build가 read-only API에서 `VALID`가
+된 경우에만 처리 완료로 인정하고 내부 그룹에 연결한다. 조회 실패·미발견·`INVALID`·계속 처리 중인
+경우에는 결과 미확정으로 중단하고 App Store Connect에서 상태를 확인한다. Provider 원문은
+출력하지 않는다.
 
 검증된 archive는 entry type, 상대 경로, permission, symlink target과 각 regular file SHA-256을
 정렬된 manifest로 만들고 그 manifest의 SHA-256을 archive checksum으로 사용한다. 따라서 절대 경로,

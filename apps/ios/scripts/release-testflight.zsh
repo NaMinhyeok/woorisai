@@ -27,6 +27,8 @@ typeset -g release_profile_sha256=""
 typeset -g release_installed_profile_path=""
 typeset -g release_installed_profile_owned=false
 typeset -g release_beta_group=""
+typeset -g release_asc_app_id=""
+typeset -g release_asc_group_id=""
 typeset -gr release_ascapi_base="https://api.appstoreconnect.apple.com"
 
 # This sources executable parser code, never a dotenv file. The parser treats dotenv input as data.
@@ -865,6 +867,80 @@ release_ascapi_get() {
   [[ "$http_code" == 200 ]]
 }
 
+release_preflight_testflight() {
+  local marketing_version="$1"
+  local build_number="$2"
+  local group_name="$3"
+  local bearer response
+  response="${release_temp_dir}/ascapi-preflight-$RANDOM.json"
+  bearer="$(release_ascapi_bearer)"
+  release_asc_app_id=""
+  release_asc_group_id=""
+
+  if ! release_ascapi_get \
+    "/v1/apps?filter%5BbundleId%5D=${release_bundle_identifier}&fields%5Bapps%5D=bundleId&limit=1" \
+    "$bearer" "$response"; then
+    release_fail "App Store Connect app lookup failed before upload"
+  fi
+  release_asc_app_id="$(/usr/bin/jq -r '.data[0].id // empty' "$response")"
+  [[ -n "$release_asc_app_id" ]] || release_fail "App Store Connect app is missing before upload"
+
+  if ! release_ascapi_get \
+    "/v1/builds?filter%5Bapp%5D=${release_asc_app_id}&filter%5BpreReleaseVersion.version%5D=${marketing_version}&filter%5Bversion%5D=${build_number}&fields%5Bbuilds%5D=version,processingState&limit=1" \
+    "$bearer" "$response"; then
+    release_fail "App Store Connect build lookup failed before upload; do not retry blindly"
+  fi
+  [[ "$(/usr/bin/jq -r '.data[0].id // empty' "$response")" == '' ]] || \
+    release_fail "build ${marketing_version} (${build_number}) already exists in App Store Connect; do not upload it again"
+
+  if [[ -n "$group_name" ]]; then
+    if ! release_ascapi_get \
+      "/v1/betaGroups?filter%5Bapp%5D=${release_asc_app_id}&filter%5BisInternalGroup%5D=true&fields%5BbetaGroups%5D=name&limit=200" \
+      "$bearer" "$response"; then
+      release_fail "internal TestFlight groups could not be checked before upload"
+    fi
+    release_asc_group_id="$(/usr/bin/jq -r --arg name "$group_name" \
+      'first(.data[] | select(.attributes.name == $name) | .id) // empty' "$response")"
+    [[ -n "$release_asc_group_id" ]] || \
+      release_fail "internal TestFlight group '${group_name}' is missing; create it before uploading"
+  fi
+  /bin/rm -f -- "$response"
+  release_log "App Store Connect build number and internal group preflight passed."
+}
+
+release_reconcile_failed_upload() {
+  local marketing_version="$1"
+  local build_number="$2"
+  local -i max_attempts="${3:-12}"
+  local -i attempt=0
+  local bearer response build_id state
+  response="${release_temp_dir}/ascapi-upload-check-$RANDOM.json"
+  [[ -n "$release_asc_app_id" && $max_attempts -gt 0 ]] || return 1
+  bearer="$(release_ascapi_bearer)" || return 1
+
+  while (( attempt < max_attempts )); do
+    if release_ascapi_get \
+      "/v1/builds?filter%5Bapp%5D=${release_asc_app_id}&filter%5BpreReleaseVersion.version%5D=${marketing_version}&filter%5Bversion%5D=${build_number}&fields%5Bbuilds%5D=version,processingState&limit=1" \
+      "$bearer" "$response"; then
+      build_id="$(/usr/bin/jq -r '.data[0].id // empty' "$response")"
+      state="$(/usr/bin/jq -r '.data[0].attributes.processingState // empty' "$response")"
+      if [[ -n "$build_id" && "$state" == VALID ]]; then
+        /bin/rm -f -- "$response"
+        print -r -- "$build_id"
+        return 0
+      fi
+      if [[ "$state" == INVALID || "$state" == FAILED ]]; then
+        /bin/rm -f -- "$response"
+        return 1
+      fi
+    fi
+    (( attempt += 1 ))
+    if (( attempt < max_attempts )); then /bin/sleep 15; fi
+  done
+  /bin/rm -f -- "$response"
+  return 1
+}
+
 release_ascapi_assign_build() {
   local bearer="$1"
   local group_id="$2"
@@ -950,6 +1026,7 @@ release_archive_and_export() {
   local source_revision archive_tree_sha256 ipa_sha256
   local validation_status=not-run
   local upload_status=not-run
+  local upload_tool_succeeded=true
   local app_store_build_identifier=not-applicable
   local validation_log="${release_temp_dir}/altool-validate.log"
   local upload_log="${release_temp_dir}/altool-upload.log"
@@ -1015,20 +1092,28 @@ release_archive_and_export() {
   validation_status=succeeded
 
   if [[ "$should_upload" == true ]]; then
+    release_preflight_testflight "$marketing_version" "$build_number" "$release_beta_group"
     release_log "Uploading the validated IPA and waiting for App Store Connect processing."
     if ! /usr/bin/xcrun altool --upload-package "$ipa_path" \
       --api-key "${WOORISAI_ENV_VALUES[APP_STORE_CONNECT_KEY_ID]}" \
       --api-issuer "${WOORISAI_ENV_VALUES[APP_STORE_CONNECT_ISSUER_ID]}" \
       --wait --output-format json >"$upload_log" 2>&1; then
-      release_fail "App Store Connect upload or processing failed; provider output was suppressed"
+      upload_tool_succeeded=false
     fi
-    upload_status=succeeded
-    app_store_build_identifier=not-reported
-    if app_store_build_identifier="$(release_extract_app_store_build_identifier "$upload_log")"; then
-      :
+    if [[ "$upload_tool_succeeded" == false ]]; then
+      if ! app_store_build_identifier="$(release_reconcile_failed_upload "$marketing_version" "$build_number")"; then
+        release_fail "altool failed and the exact build could not be confirmed VALID in App Store Connect; upload outcome is unknown, do not retry this build number"
+      fi
+      release_log "altool wait failed, but App Store Connect confirms the exact build is VALID; continuing to internal group assignment."
     else
       app_store_build_identifier=not-reported
+      if app_store_build_identifier="$(release_extract_app_store_build_identifier "$upload_log")"; then
+        :
+      else
+        app_store_build_identifier=not-reported
+      fi
     fi
+    upload_status=succeeded
     release_log "TestFlight upload and processing completed."
   else
     upload_status=skipped
