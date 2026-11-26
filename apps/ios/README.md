@@ -129,7 +129,9 @@ Simulator는 generated client, feature state, navigation과 접근성 회귀를 
 
 ## UI smoke
 
-CI `Verify`는 iOS unit/API test만 실행한다. 화면 회귀는 다음 script로 로컬에서 확인하고,
+자동 CI `Verify`는 iPhone 15 Pro(iOS 26.5)에서 iOS unit/API test를 실행한다.
+수동 `Verify`에서 `full_ios_e2e`를 켜면 iPhone 15 Pro(iOS 26.5)와
+iPhone 18 Pro(iOS 27.2)에서 전체 UI E2E를 실행한다. 로컬에서는 다음 script로 확인하고,
 UI에 영향 있는 변경은 merge 전에 통과 결과를 남긴다.
 
 ```bash
