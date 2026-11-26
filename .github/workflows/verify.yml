@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       full_ios_e2e:
-        description: Run the complete iOS UI regression suite on both supported screen sizes
+        description: Run the complete UI regression suite on iPhone 15 Pro and iPhone 18 Pro
         required: false
         type: boolean
         default: false
@@ -155,7 +155,7 @@ jobs:
           -scheme Woorisai
           -clonedSourcePackagesDirPath .local/ios-source-packages
           -onlyUsePackageVersionsFromResolvedFile
-      - name: Create supported-screen simulators
+      - name: Create iPhone 15 Pro simulator
         id: simulators
         shell: bash
         run: |
@@ -165,12 +165,7 @@ jobs:
             'Woorisai CI iPhone 15 Pro' \
             'com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro' \
             "${runtime}")"
-          iphone_13_id="$(xcrun simctl create \
-            'Woorisai CI iPhone 13 Pro' \
-            'com.apple.CoreSimulator.SimDeviceType.iPhone-13-Pro' \
-            "${runtime}")"
           printf 'iphone15=%s\n' "${iphone_15_id}" >>"${GITHUB_OUTPUT}"
-          printf 'iphone13=%s\n' "${iphone_13_id}" >>"${GITHUB_OUTPUT}"
       - name: Build app and test bundles once
         run: >-
           xcodebuild build-for-testing
@@ -221,31 +216,11 @@ jobs:
           -onlyUsePackageVersionsFromResolvedFile
           -skipPackagePluginValidation
           CODE_SIGNING_ALLOWED=NO
-      - name: Run full UI E2E on iPhone 13 Pro
-        if: github.event_name == 'workflow_dispatch' && inputs.full_ios_e2e
-        run: >-
-          xcodebuild test-without-building
-          -project apps/ios/Woorisai.xcodeproj
-          -scheme Woorisai
-          -configuration Debug
-          -destination 'platform=iOS Simulator,id=${{ steps.simulators.outputs.iphone13 }}'
-          -derivedDataPath .local/ios-ci-debug
-          -clonedSourcePackagesDirPath .local/ios-source-packages
-          -parallel-testing-enabled NO
-          -test-timeouts-enabled YES
-          -default-test-execution-time-allowance 120
-          -maximum-test-execution-time-allowance 600
-          -only-testing:WoorisaiUITests
-          -enableCodeCoverage NO
-          -onlyUsePackageVersionsFromResolvedFile
-          -skipPackagePluginValidation
-          CODE_SIGNING_ALLOWED=NO
-      - name: Remove supported-screen simulators
+      - name: Remove iPhone 15 Pro simulator
         if: always() && steps.simulators.outcome == 'success'
         shell: bash
         run: |
           xcrun simctl delete '${{ steps.simulators.outputs.iphone15 }}' || true
-          xcrun simctl delete '${{ steps.simulators.outputs.iphone13 }}' || true
       - name: Build the Release simulator artifact
         if: github.event_name != 'pull_request'
         run: >-
@@ -256,6 +231,47 @@ jobs:
           -destination 'generic/platform=iOS Simulator'
           -derivedDataPath .local/ios-ci-release
           -clonedSourcePackagesDirPath .local/ios-source-packages
+          -onlyUsePackageVersionsFromResolvedFile
+          -skipPackagePluginValidation
+          CODE_SIGNING_ALLOWED=NO
+
+  ios-ui-regression-18:
+    name: iOS UI regression (iPhone 18 Pro)
+    if: github.event_name == 'workflow_dispatch' && inputs.full_ios_e2e
+    runs-on: xcode-27
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify pinned Xcode
+        run: |
+          xcodebuild -version
+          xcodebuild -version | grep --fixed-strings --line-regexp "Xcode 27.2"
+          xcodebuild -version | grep --fixed-strings --line-regexp "Build version 27B52"
+      - name: Cache pinned Swift packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .local/ios-source-packages
+          key: ios-spm-xcode27-${{ hashFiles('apps/ios/Woorisai.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+      - name: Run full UI E2E on iPhone 18 Pro
+        run: >-
+          xcodebuild test
+          -project apps/ios/Woorisai.xcodeproj
+          -scheme Woorisai
+          -configuration Debug
+          -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.2'
+          -derivedDataPath .local/ios-ci-debug
+          -clonedSourcePackagesDirPath .local/ios-source-packages
+          -parallel-testing-enabled NO
+          -test-timeouts-enabled YES
+          -default-test-execution-time-allowance 120
+          -maximum-test-execution-time-allowance 600
+          -only-testing:WoorisaiUITests
+          -enableCodeCoverage NO
           -onlyUsePackageVersionsFromResolvedFile
           -skipPackagePluginValidation
           CODE_SIGNING_ALLOWED=NO

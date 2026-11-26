@@ -62,9 +62,11 @@ Simulator와 unit test는 다음 계약을 다룬다.
 Simulator success를 physical device gate의 대체로 사용하지 않는다.
 
 GitHub `Verify` workflow는 pull request와 `main`에서 Repository hygiene, backend/container와 함께
-iOS unit/API test를 실행한다. 두 지원 화면의 UI smoke는 `apps/ios/scripts/ui-smoke.zsh`로
-로컬에서 실행하고, 전체 UI E2E는 `Verify`의 `full_ios_e2e` workflow_dispatch 옵션으로 CI에서
-실행할 수 있다. Release simulator artifact build는 `main` push에서만 실행한다. TestFlight
+iPhone 15 Pro(iOS 26.5)에서 iOS unit/API test를 실행한다. 로컬 UI smoke는
+`apps/ios/scripts/ui-smoke.zsh`로 실행한다. `Verify`를 수동 실행할 때 `full_ios_e2e`를 켜면
+iPhone 15 Pro(iOS 26.5)와 iPhone 18 Pro(iOS 27.2)에서 전체 UI E2E를 실행한다.
+18 Pro job은 Xcode 27.2를 사용하며 필수 `iOS app gates`와 분리되어 있다.
+Release simulator artifact build는 PR 이외의 실행에서 수행한다. TestFlight
 workflow는 선택한 revision이 `main`이고 같은 SHA의
 Repository hygiene, Backend check, Container smoke와 iOS app gates가 모두 성공한 경우에만 release
 job을 시작한다. CI 성공 여부를 문서에 복제하지 않고 GitHub check가 실행 증거를 소유한다.
