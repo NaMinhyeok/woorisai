@@ -55,6 +55,30 @@ struct CalendarModelTests {
   }
 
   @Test
+  func upcomingPreviewUsesItsOwnUTCWindowAndSkipsPastEvents() async throws {
+    let service = CalendarServiceStub()
+    let zone = try #require(TimeZone(identifier: "Asia/Seoul"))
+    let now = date("2026-11-30T18:00:00Z")  // December 1, 03:00 in Seoul.
+    let model = CalendarModel(service: service, initialDate: date("2026-04-01T03:00:00Z"), timeZone: zone)
+    let originalMonth = model.displayedMonth
+    let next = event(start: "2026-12-02T12:00:00Z", end: "2026-12-02T13:00:00Z")
+    await service.setEvents([
+      event(start: "2026-12-04T12:00:00Z", end: "2026-12-04T13:00:00Z"),
+      event(start: "2026-11-30T16:00:00Z", end: "2026-11-30T17:00:00Z"),
+      next,
+    ])
+    await model.refreshUpcoming(now: now)
+    #expect(await service.lastRange == CalendarDateRange(from: "2026-11-30", to: "2026-12-30"))
+    #expect(model.upcoming == .event(next))
+    #expect(model.displayedMonth == originalMonth)
+
+    model.openUpcoming(next, now: now)
+    #expect(model.selectedDay == date("2026-12-01T15:00:00Z"))
+    model.clear()
+    #expect(model.upcoming == .loading)
+  }
+
+  @Test
   func monthRangeAndOvernightEventsAppearOnBothDays() async throws {
     let service = CalendarServiceStub()
     let model = CalendarModel(service: service, initialDate: date("2026-11-25T12:00:00Z"), timeZone: .gmt)
