@@ -1,16 +1,25 @@
 package com.woorisai.media.internal;
 
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 interface MediaAttachmentRepository extends JpaRepository<MediaAttachment, UUID> {
+    @Modifying
+    @Query("""
+            update MediaAttachment media set media.revokedAt = :revokedAt
+            where media.diaryEntryId = :diaryEntryId and media.revokedAt is null
+            """)
+    void revokeDiaryEntryDownloads(@Param("diaryEntryId") long diaryEntryId,
+            @Param("revokedAt") Instant revokedAt);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select media from MediaAttachment media where media.id = :id")

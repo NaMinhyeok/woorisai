@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.AccessLevel;
@@ -66,7 +67,10 @@ class DiaryEntry {
                 Objects.requireNonNull(replacement, "replacement");
         Instant requested = Objects.requireNonNull(revisedAt, "revisedAt");
         requestedContent.ifPresent(value -> content = value.value());
-        updatedAt = requested.isBefore(createdAt) ? createdAt : requested;
+        Instant effectiveTime = requested.isBefore(createdAt) ? createdAt : requested;
+        // A media-only revision must dirty this row so its version is checked before changing media.
+        updatedAt = updatedAt != null && !effectiveTime.isAfter(updatedAt)
+                ? updatedAt.plus(1, ChronoUnit.MICROS) : effectiveTime;
     }
 
     void requireDeletionBy(long actorId) {

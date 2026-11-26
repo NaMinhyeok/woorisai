@@ -96,6 +96,9 @@ Attachment 정본은 DB이며 이 상황을 보완하려 custom CAS/lease/reconc
 - Diary update에서 `mediaUploadIds`가 생략되면 기존 list를 유지하고, 빈 list면 모두 제거하며,
   값이 있으면 request order가 final list다.
 - 같은 diary에 붙은 row는 유지할 수 있고 빠진 row는 DB에서 삭제한다.
+- Diary delete는 일기 row를 version check와 함께 먼저 갱신하고 같은 transaction에서
+  `MediaAttachmentMutation`을 호출한다. Media는 연결된 row에 `revoked_at`을 기록하여
+  새 다운로드 URL 발급을 중단한다. Attachment FK와 position은 그대로 보존한다.
 - Parent write, attachment FK/position과 event publication은 함께 commit하거나 rollback한다.
 
 DB row 삭제는 R2 object 삭제를 보장하지 않는다. Read API는 parented `READY`만 신뢰하므로
@@ -108,13 +111,15 @@ Position은 0부터 연속이어야 하며 kind/count/type/size가 stored policy
 service unavailable로 취급한다.
 
 `GET /api/v2/media-attachments/{id}/download-url`은 canonical participant가 parented `READY`
-attachment를 요청할 때만 private GET URL을 발급한다. Parentless upload나 불일치 topology를
-노출하지 않는다. Response는 `Cache-Control: no-store`다.
+attachment를 요청할 때만 private GET URL을 발급한다. Media는 attachment row만 읽으며
+`revoked_at`이 있으면 새 URL을 발급하지 않고 `404`를 반환한다.
+Parentless upload나 불일치 topology를 노출하지 않는다. Response는 `Cache-Control: no-store`다.
 
 Grant를 받은 client가 object를 기기에 영구 보관하는 것은 막지 않는다. iOS는 viewer에서 사진 앱
 저장을 제공하며 그 경계와 근거는 [iOS 아키텍처](../architecture/ios-architecture.md)가
-소유한다. Server는 발급 시점의 권한만 판단하고 이미 내려간 사본을 회수하지 않는다. 서로의 미디어를
-이미 볼 수 있는 두 participant 사이에서 회수 가능한 반출 통제는 지키는 위협이 없고, 구현하려면
+소유한다. Server는 발급 요청의 권한만 판단하며 이미 발급된 URL은 TTL까지 유효할 수 있고
+이미 내려간 사본도 회수하지 않는다. 서로의 미디어를 이미 볼 수 있는 두 participant 사이에서
+회수 가능한 반출 통제는 지키는 위협이 없고, 구현하려면
 DRM 수준의 복잡도를 감수해야 한다. `no-store`와 짧은 TTL은 여전히 URL 자체가 credential이기
 때문에 유지한다.
 
@@ -130,11 +135,9 @@ DB commit 뒤 staging/final object 삭제를 best effort로 수행한다.
 - DB transaction 뒤 삭제에 실패한 staging/final object
 - Diary replacement/delete 뒤 남은 final object
 
-Diary entry delete는 soft delete이므로 `media_attachment` 행 자체가 남는다. Parent 행이 살아
-있어 `ON DELETE CASCADE`가 동작하지 않기 때문이고, 그만큼 R2 object도 물리 삭제 때보다 오래
-남는다. 삭제 표시된 entry는 조회에서 제외되어 attachment도 노출되지 않으므로 이를 accepted
-orphan으로 다룬다. Attachment까지 삭제 표시로 바꾸려면 `(diary_entry_id, position)` 부분 유니크
-인덱스가 slot을 영구 점유하지 않도록 `AND deleted_at IS NULL`을 함께 넣어야 한다.
+Diary delete는 `media_attachment` 행과 R2 object를 삭제하지 않는다. `revoked_at`은
+다운로드 발급 상태이지 첨부 해제나 복구 기능이 아니다. 삭제된 일기에 새 첨부를 붙이지 않으므로
+기존 `(diary_entry_id, position)` 인덱스가 연결을 계속 보존한다.
 
 Bucket 규모, 비용이나 privacy 위험이 이 선택을 감당하지 못한다는 증거가 생기면 이 문서와
 관련 schema·운영 문서에 retention, list/delete 권한, idempotency, recovery와 observability의

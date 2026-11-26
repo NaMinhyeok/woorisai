@@ -105,8 +105,41 @@ class CleanSchemaPostgresMigrationTest {
 
         var v4Result = flywayAt(MigrationVersion.fromVersion("4")).migrate();
         assertThat(v4Result.migrationsExecuted).isOne();
-        var v5Result = flyway().migrate();
+        var v5Result = flywayAt(MigrationVersion.fromVersion("5")).migrate();
         assertThat(v5Result.migrationsExecuted).isOne();
+        try (Connection connection = connection()) {
+            execute(connection, """
+                    INSERT INTO woorisai.participant (id, slot, display_name, created_at)
+                    VALUES (9001, 1, 'upgrade fixture', CURRENT_TIMESTAMP)
+                    """);
+            execute(connection, """
+                    INSERT INTO woorisai.diary_entry (id, author_id, content, created_at, deleted_at)
+                    VALUES (9040, 9001, 'deleted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                           (9041, 9001, 'live', CURRENT_TIMESTAMP, NULL)
+                    """);
+            execute(connection, """
+                    INSERT INTO woorisai.media_attachment (
+                        id, uploader_id, diary_entry_id, purpose, kind, status, object_key,
+                        original_name, content_type, expected_size, actual_size, position, created_at, ready_at)
+                    SELECT gen_random_uuid(), 9001, id, 'DIARY_ENTRY', 'IMAGE', 'READY', 'fixture/' || id,
+                           'fixture.png', 'image/png', 8, 8, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    FROM woorisai.diary_entry WHERE id IN (9040, 9041)
+                    """);
+        }
+        assertThat(flyway().migrate().migrationsExecuted).isOne();
+        try (Connection connection = connection()) {
+            assertThat(queryInt(connection, """
+                    SELECT COUNT(*) FROM woorisai.media_attachment AS media
+                    JOIN woorisai.diary_entry AS entry ON media.diary_entry_id = entry.id
+                    WHERE entry.id = 9040 AND media.revoked_at = entry.deleted_at
+                    """)).isOne();
+            assertThat(queryInt(connection, """
+                    SELECT COUNT(*) FROM woorisai.media_attachment
+                    WHERE diary_entry_id = 9041 AND revoked_at IS NULL
+                    """)).isOne();
+            execute(connection, "DELETE FROM woorisai.diary_entry WHERE id IN (9040, 9041)");
+            execute(connection, "DELETE FROM woorisai.participant WHERE id = 9001");
+        }
     }
 
     @AfterAll

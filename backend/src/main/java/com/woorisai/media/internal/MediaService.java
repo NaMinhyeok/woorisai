@@ -177,7 +177,7 @@ class MediaService {
         } catch (DataAccessException exception) {
             throw new MediaDownloadUnavailableException(exception);
         }
-        if (!attachment.isParentedReady()) {
+        if (!attachment.isDownloadable()) {
             throw new MediaAttachmentNotFoundException();
         }
 

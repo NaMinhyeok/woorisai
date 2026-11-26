@@ -9,6 +9,7 @@ import com.woorisai.media.MediaAttachmentMutation.MediaAttachmentForbiddenExcept
 import com.woorisai.media.MediaAttachmentMutation.MediaAttachmentUnavailableException;
 import com.woorisai.media.MediaAttachmentMutation.MediaUploadNotFoundException;
 import com.woorisai.media.ReplaceDiaryEntryMediaCommand;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -153,6 +154,19 @@ class MediaAttachmentMutationService implements MediaAttachmentMutation {
             throw exception;
         } catch (IllegalStateException exception) {
             throw new MediaAttachmentConflictException();
+        } catch (DataAccessException exception) {
+            throw new MediaAttachmentUnavailableException(exception);
+        }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void revokeDiaryEntryDownloads(long diaryEntryId, Instant revokedAt) {
+        if (diaryEntryId <= 0 || revokedAt == null) {
+            throw new InvalidMediaAttachmentRequestException();
+        }
+        try {
+            attachments.revokeDiaryEntryDownloads(diaryEntryId, revokedAt);
         } catch (DataAccessException exception) {
             throw new MediaAttachmentUnavailableException(exception);
         }

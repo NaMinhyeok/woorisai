@@ -226,6 +226,33 @@ class MediaCleanSchemaH2Test {
     }
 
     @Test
+    void doesNotGrantDownloadsForARevokedDiaryAttachmentEvenWhenTheParentIsLive() {
+        long entryId = 40L;
+        jdbc.update("""
+                INSERT INTO woorisai.diary_entry (id, author_id, content, created_at)
+                VALUES (?, ?, 'fixture diary', CAST(? AS TIMESTAMP WITH TIME ZONE))
+                """, entryId, FIRST, NOW.toString());
+        UUID upload = readyImage(MediaPurpose.DIARY_ENTRY, "diary.png");
+        transactions.executeWithoutResult(ignored -> mutation.replaceDiaryEntry(
+                new ReplaceDiaryEntryMediaCommand(FIRST, entryId, List.of(upload))));
+        assertThat(media.download(SECOND, upload)).isNotNull();
+
+        assertThatThrownBy(() -> mutation.revokeDiaryEntryDownloads(entryId, NOW))
+                .isInstanceOf(IllegalTransactionStateException.class);
+        transactions.executeWithoutResult(status -> {
+            mutation.revokeDiaryEntryDownloads(entryId, NOW);
+            status.setRollbackOnly();
+        });
+        assertThat(media.download(SECOND, upload)).isNotNull();
+
+        transactions.executeWithoutResult(status -> mutation.revokeDiaryEntryDownloads(entryId, NOW));
+
+        assertThat(attachedDiaryRows(entryId)).containsExactly(upload + ":0");
+        assertThatThrownBy(() -> media.download(SECOND, upload))
+                .isInstanceOf(MediaAttachmentNotFoundException.class);
+    }
+
+    @Test
     void mutationRequiresTheCallerTransactionAndDiscardDeletesRowsBeforeBestEffortObjects() {
         UUID upload = readyImage(MediaPurpose.SCORE_CHANGE_COMMENT, "standalone.png");
         assertThat(objects.deletedKeys()).containsExactly("pending/" + upload);

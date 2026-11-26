@@ -190,6 +190,19 @@ class MediaHttpTest {
     }
 
     @Test
+    void returnsNotFoundWithoutADownloadUrlForAnUnavailableAttachment() throws Exception {
+        given(media.download(ACTOR_ID, UPLOAD_ID))
+                .willThrow(new MediaAttachmentNotFoundException());
+
+        mvc.perform(get("/api/v2/media-attachments/{id}/download-url", UPLOAD_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.errorCode").value("MEDIA_ATTACHMENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.downloadUrl").doesNotExist());
+    }
+
+    @Test
     void preservesTheExistingUnavailableHttpProblems() throws Exception {
         given(media.complete(ACTOR_ID, UPLOAD_ID))
                 .willThrow(new MediaUploadCompletionUnavailableException());

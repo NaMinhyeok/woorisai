@@ -40,7 +40,7 @@ class CleanSchemaH2MigrationTest {
 
         var result = flyway.migrate();
 
-        assertThat(result.migrationsExecuted).isEqualTo(5);
+        assertThat(result.migrationsExecuted).isEqualTo(6);
     }
 
     @AfterEach

@@ -65,9 +65,9 @@ timestamps, 내부 JPA `@Version`과 nullable `deleted_at`을 가진다. Thread 
 않는다.
 
 Entry delete는 물리 삭제가 아니라 `deleted_at` 기록이므로 `ON DELETE CASCADE`가 동작하지
-않는다. Application이 같은 transaction에서 살아있는 comment를 함께 표시한다. 연결된
-`media_attachment` 행은 남으며 R2 object도 함께 남는다 — 삭제 표시된 entry가 조회에서 제외되어
-첨부도 노출되지 않는다. 자세한 의미는 [media lifecycle](media-lifecycle.md)을 따른다.
+않는다. Application이 같은 transaction에서 살아있는 comment를 함께 표시하고, `media`에
+연결된 첨부의 새 다운로드 URL 발급 중단을 요청한다. 첨부 행과 R2 object는 남는다.
+자세한 의미는 [media lifecycle](media-lifecycle.md)을 따른다.
 
 `deleted_at`은 `score_change`, `score_change_comment`, `participant`에도 있지만 이 세 테이블은
 삭제 경로가 없어 항상 `NULL`이다. `score_change` 계열은 불변 이력이고, `participant`는 정확히 두
@@ -96,6 +96,7 @@ DB는 비어 있지 않은 title, `end_at > start_at`, 유효 kind와 생성 이
 - `IMAGE`/`VIDEO` kind, 원본 이름, normalized content type, expected/actual size
 - Private R2 object key, `PENDING`/`READY` status와 timestamps
 - Purpose별 nullable parent FK와 parent 안의 zero-based `position`
+- 새 다운로드 URL 발급을 중단한 시각인 nullable `revoked_at`
 
 `PENDING`은 parent, actual size와 ready time이 없고 position 0이다. `READY`는 actual size가
 expected size와 같고 ready time이 있으며, parent가 없거나 purpose와 맞는 parent 하나를 가진다.

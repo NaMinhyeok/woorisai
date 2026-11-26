@@ -42,6 +42,18 @@ class DiaryEntryTest {
     }
 
     @Test
+    void consecutiveMediaOnlyRevisionsAtTheSameClockTickStillTouchTheEntry() {
+        DiaryEntry entry = DiaryEntry.create(
+                AUTHOR_ID, DiaryEntryContent.from("original"), CREATED_AT);
+        entry.reviseBy(AUTHOR_ID, Optional.empty(), CREATED_AT);
+        Instant firstRevision = entry.getUpdatedAt();
+
+        entry.reviseBy(AUTHOR_ID, Optional.empty(), CREATED_AT);
+
+        assertThat(entry.getUpdatedAt()).isAfter(firstRevision);
+    }
+
+    @Test
     void nonAuthorCannotReviseOrDeleteAndFailedRevisionDoesNotMutate() {
         DiaryEntry entry = DiaryEntry.create(
                 AUTHOR_ID, DiaryEntryContent.from("original"), CREATED_AT);

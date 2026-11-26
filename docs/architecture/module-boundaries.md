@@ -103,7 +103,8 @@ Spring Security principal은 canonical participant ID scalar다. Credential enti
 다른 domain은 다음 좁은 port만 사용한다.
 
 - `AttachedMediaQuery`: parent ID와 expected uploader에 맞는 parented `READY` metadata 조회
-- `MediaAttachmentMutation`: caller transaction 안에서 upload를 parent에 연결·교체
+- `MediaAttachmentMutation`: caller transaction 안에서 upload 연결·교체 또는 일기 첨부의
+  새 다운로드 URL 발급 중단
 
 Command와 result는 scalar ID, UUID와 immutable value만 전달한다. R2 SDK/client, JPA
 entity/repository, presign request와 HTTP DTO는 internal이다. Media row는 다른 module entity를

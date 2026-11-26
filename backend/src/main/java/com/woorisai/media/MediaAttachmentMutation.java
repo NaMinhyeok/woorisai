@@ -1,5 +1,7 @@
 package com.woorisai.media;
 
+import java.time.Instant;
+
 public interface MediaAttachmentMutation {
 
     void attachScoreChange(AttachScoreChangeMediaCommand command);
@@ -7,6 +9,9 @@ public interface MediaAttachmentMutation {
     void attachScoreComment(AttachScoreCommentMediaCommand command);
 
     void replaceDiaryEntry(ReplaceDiaryEntryMediaCommand command);
+
+    /** Stops new download grants; preserves the attachments and their parent links. */
+    void revokeDiaryEntryDownloads(long diaryEntryId, Instant revokedAt);
 
     final class InvalidMediaAttachmentRequestException extends RuntimeException {
 

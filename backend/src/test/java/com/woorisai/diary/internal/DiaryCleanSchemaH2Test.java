@@ -191,6 +191,22 @@ class DiaryCleanSchemaH2Test {
                 .isInstanceOf(DiaryEntryNotFoundException.class);
         assertThat(countUuid("media_attachment", "id", FIRST_UPLOAD)).isOne();
         assertThat(media.replacements()).hasSize(replacementCount);
+        assertThat(media.revokedDiaryEntries).containsExactly(created.id());
+    }
+
+    @Test
+    void mediaFailureRollsBackEntryAndCommentDeletion() {
+        long entryId = diary.createEntry(
+                FIRST, CreateDiaryEntryCommand.from("rollback", List.of(FIRST_UPLOAD))).id();
+        long commentId = diary.createComment(
+                SECOND, entryId, CreateDiaryCommentCommand.from("still here")).id();
+        media.failNext(new MediaAttachmentMutation.MediaAttachmentUnavailableException());
+
+        assertThatThrownBy(() -> diary.deleteEntry(FIRST, entryId))
+                .isInstanceOf(DiaryUnavailableException.class);
+
+        assertThat(liveCount("diary_entry", "id", entryId)).isOne();
+        assertThat(liveCount("diary_entry_comment", "id", commentId)).isOne();
     }
 
     @Test
@@ -500,6 +516,7 @@ class DiaryCleanSchemaH2Test {
     static final class RecordingMedia implements MediaAttachmentMutation, AttachedMediaQuery {
 
         private final List<ReplaceDiaryEntryMediaCommand> replacements = new ArrayList<>();
+        private final List<Long> revokedDiaryEntries = new ArrayList<>();
         private final Map<Long, List<AttachedMedia>> attachments = new LinkedHashMap<>();
         private RuntimeException nextFailure;
         private RuntimeException nextQueryFailure;
@@ -517,6 +534,16 @@ class DiaryCleanSchemaH2Test {
         @Override
         public void replaceDiaryEntry(ReplaceDiaryEntryMediaCommand command) {
             replacements.add(command);
+            throwPendingFailure();
+        }
+
+        @Override
+        public void revokeDiaryEntryDownloads(long diaryEntryId, Instant revokedAt) {
+            throwPendingFailure();
+            revokedDiaryEntries.add(diaryEntryId);
+        }
+
+        private void throwPendingFailure() {
             if (nextFailure != null) {
                 RuntimeException failure = nextFailure;
                 nextFailure = null;
@@ -569,6 +596,7 @@ class DiaryCleanSchemaH2Test {
 
         void reset() {
             replacements.clear();
+            revokedDiaryEntries.clear();
             attachments.clear();
             nextFailure = null;
             nextQueryFailure = null;

@@ -127,6 +127,11 @@ data copy, backfill, reconcile과 destructive cleanup을 startup, build, pre-dep
 여러 replica가 함께 동작할 수 있으므로 schema와 OpenAPI 변경은 지원 중인 이전 artifact/iOS
 binary와 forward compatible해야 한다.
 
+첨부 `revoked_at` 전환은 schema 추가 자체는 호환되지만, 이전 artifact는 일기를 삭제할 때 이
+컬럼을 갱신하지 않는다. 첫 전환은 maintenance에서 이전 writer의 요청을 중단하고 진행 중인
+write가 모두 끝난 뒤 V6 적용과 새 artifact 활성화를 진행한다. 이전 writer를 다시 허용한
+경우에는 새 버전으로 복귀하기 전 누락된 첨부 발급 중단 상태를 승인된 정정 절차로 반영해야 한다.
+
 ## Runtime 변수
 
 실제 값은 Railway variable/secret store에만 둔다.

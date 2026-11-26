@@ -1,6 +1,7 @@
 package com.woorisai.media.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.woorisai.media.AttachScoreCommentMediaCommand;
 import com.woorisai.media.MediaAttachmentMutation;
@@ -298,6 +299,26 @@ class MediaAttachmentPostgresTest {
         }
     }
 
+    @Test
+    void revocationPreservesTheAttachmentButPreventsNewDownloadGrants() {
+        jdbc.update("""
+                INSERT INTO woorisai.diary_entry (id, author_id, content, created_at)
+                VALUES (40, ?, 'fixture diary', ?)
+                """, FIRST, NOW);
+        UUID id = UUID.fromString("20000000-0000-4000-8000-000000000002");
+        insertReady(id, "DIARY_ENTRY", null, null, 40L, 0);
+        assertThat(media.download(SECOND, id)).isNotNull();
+
+        transactions.executeWithoutResult(status -> mutation.revokeDiaryEntryDownloads(40L, NOW.toInstant()));
+
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM woorisai.media_attachment
+                WHERE id = ? AND diary_entry_id = 40 AND revoked_at = ?
+                """, Integer.class, id, NOW)).isOne();
+        assertThatThrownBy(() -> media.download(SECOND, id))
+                .isInstanceOf(MediaAttachmentNotFoundException.class);
+    }
+
     private void nameCurrentTransaction(String applicationName) {
         jdbc.queryForObject(
                 "SELECT set_config('application_name', ?, true)",
@@ -499,7 +520,7 @@ class MediaAttachmentPostgresTest {
 
         @Override
         public URI presignDownload(DownloadPresignRequest request) {
-            throw new UnsupportedOperationException();
+            return URI.create("https://downloads.example.test/" + request.objectKey());
         }
 
         @Override
