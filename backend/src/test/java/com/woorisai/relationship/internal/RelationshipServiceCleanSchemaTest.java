@@ -339,6 +339,10 @@ class RelationshipServiceCleanSchemaTest {
     }
 
     static final class FakeMedia implements MediaAttachmentMutation, AttachedMediaQuery {
+        @Override
+        public void revokeDiaryEntryDownloads(long diaryEntryId, Instant revokedAt) {
+            throw new UnsupportedOperationException();
+        }
 
         private final List<AttachScoreChangeMediaCommand> scoreCommands = new ArrayList<>();
         private final List<AttachScoreCommentMediaCommand> commentCommands = new ArrayList<>();

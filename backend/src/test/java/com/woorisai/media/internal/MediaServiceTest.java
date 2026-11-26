@@ -102,7 +102,7 @@ class MediaServiceTest {
         attachments = mock(MediaAttachmentRepository.class);
         objects = mock(MediaObjectStorage.class);
         service = service(attachments, objects);
-        given(attachments.findByIdWithVisibleParent(UPLOAD_ID)).willReturn(Optional.of(parentedReady()));
+        given(attachments.findById(UPLOAD_ID)).willReturn(Optional.of(parentedReady()));
         var storageFailure = storageFailure();
         given(objects.presignDownload(any(DownloadPresignRequest.class)))
                 .willThrow(storageFailure);

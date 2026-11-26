@@ -120,11 +120,14 @@ class DiaryService {
         DiaryEntry entry = entry(entryId, context);
         Instant deletedAt = now();
         entry.deleteBy(context.actor().id(), deletedAt);
+        // As in updateEntry, take the versioned parent write before changing its attachments.
+        flushEntries();
         // The parent no longer disappears physically, so ON DELETE CASCADE cannot
         // clear the thread. Mark the live children in the same transaction.
         liveComments(entryId).forEach(comment -> comment.deleteWithParent(deletedAt));
         flushComments();
-        flushEntries();
+        DiaryMediaFailures.translating(() -> mediaMutation.revokeDiaryEntryDownloads(
+                entry.getId(), entry.getDeletedAt()));
     }
 
     @Transactional

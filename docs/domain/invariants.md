@@ -87,6 +87,8 @@
   단건 조회, thread와 comment count에서 제외되며 재조회는 `404`다.
 - Entry를 삭제하면 같은 transaction에서 살아있는 comment도 함께 표시한다. Parent 행이 남아
   `ON DELETE CASCADE`가 더 이상 동작하지 않기 때문이다.
+- Entry 삭제와 그 첨부의 새 다운로드 URL 발급 중단은 한 transaction이다. 첨부 교체와
+  삭제는 둘 다 entry의 versioned write를 첨부 변경보다 먼저 수행한다.
 - Optimistic loser와 comment create 중 parent가 먼저 삭제된 race는 `409 DIARY_CONFLICT`다.
   실패한 transaction은 content, attachment와 event를 모두 rollback하며 자동 재시도하지 않는다.
 - 같은 entry에 독립적인 comment create는 parent version을 갱신하지 않아 함께 commit될 수

@@ -170,14 +170,14 @@ class MediaService {
         }
         MediaAttachment attachment;
         try {
-            attachment = attachments.findByIdWithVisibleParent(attachmentId)
+            attachment = attachments.findById(attachmentId)
                     .orElseThrow(MediaAttachmentNotFoundException::new);
         } catch (MediaAttachmentNotFoundException exception) {
             throw exception;
         } catch (DataAccessException exception) {
             throw new MediaDownloadUnavailableException(exception);
         }
-        if (!attachment.isParentedReady()) {
+        if (!attachment.isDownloadable()) {
             throw new MediaAttachmentNotFoundException();
         }
 

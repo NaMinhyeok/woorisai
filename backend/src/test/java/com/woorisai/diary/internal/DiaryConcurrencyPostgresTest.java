@@ -204,7 +204,8 @@ class DiaryConcurrencyPostgresTest {
     }
 
     @Test
-    void committedEntryUpdateMakesAnOverlappingDeleteConflict() throws Exception {
+    void committedMediaOnlyUpdateAtTheSameClockTickMakesAnOverlappingDeleteConflict() throws Exception {
+        jdbc.update("UPDATE woorisai.diary_entry SET updated_at = ? WHERE id = ?", NOW, ENTRY_ID);
         CountDownLatch updateFlushed = new CountDownLatch(1);
         CountDownLatch releaseUpdate = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -213,7 +214,7 @@ class DiaryConcurrencyPostgresTest {
                     () -> diary.updateEntry(
                             FIRST_ID,
                             ENTRY_ID,
-                            UpdateDiaryEntryCommand.from("updated entry", null)),
+                            UpdateDiaryEntryCommand.from(null, List.of())),
                     updateFlushed,
                     releaseUpdate));
             assertThat(updateFlushed.await(5, TimeUnit.SECONDS)).isTrue();
@@ -232,14 +233,14 @@ class DiaryConcurrencyPostgresTest {
             DiaryEntryUpdatedResponse updated = update.get(5, TimeUnit.SECONDS);
             Object deleteOutcome = delete.get(5, TimeUnit.SECONDS);
 
-            assertThat(updated.content()).isEqualTo("updated entry");
+            assertThat(updated.content()).isEqualTo("original entry");
             assertThat(deleteOutcome).isInstanceOf(DiaryConflictException.class);
             assertThat(jdbc.queryForMap("""
                     SELECT content, version
                     FROM woorisai.diary_entry
                     WHERE id = ?
                     """, ENTRY_ID))
-                    .containsEntry("content", "updated entry")
+                    .containsEntry("content", "original entry")
                     .containsEntry("version", 1L);
         } finally {
             releaseUpdate.countDown();
@@ -386,7 +387,7 @@ class DiaryConcurrencyPostgresTest {
 
         @Bean
         Clock clock() {
-            return Clock.systemUTC();
+            return Clock.fixed(NOW.toInstant(), java.time.ZoneOffset.UTC);
         }
 
         @Bean
@@ -475,6 +476,9 @@ class DiaryConcurrencyPostgresTest {
 
         @Override
         public void replaceDiaryEntry(ReplaceDiaryEntryMediaCommand command) {}
+
+        @Override
+        public void revokeDiaryEntryDownloads(long diaryEntryId, java.time.Instant revokedAt) {}
 
         @Override
         public Map<Long, List<AttachedMedia>> attachmentsForScoreChanges(

@@ -304,6 +304,10 @@ class RelationshipConcurrencyPostgresTest {
     }
 
     static final class NoMedia implements MediaAttachmentMutation, AttachedMediaQuery {
+        @Override
+        public void revokeDiaryEntryDownloads(long diaryEntryId, java.time.Instant revokedAt) {
+            throw new UnsupportedOperationException();
+        }
 
         private final AtomicInteger scoreAttachAttempts = new AtomicInteger();
         private CountDownLatch firstScoreAttachReached = new CountDownLatch(1);

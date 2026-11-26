@@ -71,6 +71,9 @@ class MediaAttachment {
     @Column(name = "ready_at")
     private Instant readyAt;
 
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
+
     static MediaAttachment pending(
             UUID id,
             long uploaderId,
@@ -147,6 +150,10 @@ class MediaAttachment {
             case SCORE_CHANGE_COMMENT -> scoreChangeCommentId != null;
             case DIARY_ENTRY -> diaryEntryId != null;
         };
+    }
+
+    boolean isDownloadable() {
+        return revokedAt == null && isParentedReady();
     }
 
     boolean isAttachedToDiary(long parentId) {

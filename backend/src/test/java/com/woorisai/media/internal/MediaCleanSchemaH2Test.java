@@ -226,7 +226,7 @@ class MediaCleanSchemaH2Test {
     }
 
     @Test
-    void doesNotGrantDiaryAttachmentDownloadsAfterTheParentIsSoftDeleted() {
+    void doesNotGrantDownloadsForARevokedDiaryAttachmentEvenWhenTheParentIsLive() {
         long entryId = 40L;
         jdbc.update("""
                 INSERT INTO woorisai.diary_entry (id, author_id, content, created_at)
@@ -237,11 +237,15 @@ class MediaCleanSchemaH2Test {
                 new ReplaceDiaryEntryMediaCommand(FIRST, entryId, List.of(upload))));
         assertThat(media.download(SECOND, upload)).isNotNull();
 
-        jdbc.update("""
-                UPDATE woorisai.diary_entry
-                SET deleted_at = CAST(? AS TIMESTAMP WITH TIME ZONE)
-                WHERE id = ?
-                """, NOW.toString(), entryId);
+        assertThatThrownBy(() -> mutation.revokeDiaryEntryDownloads(entryId, NOW))
+                .isInstanceOf(IllegalTransactionStateException.class);
+        transactions.executeWithoutResult(status -> {
+            mutation.revokeDiaryEntryDownloads(entryId, NOW);
+            status.setRollbackOnly();
+        });
+        assertThat(media.download(SECOND, upload)).isNotNull();
+
+        transactions.executeWithoutResult(status -> mutation.revokeDiaryEntryDownloads(entryId, NOW));
 
         assertThat(attachedDiaryRows(entryId)).containsExactly(upload + ":0");
         assertThatThrownBy(() -> media.download(SECOND, upload))
