@@ -42,8 +42,14 @@ final class CalendarModel {
 
   var days: [Date] {
     guard let interval = calendar.dateInterval(of: .month, for: displayedMonth) else { return [] }
-    return stride(from: 0, to: calendar.dateComponents([.day], from: interval.start, to: interval.end).day ?? 0, by: 1)
-      .compactMap { calendar.date(byAdding: .day, value: $0, to: interval.start) }
+    var days: [Date] = []
+    var day = interval.start
+    while day < interval.end {
+      days.append(day)
+      guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+      day = calendar.startOfDay(for: next)
+    }
+    return days
   }
 
   func events(on day: Date) -> [CalendarEvent] {
@@ -57,8 +63,14 @@ final class CalendarModel {
 
   func changeMonth(by offset: Int) {
     guard let month = calendar.date(byAdding: .month, value: offset, to: displayedMonth) else { return }
+    showDay(month)
+  }
+
+  func showDay(_ day: Date) {
+    select(day)
+    guard let month = calendar.dateInterval(of: .month, for: day)?.start,
+          month != displayedMonth else { return }
     displayedMonth = month
-    selectedDay = month
     load()
   }
 

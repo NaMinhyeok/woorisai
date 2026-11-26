@@ -3,6 +3,11 @@ import WoorisaiAPI
 
 // The form shows an inclusive final day; the API stores an exclusive end instant.
 enum CalendarEditorDates {
+  static func endAfterStartChange(_ start: Date, previousEnd: Date, allDay: Bool, calendar: Calendar) -> Date {
+    guard !allDay else { return previousEnd }
+    return calendar.date(byAdding: .hour, value: 1, to: start) ?? start.addingTimeInterval(3600)
+  }
+
   static func displayedEnd(_ storedEnd: Date, allDay: Bool, calendar: Calendar) -> Date {
     guard allDay else { return storedEnd }
     return calendar.date(byAdding: .day, value: -1, to: storedEnd) ?? storedEnd
@@ -16,50 +21,20 @@ enum CalendarEditorDates {
 }
 
 struct CalendarView: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State var model: CalendarModel
   let participant: AuthenticatedParticipant
   let onAuthenticationRequired: @MainActor () -> Void
   @State private var editor: CalendarEvent?
   @State private var creating = false
   @State private var deleting: CalendarEvent?
+  @State private var monthDirection: CGFloat = 1
 
   var body: some View {
     NavigationStack {
       ScrollView {
-        VStack(alignment: .leading, spacing: 20) {
-          HStack {
-            Button { model.changeMonth(by: -1) } label: { Image(systemName: "chevron.left") }
-              .accessibilityLabel("이전 달")
-            Spacer()
-            Text(model.displayedMonth, format: .dateTime.year().month(.wide))
-              .font(.title2.bold())
-              .accessibilityIdentifier("calendar.month")
-            Spacer()
-            Button { model.changeMonth(by: 1) } label: { Image(systemName: "chevron.right") }
-              .accessibilityLabel("다음 달")
-          }
-          .padding(.horizontal)
-          LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
-            ForEach(0..<7, id: \.self) { index in
-              Text(model.weekdaySymbols[index])
-                .font(.caption).foregroundStyle(.secondary)
-            }
-            ForEach(0..<model.leadingEmptyDays, id: \.self) { _ in Color.clear.frame(height: 42) }
-            ForEach(model.days, id: \.self) { day in
-              Button {
-                model.select(day)
-              } label: {
-                VStack(spacing: 4) {
-                  Text(day, format: .dateTime.day())
-                  Circle().fill(model.events(on: day).isEmpty ? .clear : Color.accentColor)
-                    .frame(width: 5, height: 5)
-                }
-                .frame(maxWidth: .infinity, minHeight: 42)
-                .background(Calendar.current.isDate(day, inSameDayAs: model.selectedDay) ? Color.accentColor.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 8))
-              }
-              .accessibilityLabel(day.formatted(date: .complete, time: .omitted))
-            }
-          }
+        VStack(alignment: .leading, spacing: WoorisaiSpacing.regular) {
+          monthCard
           if model.isLoading { ProgressView("일정을 불러오는 중이에요") }
           if let notice = model.notice {
             Text(notice).foregroundStyle(.red)
@@ -68,11 +43,14 @@ struct CalendarView: View {
           if model.uncertainMutation {
             Button("재전송 없이 초안 정리") { model.abandonUncertainMutation() }
           }
-          Text(model.selectedDay, format: .dateTime.month().day()).font(.headline)
-          if model.events(on: model.selectedDay).isEmpty && !model.isLoading {
-            ContentUnavailableView("이날은 일정이 없어요", systemImage: "calendar")
+          Text(model.selectedDay, format: .dateTime.month().day().weekday(.wide))
+            .font(.headline)
+            .accessibilityAddTraits(.isHeader)
+          let dayEvents = model.events(on: model.selectedDay)
+          if dayEvents.isEmpty && !model.isLoading && model.notice == nil {
+            emptyDayCard
           }
-          ForEach(model.events(on: model.selectedDay)) { event in
+          ForEach(dayEvents) { event in
             VStack(alignment: .leading, spacing: 8) {
               Text(event.kind.label).font(.caption).foregroundStyle(.secondary)
               Text(event.title).font(.headline)
@@ -98,7 +76,7 @@ struct CalendarView: View {
         Button { creating = true } label: { Image(systemName: "plus") }
           .accessibilityLabel("일정 추가")
           .accessibilityIdentifier("calendar.create")
-          .disabled(model.isMutating || model.uncertainMutation)
+          .disabled(model.requiresNavigationProtection)
       }
       .sheet(isPresented: $creating) {
         CalendarEditor(model: model, event: nil, participant: participant)
@@ -120,6 +98,128 @@ struct CalendarView: View {
         if model.authenticationRequired { onAuthenticationRequired() }
       }
     }
+  }
+
+  private var monthCard: some View {
+    VStack(spacing: WoorisaiSpacing.xSmall) {
+      HStack(spacing: 0) {
+        monthArrow(-1, symbol: "chevron.left", label: "이전 달")
+        Text(model.displayedMonth, format: .dateTime.year().month(.wide))
+          .font(.headline)
+          .frame(maxWidth: .infinity)
+          .accessibilityAddTraits(.isHeader)
+          .accessibilityIdentifier("calendar.month")
+        monthArrow(1, symbol: "chevron.right", label: "다음 달")
+      }
+      ZStack(alignment: .top) {
+        monthGrid
+          .id(model.displayedMonth)
+          .transition(reduceMotion ? .identity : .asymmetric(
+            insertion: .offset(x: 56 * monthDirection).combined(with: .opacity),
+            removal: .opacity
+          ))
+      }
+      .clipped()
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.23), value: model.displayedMonth)
+
+      Button { goToToday() } label: {
+        Label("오늘", systemImage: "calendar")
+          .font(.subheadline.weight(.semibold))
+          .padding(.horizontal, WoorisaiSpacing.medium)
+          .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
+          .contentShape(Rectangle())
+      }
+      .frame(maxWidth: .infinity, alignment: .trailing)
+      .accessibilityIdentifier("calendar.today")
+    }
+    .padding(WoorisaiSpacing.small)
+    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: WoorisaiRadius.medium))
+    .contentShape(Rectangle())
+    .simultaneousGesture(DragGesture(minimumDistance: 18).onEnded { value in
+      let delta = value.translation
+      guard abs(delta.width) >= 44, abs(delta.width) > abs(delta.height) * 1.5 else { return }
+      changeMonth(by: delta.width < 0 ? 1 : -1)
+    })
+  }
+
+  private var monthGrid: some View {
+    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: WoorisaiSpacing.xSmall), count: 7), spacing: WoorisaiSpacing.xSmall) {
+      ForEach(0..<7, id: \.self) { index in
+        Text(model.weekdaySymbols[index])
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.secondary)
+      }
+      ForEach(0..<model.leadingEmptyDays, id: \.self) { _ in
+        Color.clear.frame(height: WoorisaiControlMetric.minimumTapTarget)
+      }
+      ForEach(model.days, id: \.self) { day in
+        let selected = day == model.selectedDay
+        let today = Calendar.current.isDateInToday(day)
+        let hasEvents = !model.events(on: day).isEmpty
+        Button { model.select(day) } label: {
+          VStack(spacing: WoorisaiSpacing.xSmall) {
+            Text(day, format: .dateTime.day())
+              .font(.subheadline.weight(selected || today ? .bold : .regular))
+            Circle().fill(hasEvents ? Color.accentColor : .clear).frame(width: 5, height: 5)
+          }
+          .foregroundStyle(today && !selected ? Color.accentColor : Color.primary)
+          .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
+          .background(selected ? Color.accentColor.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: WoorisaiRadius.small))
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(day.formatted(date: .complete, time: .omitted))
+        .accessibilityValue(today ? (hasEvents ? "오늘, 일정 있음" : "오늘") : (hasEvents ? "일정 있음" : ""))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+      }
+    }
+  }
+
+  private var emptyDayCard: some View {
+    Button { creating = true } label: {
+      HStack(spacing: WoorisaiSpacing.medium) {
+        Image(systemName: "calendar.badge.plus")
+          .font(.title2)
+          .foregroundStyle(Color.accentColor)
+          .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
+          Text("이날은 일정이 없어요").font(.headline).foregroundStyle(.primary)
+          Text("일정 추가하기").font(.subheadline).foregroundStyle(.secondary)
+        }
+        Spacer(minLength: 0)
+        Image(systemName: "chevron.right")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.secondary)
+          .accessibilityHidden(true)
+      }
+      .padding(WoorisaiSpacing.regular)
+      .background(.thinMaterial, in: RoundedRectangle(cornerRadius: WoorisaiRadius.medium))
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("calendar.empty.add")
+    .disabled(model.requiresNavigationProtection)
+  }
+
+  private func monthArrow(_ offset: Int, symbol: String, label: String) -> some View {
+    Button { changeMonth(by: offset) } label: {
+      Image(systemName: symbol)
+        .font(.subheadline.weight(.semibold))
+        .frame(width: WoorisaiControlMetric.minimumTapTarget, height: WoorisaiControlMetric.minimumTapTarget)
+        .contentShape(Rectangle())
+    }
+    .accessibilityLabel(label)
+  }
+
+  private func changeMonth(by offset: Int) {
+    monthDirection = offset > 0 ? 1 : -1
+    model.changeMonth(by: offset)
+  }
+
+  private func goToToday() {
+    let today = Date.now
+    monthDirection = today < model.displayedMonth ? -1 : 1
+    model.showDay(today)
   }
 }
 
@@ -163,6 +263,9 @@ private struct CalendarEditor: View {
         }
         Toggle("종일", isOn: $allDay)
         DatePicker("시작", selection: $startAt, displayedComponents: allDay ? [.date] : [.date, .hourAndMinute])
+          .onChange(of: startAt) { _, newStart in
+            endAt = CalendarEditorDates.endAfterStartChange(newStart, previousEnd: endAt, allDay: allDay, calendar: .current)
+          }
         DatePicker("종료", selection: $endAt, displayedComponents: allDay ? [.date] : [.date, .hourAndMinute])
         TextField("메모", text: $note, axis: .vertical)
         if let error { Text(error).foregroundStyle(.red) }

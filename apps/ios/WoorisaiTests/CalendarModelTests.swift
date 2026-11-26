@@ -33,6 +33,18 @@ struct CalendarModelTests {
   }
 
   @Test
+  func gridDatesMatchSelectedDayAfterMonthStartsWithSkippedMidnight() throws {
+    let zone = try #require(TimeZone(identifier: "America/Asuncion"))
+    let model = CalendarModel(service: CalendarServiceStub(), initialDate: date("2023-10-01T12:00:00Z"), timeZone: zone)
+    #expect(model.days.count == 31)
+    let secondDay = try #require(model.days.dropFirst().first)
+    model.select(secondDay)
+    #expect(secondDay == model.selectedDay)
+    model.changeMonth(by: 1)
+    #expect(model.days.first == model.selectedDay)
+  }
+
+  @Test
   func localMonthRequestsUTCOverlappingBoundaryDays() async {
     let service = CalendarServiceStub()
     let zone = TimeZone(secondsFromGMT: 9 * 3600)!
@@ -65,6 +77,16 @@ struct CalendarModelTests {
     #expect(calendar.isDate(displayedEnd, inSameDayAs: date("2026-11-25T15:00:00Z")))
     #expect(CalendarEditorDates.exclusiveEnd(displayedEnd, allDay: true, calendar: calendar) == exclusiveEnd)
     #expect(CalendarEditorDates.displayedEnd(exclusiveEnd, allDay: false, calendar: calendar) == exclusiveEnd)
+  }
+
+  @Test
+  func changingTimedStartResetsEndToOneHourLater() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "Asia/Seoul")!
+    let start = date("2026-11-25T14:30:00Z") // 23:30 local
+    let previousEnd = date("2026-11-26T05:00:00Z")
+    #expect(CalendarEditorDates.endAfterStartChange(start, previousEnd: previousEnd, allDay: false, calendar: calendar) == date("2026-11-25T15:30:00Z"))
+    #expect(CalendarEditorDates.endAfterStartChange(start, previousEnd: previousEnd, allDay: true, calendar: calendar) == previousEnd)
   }
 
   @Test
