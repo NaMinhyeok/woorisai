@@ -28,6 +28,38 @@ final class CalendarUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["E2E same day"].waitForExistence(timeout: 10))
     let sameDate = app.buttons.matching(NSPredicate(format: "selected == true AND label == %@", selectedDate)).firstMatch
     XCTAssertTrue((sameDate.value as? String)?.contains("일정 2개") == true)
+    app.buttons["calendar.event.700"].tap()
+    XCTAssertTrue(app.descendants(matching: .any)["calendar.event.detail"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["calendar.event.edit"].exists)
+    app.navigationBars.buttons.firstMatch.tap()
+    XCTAssertTrue(app.buttons["calendar.day.disclosure"].waitForExistence(timeout: 5))
+    app.buttons["calendar.event.700"].tap()
+    app.tabBars.buttons["우리 사이"].tap()
+    XCTAssertTrue(shortcut.waitForExistence(timeout: 5))
+    shortcut.tap()
+    XCTAssertTrue(app.buttons["calendar.day.disclosure"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.buttons["calendar.event.edit"].exists)
+  }
+
+  func testCalendarKeepsOnePanelAcrossDateTapsAndDrag() {
+    let app = openCalendar()
+    let disclosure = app.buttons["calendar.day.disclosure"]
+    XCTAssertFalse(disclosure.exists)
+    let dates = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "calendar.day.cell.")).allElementsBoundByIndex
+    guard dates.count >= 3 else { return XCTFail("Expected selectable dates") }
+    for date in dates.prefix(3) {
+      let key = date.identifier
+      app.buttons[key].tap()
+      XCTAssertTrue(disclosure.exists)
+      XCTAssertTrue(app.buttons[key].isSelected)
+      XCTAssertTrue(app.tabBars.buttons["일기"].isHittable)
+    }
+    XCTAssertEqual(disclosure.value as? String, "접힘")
+    let origin = disclosure.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+    origin.press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: 0, dy: -120)))
+    XCTAssertEqual(disclosure.value as? String, "펼쳐짐")
+    disclosure.tap()
+    XCTAssertEqual(disclosure.value as? String, "접힘")
   }
 
   func testCalendarTabOpensMonthAndCreateForm() {
@@ -60,6 +92,8 @@ final class CalendarUITests: XCTestCase {
 
   func testEmptyDayCardOpensCreateForm() {
     let app = openCalendar()
+    let date = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "calendar.day.cell.")).firstMatch
+    date.tap()
     let add = app.buttons["calendar.empty.add"]
     guard add.waitForExistence(timeout: 5) else { return XCTFail("Empty day is not actionable") }
     add.tap()

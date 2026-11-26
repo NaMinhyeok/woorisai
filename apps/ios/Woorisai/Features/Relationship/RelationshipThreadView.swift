@@ -166,26 +166,16 @@ struct ScoreChangeThreadView: View {
         ScrollView {
           if let thread = model.selectedThread {
             LazyVStack(alignment: .leading, spacing: WoorisaiSpacing.large) {
-              VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
-                Text("이 마음에 대한 대화")
-                  .font(.system(.title2, design: .rounded, weight: .bold))
-                  .foregroundStyle(WoorisaiColor.Fg.neutral)
-                Text("오래된 이야기부터 차례로 읽고, 가장 아래에서 답장을 건네 보세요.")
-                  .font(.subheadline)
-                  .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
-              }
-              .accessibilityElement(children: .combine)
-              .accessibilityAddTraits(.isHeader)
-              .accessibilityIdentifier("relationship.thread.hero")
-
               ScoreChangeRow(
                 change: thread.change,
                 mediaService: mediaService,
                 onAuthenticationRequired: onAuthenticationRequired,
                 reasonDisplay: .threadDetail
               )
+              .accessibilityIdentifier("relationship.thread.origin")
 
               commentConversation(thread)
+                .accessibilityIdentifier("relationship.thread.comments")
 
               Color.clear
                 .frame(height: 1)

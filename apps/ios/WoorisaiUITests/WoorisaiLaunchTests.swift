@@ -326,7 +326,7 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertTrue(history.exists)
     history.tap()
     XCTAssertTrue(element("relationship.thread.loaded", in: app).waitForExistence(timeout: 5))
-    XCTAssertTrue(element("relationship.thread.hero", in: app).exists)
+    XCTAssertTrue(element("relationship.thread.origin", in: app).exists)
     XCTAssertTrue(element("relationship.thread.comment.301", in: app).exists)
     XCTAssertTrue(app.staticTexts["여름"].exists)
     XCTAssertTrue(app.staticTexts["나도 고마워"].exists)
@@ -653,7 +653,7 @@ final class WoorisaiLaunchTests: XCTestCase {
     let entry = element("diary.entry.501", in: app)
     scrollToVisible(entry, in: app, maximumSwipes: 20)
     assertContainedHorizontally(entry, in: app)
-    let conversation = element("diary.entry.501.conversation", in: app)
+    let conversation = element("diary.entry.501.open", in: app)
     scrollToHittable(conversation, in: app, maximumSwipes: 20)
     conversation.tap()
 
@@ -913,6 +913,8 @@ final class WoorisaiLaunchTests: XCTestCase {
     app.navigationBars.buttons.firstMatch.tap()
     XCTAssertTrue(element("diary.loaded", in: app).waitForExistence(timeout: 5))
     XCTAssertFalse(app.navigationBars.firstMatch.exists)
+    XCTAssertTrue(element("diary.entry.501.open", in: app).exists)
+    XCTAssertFalse(element("diary.entry.501.conversation", in: app).exists)
     let diaryScreenshot = XCTAttachment(screenshot: app.screenshot())
     diaryScreenshot.name = "일기 첫 화면"
     diaryScreenshot.lifetime = .keepAlways
@@ -1393,7 +1395,7 @@ final class WoorisaiLaunchTests: XCTestCase {
   }
 
   private func openDiaryDetail(entryID: Int64, in app: XCUIApplication) {
-    let conversation = element("diary.entry.\(entryID).conversation", in: app)
+    let conversation = element("diary.entry.\(entryID).open", in: app)
     scrollToHittable(conversation, in: app, maximumSwipes: 20)
     conversation.tap()
     XCTAssertTrue(element("diary.detail.loaded", in: app).waitForExistence(timeout: 5))

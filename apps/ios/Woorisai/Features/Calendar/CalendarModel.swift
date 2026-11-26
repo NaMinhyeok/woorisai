@@ -4,6 +4,8 @@ import WoorisaiAPI
 
 @MainActor @Observable
 final class CalendarModel {
+  enum DayPanel: Equatable { case hidden, compact, expanded }
+
   enum Upcoming: Equatable {
     case loading, empty, failed
     case event(CalendarEvent)
@@ -18,6 +20,8 @@ final class CalendarModel {
   private var sessionEpoch = 0
   private var upcomingGeneration = 0
   private(set) var upcoming: Upcoming = .loading
+  private(set) var dayPanel: DayPanel = .hidden
+  private(set) var externalSelectionRevision = 0
   private(set) var selectedDay: Date
   private(set) var displayedMonth: Date
   private(set) var events: [CalendarEvent] = []
@@ -68,6 +72,13 @@ final class CalendarModel {
 
   func select(_ day: Date) { selectedDay = calendar.startOfDay(for: day) }
 
+  func inspect(_ day: Date) {
+    showDay(day)
+    if dayPanel == .hidden { dayPanel = .compact }
+  }
+
+  func setDayPanel(_ panel: DayPanel) { dayPanel = panel }
+
   /// The home preview is independent of the month being browsed in the calendar tab.
   func refreshUpcoming(now: Date = .now) async {
     upcomingGeneration += 1
@@ -88,15 +99,17 @@ final class CalendarModel {
   }
 
   func openUpcoming(_ event: CalendarEvent, now: Date = .now) {
+    externalSelectionRevision &+= 1
     let day = event.endAt > now ? max(event.startAt, now) : event.startAt
     let previousMonth = displayedMonth
-    showDay(day)
+    inspect(day)
     if displayedMonth == previousMonth { load() }
   }
 
   func changeMonth(by offset: Int) {
     guard let month = calendar.date(byAdding: .month, value: offset, to: displayedMonth) else { return }
     showDay(month)
+    dayPanel = .hidden
   }
 
   func showDay(_ day: Date) {
@@ -108,6 +121,7 @@ final class CalendarModel {
   }
 
   func openEvent(id: Int64) {
+    externalSelectionRevision &+= 1
     generation += 1
     let current = generation
     loadTask?.cancel()
@@ -118,6 +132,7 @@ final class CalendarModel {
         guard !Task.isCancelled, generation == current else { return }
         displayedMonth = calendar.dateInterval(of: .month, for: event.startAt)!.start
         selectedDay = calendar.startOfDay(for: event.startAt)
+        dayPanel = .compact
         load()
       } catch {
         guard !Task.isCancelled, generation == current else { return }
@@ -192,6 +207,7 @@ final class CalendarModel {
   func clear() {
     generation += 1; sessionEpoch += 1; loadTask?.cancel(); mutationTask?.cancel()
     upcomingGeneration += 1; upcoming = .loading
+    dayPanel = .hidden
     events = []; notice = nil; pendingDraft = nil; uncertainMutation = false; authenticationRequired = false
     isLoading = false; isMutating = false
   }

@@ -169,7 +169,6 @@ struct RelationshipHomeUpdates: View {
 
 struct RelationshipView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @State private var model: RelationshipModel
   @State private var scoreMediaModel: MediaAttachmentComposerModel
   @State private var targetScore: Int64 = 50
@@ -380,110 +379,46 @@ struct RelationshipView: View {
   }
 
   private func scoreOverview(_ scores: RelationshipScores) -> some View {
-    VStack(alignment: .leading, spacing: WoorisaiSpacing.medium) {
-      WoorisaiSectionHeading(
-        "서로의 마음",
-        detail: "각자 느끼는 방향이 달라요",
-        symbol: "heart.text.square.fill"
-      )
-      .accessibilityIdentifier("relationship.scores")
-
-      Group {
-        if dynamicTypeSize.isAccessibilitySize {
-          VStack(spacing: WoorisaiSpacing.medium) {
-            scoreCard(
-              eyebrow: "내가 느끼는 마음",
-              sourceName: scores.currentParticipant.displayName,
-              targetName: scores.partner.displayName,
-              score: scores.outgoingScore,
-              isMine: true,
-              identifier: "relationship.outgoingScore"
-            )
-            scoreCard(
-              eyebrow: "상대가 느끼는 마음",
-              sourceName: scores.partner.displayName,
-              targetName: scores.currentParticipant.displayName,
-              score: scores.incomingScore,
-              isMine: false,
-              identifier: "relationship.incomingScore"
-            )
-          }
-        } else {
-          HStack(alignment: .top, spacing: WoorisaiSpacing.medium) {
-            scoreCard(
-              eyebrow: "내가 느끼는 마음",
-              sourceName: scores.currentParticipant.displayName,
-              targetName: scores.partner.displayName,
-              score: scores.outgoingScore,
-              isMine: true,
-              identifier: "relationship.outgoingScore"
-            )
-            scoreCard(
-              eyebrow: "상대가 느끼는 마음",
-              sourceName: scores.partner.displayName,
-              targetName: scores.currentParticipant.displayName,
-              score: scores.incomingScore,
-              isMine: false,
-              identifier: "relationship.incomingScore"
-            )
-          }
+    VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
+      Text("서로 남긴 마음")
+        .font(.title3.bold())
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("relationship.scores")
+      WarmSurface {
+        VStack(spacing: 0) {
+          scoreRow(source: scores.currentParticipant.displayName, target: scores.partner.displayName,
+                   score: scores.outgoingScore, identifier: "relationship.outgoingScore")
+          Divider().accessibilityHidden(true)
+          scoreRow(source: scores.partner.displayName, target: scores.currentParticipant.displayName,
+                   score: scores.incomingScore, identifier: "relationship.incomingScore")
         }
+        .padding(.horizontal, WoorisaiSpacing.regular)
       }
     }
   }
 
-  private func scoreCard(
-    eyebrow: String,
-    sourceName: String,
-    targetName: String,
-    score: Int64,
-    isMine: Bool,
-    identifier: String
-  ) -> some View {
-    WarmSurface {
-      VStack(alignment: .leading, spacing: WoorisaiSpacing.small) {
-        HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.small) {
-          Text(eyebrow)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
-          Spacer(minLength: WoorisaiSpacing.xSmall)
-          if isMine {
-            scoreOwnershipBadge
-          }
-        }
-
-        HStack(alignment: .firstTextBaseline, spacing: WoorisaiSpacing.xSmall) {
-          Text("\(score)")
-            .font(.system(.title, design: .rounded, weight: .bold))
-            .foregroundStyle(WoorisaiColor.Fg.neutral)
-          Text("점")
-            .font(.subheadline.weight(.bold))
-            .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
-        }
-
-        Text("\(sourceName) → \(targetName)")
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
-          .lineLimit(2)
-          .fixedSize(horizontal: false, vertical: true)
+  private func scoreRow(source: String, target: String, score: Int64, identifier: String) -> some View {
+    let direction = Text("\(source) → \(target)").font(.subheadline.weight(.semibold))
+    let value = Text("\(score)점").font(.body.monospacedDigit().weight(.semibold))
+    return ViewThatFits(in: .horizontal) {
+      HStack(spacing: WoorisaiSpacing.small) {
+        direction.fixedSize(horizontal: true, vertical: false)
+        Spacer(minLength: 0)
+        value.fixedSize(horizontal: true, vertical: false)
+      }
+      VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
+        direction
+        value
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(WoorisaiSpacing.regular)
     }
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel("\(sourceName)님이 \(targetName)님에게 보내는 마음")
+    .foregroundStyle(WoorisaiColor.Fg.neutral)
+    .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
+    .padding(.vertical, WoorisaiSpacing.xSmall)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("\(source)님이 \(target)님에게 보내는 마음")
     .accessibilityValue("\(score)점")
     .accessibilityIdentifier(identifier)
-  }
-
-  private var scoreOwnershipBadge: some View {
-    Text("내 점수")
-      .font(.caption2.weight(.heavy))
-      .foregroundStyle(WoorisaiColor.Fg.brand)
-      .padding(.horizontal, WoorisaiSpacing.small)
-      .padding(.vertical, WoorisaiSpacing.xSmall)
-      .background(WoorisaiColor.Bg.brandWeak, in: Capsule())
-      .fixedSize(horizontal: true, vertical: true)
   }
 
   private func openScoreComposer() {

@@ -692,18 +692,12 @@ private struct AppSettingsView: View {
 
   var body: some View {
     NavigationStack {
-      List {
+      Form {
         Section {
           HStack(spacing: WoorisaiSpacing.medium) {
             ParticipantAvatar(name: participant.displayName, size: 48)
-            VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
-              Text(participant.displayName)
-                .font(.headline)
-                .foregroundStyle(WoorisaiColor.Fg.neutral)
-              Text("우리 둘만의 공간에 들어와 있어요")
-                .font(.footnote)
-                .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
-            }
+            Text(participant.displayName)
+              .font(.headline)
           }
           .padding(.vertical, WoorisaiSpacing.xSmall)
           .accessibilityElement(children: .combine)
@@ -758,7 +752,6 @@ private struct AppSettingsView: View {
             confirmsForget = true
           } label: {
             Label("이 기기에서 로그인 정보 지우기", systemImage: "trash")
-              .foregroundStyle(WoorisaiColor.Fg.brand)
           }
           .accessibilityHint("이 기기에 저장된 로그인 정보를 삭제하고 로그아웃합니다.")
           .accessibilityIdentifier("settings.forget")
