@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "4.1.0"
+    id("org.springframework.boot") version "4.2.0"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.openapi.generator") version "7.23.0"
 }
@@ -18,7 +18,7 @@ repositories {
     mavenCentral()
 }
 
-extra["springModulithVersion"] = "2.1.0"
+extra["springModulithVersion"] = "2.2.0"
 
 dependencies {
     implementation("com.google.firebase:firebase-admin:9.10.0")
