@@ -4,6 +4,11 @@ import WoorisaiAPI
 
 @MainActor @Observable
 final class CalendarModel {
+  enum Upcoming: Equatable {
+    case loading, empty, failed
+    case event(CalendarEvent)
+  }
+
   private let service: any CalendarServing
   private let timeZone: TimeZone
   private var calendar: Calendar
@@ -11,6 +16,8 @@ final class CalendarModel {
   private var mutationTask: Task<Void, Never>?
   private var generation = 0
   private var sessionEpoch = 0
+  private var upcomingGeneration = 0
+  private(set) var upcoming: Upcoming = .loading
   private(set) var selectedDay: Date
   private(set) var displayedMonth: Date
   private(set) var events: [CalendarEvent] = []
@@ -61,6 +68,32 @@ final class CalendarModel {
 
   func select(_ day: Date) { selectedDay = calendar.startOfDay(for: day) }
 
+  /// The home preview is independent of the month being browsed in the calendar tab.
+  func refreshUpcoming(now: Date = .now) async {
+    upcomingGeneration += 1
+    let request = upcomingGeneration
+    let today = calendar.startOfDay(for: now)
+    guard let end = calendar.date(byAdding: .day, value: 30, to: today) else { return }
+    do {
+      let result = try await service.listCalendarEvents(range: utcRange(from: today, until: end))
+      guard !Task.isCancelled, upcomingGeneration == request else { return }
+      let next = result.filter { $0.endAt > now && $0.startAt < end }
+        .min { ($0.startAt, $0.id) < ($1.startAt, $1.id) }
+      upcoming = next.map(Upcoming.event) ?? .empty
+    } catch {
+      guard !Task.isCancelled, upcomingGeneration == request else { return }
+      upcoming = .failed
+      if (error as? WoorisaiAPIError) == .credentialRejected { authenticationRequired = true }
+    }
+  }
+
+  func openUpcoming(_ event: CalendarEvent, now: Date = .now) {
+    let day = event.endAt > now ? max(event.startAt, now) : event.startAt
+    let previousMonth = displayedMonth
+    showDay(day)
+    if displayedMonth == previousMonth { load() }
+  }
+
   func changeMonth(by offset: Int) {
     guard let month = calendar.date(byAdding: .month, value: offset, to: displayedMonth) else { return }
     showDay(month)
@@ -101,12 +134,7 @@ final class CalendarModel {
     let current = generation
     loadTask?.cancel()
     guard let interval = calendar.dateInterval(of: .month, for: displayedMonth) else { return }
-    let formatter = DateFormatter()
-    formatter.calendar = Calendar(identifier: .gregorian)
-    formatter.timeZone = TimeZone(secondsFromGMT: 0)!
-    formatter.dateFormat = "yyyy-MM-dd"
-    let lastMoment = interval.end.addingTimeInterval(-0.001)
-    let range = CalendarDateRange(from: formatter.string(from: interval.start), to: formatter.string(from: lastMoment))
+    let range = utcRange(from: interval.start, until: interval.end)
     isLoading = true; notice = nil
     loadTask = Task {
       do {
@@ -121,6 +149,18 @@ final class CalendarModel {
         if (error as? WoorisaiAPIError) == .credentialRejected { authenticationRequired = true }
       }
     }
+  }
+
+  private func utcRange(from start: Date, until end: Date) -> CalendarDateRange {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.timeZone = .gmt
+    formatter.dateFormat = "yyyy-MM-dd"
+    return CalendarDateRange(
+      from: formatter.string(from: start),
+      to: formatter.string(from: end.addingTimeInterval(-1))
+    )
   }
 
   func create(_ draft: CalendarEventDraft) { mutate(draft: draft) { try await self.service.createCalendarEvent(draft) } }
@@ -151,6 +191,7 @@ final class CalendarModel {
   func abandonUncertainMutation() { uncertainMutation = false; pendingDraft = nil; notice = nil }
   func clear() {
     generation += 1; sessionEpoch += 1; loadTask?.cancel(); mutationTask?.cancel()
+    upcomingGeneration += 1; upcoming = .loading
     events = []; notice = nil; pendingDraft = nil; uncertainMutation = false; authenticationRequired = false
     isLoading = false; isMutating = false
   }

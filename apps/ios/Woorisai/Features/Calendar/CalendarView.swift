@@ -24,7 +24,6 @@ struct CalendarView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State var model: CalendarModel
   let participant: AuthenticatedParticipant
-  let onAuthenticationRequired: @MainActor () -> Void
   @State private var editor: CalendarEvent?
   @State private var creating = false
   @State private var deleting: CalendarEvent?
@@ -43,41 +42,22 @@ struct CalendarView: View {
           if model.uncertainMutation {
             Button("재전송 없이 초안 정리") { model.abandonUncertainMutation() }
           }
-          Text(model.selectedDay, format: .dateTime.month().day().weekday(.wide))
-            .font(.headline)
-            .accessibilityAddTraits(.isHeader)
+          selectedDayHeader
           let dayEvents = model.events(on: model.selectedDay)
           if dayEvents.isEmpty && !model.isLoading && model.notice == nil {
             emptyDayCard
           }
           ForEach(dayEvents) { event in
-            VStack(alignment: .leading, spacing: 8) {
-              Text(event.kind.label).font(.caption).foregroundStyle(.secondary)
-              Text(event.title).font(.headline)
-              Text(event.allDay ? "종일" : event.startAt.formatted(date: .omitted, time: .shortened))
-              if let note = event.note, !note.isEmpty { Text(note) }
-              Text(event.author.displayName).font(.caption)
-              if event.canEdit(as: participant.slot) {
-                HStack {
-                  Button("수정") { editor = event }
-                  Button("삭제", role: .destructive) { deleting = event }
-                }
-              }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            eventRow(event)
           }
         }
-        .padding()
+        .frame(maxWidth: 680)
+        .padding(.horizontal, WoorisaiSpacing.screenGutter)
+        .padding(.vertical, WoorisaiSpacing.regular)
+        .frame(maxWidth: .infinity)
       }
-      .navigationTitle("일정")
-      .toolbar {
-        Button { creating = true } label: { Image(systemName: "plus") }
-          .accessibilityLabel("일정 추가")
-          .accessibilityIdentifier("calendar.create")
-          .disabled(model.requiresNavigationProtection)
-      }
+      .background(WoorisaiColor.Bg.layerBasement.ignoresSafeArea())
+      .toolbar(.hidden, for: .navigationBar)
       .sheet(isPresented: $creating) {
         CalendarEditor(model: model, event: nil, participant: participant)
       }
@@ -93,10 +73,56 @@ struct CalendarView: View {
         }
       }
       .task { if !model.isLoading && model.events.isEmpty { model.load() } }
-      .onChange(of: model.notice) { _, _ in
-        // Authentication failure is routed through the session owner, not hidden in a calendar alert.
-        if model.authenticationRequired { onAuthenticationRequired() }
+    }
+  }
+
+  private var selectedDayHeader: some View {
+    let date = Text(model.selectedDay, format: .dateTime.month().day().weekday(.wide))
+      .font(.headline)
+      .accessibilityAddTraits(.isHeader)
+    let add = Button { creating = true } label: {
+      Label("일정 추가", systemImage: "plus")
+        .font(.subheadline.weight(.semibold))
+        .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
+    }
+    .accessibilityIdentifier("calendar.create")
+    .disabled(model.requiresNavigationProtection)
+    return ViewThatFits(in: .horizontal) {
+      HStack(spacing: WoorisaiSpacing.small) {
+        date.fixedSize(horizontal: true, vertical: false)
+        Spacer(minLength: 0)
+        add.fixedSize(horizontal: true, vertical: false)
       }
+      VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
+        date
+        add
+      }
+    }
+  }
+
+  private func eventRow(_ event: CalendarEvent) -> some View {
+    WarmSurface {
+      VStack(alignment: .leading, spacing: WoorisaiSpacing.xSmall) {
+        Text(event.allDay ? "종일" : event.startAt.formatted(date: .omitted, time: .shortened))
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(WoorisaiColor.Fg.brand)
+        Text(event.title).font(.headline)
+        let kind = event.kind == .ours ? "우리 일정" : event.author.slot == participant.slot ? "내 일정" : "상대 일정"
+        Text("\(kind) · \(event.author.displayName)")
+          .font(.caption)
+          .foregroundStyle(WoorisaiColor.Fg.neutralMuted)
+        if let note = event.note, !note.isEmpty { Text(note).font(.subheadline) }
+        if event.canEdit(as: participant.slot) {
+          HStack(spacing: WoorisaiSpacing.regular) {
+            Button("수정") { editor = event }
+              .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
+            Button("삭제", role: .destructive) { deleting = event }
+              .frame(minHeight: WoorisaiControlMetric.minimumTapTarget)
+          }
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(WoorisaiSpacing.regular)
     }
   }
 
@@ -155,21 +181,33 @@ struct CalendarView: View {
       ForEach(model.days, id: \.self) { day in
         let selected = day == model.selectedDay
         let today = Calendar.current.isDateInToday(day)
-        let hasEvents = !model.events(on: day).isEmpty
+        let eventCount = model.events(on: day).count
         Button { model.select(day) } label: {
-          VStack(spacing: WoorisaiSpacing.xSmall) {
+          VStack(spacing: 2) {
             Text(day, format: .dateTime.day())
               .font(.subheadline.weight(selected || today ? .bold : .regular))
-            Circle().fill(hasEvents ? Color.accentColor : .clear).frame(width: 5, height: 5)
+              .minimumScaleFactor(0.65)
+              .lineLimit(1)
+            Text(eventCount == 0 ? " " : "\(eventCount)건")
+              .font(.caption2.weight(.semibold))
+              .foregroundStyle(WoorisaiColor.Fg.brand)
+              .minimumScaleFactor(0.55)
+              .lineLimit(1)
+              .accessibilityHidden(true)
           }
           .foregroundStyle(today && !selected ? Color.accentColor : Color.primary)
           .frame(maxWidth: .infinity, minHeight: WoorisaiControlMetric.minimumTapTarget)
-          .background(selected ? Color.accentColor.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: WoorisaiRadius.small))
+          .background(selected ? WoorisaiColor.Bg.selected : .clear, in: RoundedRectangle(cornerRadius: WoorisaiRadius.small))
+          .overlay {
+            if today {
+              RoundedRectangle(cornerRadius: WoorisaiRadius.small).strokeBorder(WoorisaiColor.Fg.brand)
+            }
+          }
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(day.formatted(date: .complete, time: .omitted))
-        .accessibilityValue(today ? (hasEvents ? "오늘, 일정 있음" : "오늘") : (hasEvents ? "일정 있음" : ""))
+        .accessibilityValue([today ? "오늘" : nil, eventCount > 0 ? "일정 \(eventCount)개" : nil].compactMap { $0 }.joined(separator: ", "))
         .accessibilityAddTraits(selected ? .isSelected : [])
       }
     }

@@ -377,9 +377,14 @@ SwiftUI는 조상 제스처보다 자식 제스처에 우선권을 주므로 내
 전송 성공 후에는 포커스를 복원해 연속 답장이 끊기지 않게 한다.
 
 작성 화면의 sheet는 `.large` detent로 고정한다. `.medium`은 text editor와 keyboard가 함께
-올라오면 본문이 거의 보이지 않는다. 반복 카피 hero card는 목록 root에만 두고 detail과 editor에는
-두지 않는다 — navigation title이 이미 화면을 지칭하고, hero는 사용자가 보러 온 본문과 입력란을
-화면 밖으로 밀어낸다.
+올라오면 본문이 거의 보이지 않는다. 우리 사이·일기·일정 탭의 첫 화면은 하단 탭 제목을
+반복하는 상단 내비게이션 바를 숨긴다. 대신 목록과 달력, 문맥에 맞는 인라인 작성 버튼을 먼저
+보여 준다. 상세/편집 화면에서는 뒤로, 닫기, 저장에 필요한 내비게이션 바를 유지한다.
+
+첫 탭은 새 통합 API 없이 기존 일기 목록의 최신 항목과 일정 조회의 앞으로 30일 window를
+요약한다. 월간 일정의 탭 상태와 첫 탭의 조회 범위를 분리해 이전 달을 보다가 돌아와도
+오래된 달의 일정이 다음 약속으로 표시되지 않게 한다. 요약 항목을 누르면 기존 날짜/일기 상세로
+이동하며 진행 중이거나 결과가 불명확한 쓰기가 보호 중이면 경로를 바꾸지 않는다.
 
 Light/dark system appearance 전파, 배경 탭 keyboard dismissal과 number-pad dismissal은 simulator
 UI test로 검증하고, 색상 token의 text/control 대비는 deterministic test로 검증한다.

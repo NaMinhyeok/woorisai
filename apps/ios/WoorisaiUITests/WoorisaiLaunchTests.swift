@@ -128,7 +128,7 @@ final class WoorisaiLaunchTests: XCTestCase {
     openDiaryTab(in: app)
     XCTAssertTrue(element("diary.loaded", in: app).waitForExistence(timeout: 5))
 
-    let openComposer = element("diary.createEntry.open", in: app)
+    let openComposer = element("diary.empty.create", in: app)
     XCTAssertTrue(openComposer.exists)
     openComposer.tap()
 
@@ -896,6 +896,29 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertTrue(viewer.waitForNonExistence(timeout: 5))
   }
 
+  func testHomeOpensLatestDiaryDirectly() {
+    let app = launch(scenario: "diaryCRUD")
+    enterPIN("0123", participantSlot: 1, in: app)
+    let latest = element("relationship.latestDiary", in: app)
+    guard latest.waitForExistence(timeout: 10) else { return XCTFail("Missing latest diary shortcut") }
+    XCTAssertTrue(latest.isHittable)
+    XCTAssertFalse(app.navigationBars.firstMatch.exists)
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.name = "우리 사이 첫 화면"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+    latest.tap()
+    XCTAssertTrue(element("diary.detail.loaded", in: app).waitForExistence(timeout: 10))
+    XCTAssertTrue(app.navigationBars.firstMatch.exists)
+    app.navigationBars.buttons.firstMatch.tap()
+    XCTAssertTrue(element("diary.loaded", in: app).waitForExistence(timeout: 5))
+    XCTAssertFalse(app.navigationBars.firstMatch.exists)
+    let diaryScreenshot = XCTAttachment(screenshot: app.screenshot())
+    diaryScreenshot.name = "일기 첫 화면"
+    diaryScreenshot.lifetime = .keepAlways
+    add(diaryScreenshot)
+  }
+
   func testEmptyDiaryCreatesFirstEntry() {
     let app = launch(scenario: "emptyContent")
     enterPIN("0123", participantSlot: 1, in: app)
@@ -905,6 +928,7 @@ final class WoorisaiLaunchTests: XCTestCase {
     XCTAssertTrue(element("diary.loaded", in: app).waitForExistence(timeout: 5))
     let emptyCreate = element("diary.empty.create", in: app)
     XCTAssertTrue(emptyCreate.waitForExistence(timeout: 5))
+    XCTAssertEqual(emptyCreate.label, "첫 일기 쓰기")
     emptyCreate.tap()
 
     let content = element("diary.entry.content", in: app)
