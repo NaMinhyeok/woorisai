@@ -22,7 +22,7 @@ iOS -- HTTPS + Basic --> Spring Boot API --> PostgreSQL / woorisai
                                 +--> Firebase FCM --> APNs
 ```
 
-- Backend는 Java 25, Spring Boot 4.1, Spring Modulith와 Spring Data JPA를 사용한다.
+- Backend는 Java 25, Spring Boot 4.2, Spring Modulith 2.2와 Spring Data JPA를 사용한다.
 - Flyway가 별도 PostgreSQL `woorisai` schema의 forward migration을 소유하고 Hibernate는
   `ddl-auto=validate`만 사용한다.
 - Production business data의 유일한 owner/writer는 Spring과 `woorisai`다. Legacy Django와
